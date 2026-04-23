@@ -481,73 +481,112 @@ fun ForecastDatePickerDialog(
 
 /**
  * Диалог старта/реинвеста для Потока Новичка.
- * Позволяет ввести сумму взноса и текущий кошелёк.
+ * Поддерживает два режима: новый поток и действующий поток.
  *
  * @param onDismiss Закрытие диалога
- * @param onConfirm Подтверждение с суммой и кошельком
- * @param bonusPercent Бонус за взнос в процентах
- * @param dailyPercent Ежедневный процент начислений
+ * @param onConfirm Подтверждение с данными потока
+ * @param bonusPercent Бонус за взнос в процентах (из БД Настроек)
+ * @param dailyPercent Ежедневный процент начислений (из БД Настроек)
  * @param isNewFlow true если это создание нового потока
  */
 @Composable
 fun NoviceReinvestDialog(
     onDismiss: () -> Unit,
-    onConfirm: (Double, Double?) -> Unit,
+    onConfirm: (Double, Double, Double) -> Unit,
     bonusPercent: Double = 50.0,
     dailyPercent: Double = 2.0,
     isNewFlow: Boolean = false
 ) {
+    var isExistingFlow by remember { mutableStateOf(false) }
     var amountText by remember { mutableStateOf("") }
     var walletText by remember { mutableStateOf("") }
     var walletExplicitlySet by remember { mutableStateOf(false) }
+
+    fun parseDouble(text: String): Double = text.replace(",", ".").toDoubleOrNull() ?: 0.0
+
+    val amount = parseDouble(amountText)
+    val inFlow = if (isExistingFlow) amount else amount + amount * bonusPercent / 100.0
+    val dailyAccrual = inFlow * dailyPercent / 100.0
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (isNewFlow) "Старт ПН" else "Реинвест ПН", fontSize = 18.sp) },
         text = {
             Column {
-                Text("Бонус ко взносу: ${String.format(Locale.US, "%.0f", bonusPercent)}%", fontSize = 12.sp, color = Color.Gray)
-                Text("Ежедневный процент: ${String.format(Locale.US, "%.0f", dailyPercent)}%", fontSize = 12.sp, color = Color.Gray)
+                if (isExistingFlow) {
+                    Text(
+                        "Начисление: ${String.format(Locale.US, "%.2f", dailyAccrual)} руб.",
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
+                } else {
+                    Text("Бонус ко взносу: ${String.format(Locale.US, "%.0f", bonusPercent)}%", fontSize = 12.sp, color = Color.Gray)
+                    Text("Ежедневный процент: ${String.format(Locale.US, "%.0f", dailyPercent)}%", fontSize = 12.sp, color = Color.Gray)
+                    if (amount > 0) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "В потоке: ${String.format(Locale.US, "%.2f", inFlow)} (+${String.format(Locale.US, "%.0f", bonusPercent)}%)",
+                            fontSize = 11.sp,
+                            color = Color(0xFF4CAF50)
+                        )
+                        Text(
+                            "Начисление: ${String.format(Locale.US, "%.2f", dailyAccrual)} руб.",
+                            fontSize = 11.sp,
+                            color = Color(0xFF4CAF50)
+                        )
+                    }
+                }
+
+                if (isNewFlow) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = isExistingFlow,
+                            onCheckedChange = { isExistingFlow = it }
+                        )
+                        Text("Поток действующий", fontSize = 12.sp, color = Color.Gray)
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(
-                    value = amountText, onValueChange = { amountText = it },
-                    label = { Text("Сумма взноса *") },
+                    value = amountText,
+                    onValueChange = { amountText = it },
+                    label = { Text(if (isExistingFlow) "В потоке" else "Сумма взноса *") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
-                    value = walletText, onValueChange = { 
+                    value = walletText,
+                    onValueChange = {
                         walletText = it
                         walletExplicitlySet = it.isNotEmpty()
                     },
-                    label = { Text("В кошельке") },
+                    label = { Text("Текущий кошелек") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    supportingText = { 
+                    supportingText = {
                         Text(
-                            if (walletExplicitlySet && walletText.isEmpty()) 
+                            if (walletExplicitlySet && walletText.isEmpty())
                                 "Введите 0, чтобы обнулить кошелёк"
-                            else if (!walletExplicitlySet) 
+                            else if (!walletExplicitlySet)
                                 "Оставьте поле пустым, если в кошельке пусто"
-                            else 
+                            else
                                 "Введите нужную сумму"
-                        ) 
+                        )
                     }
                 )
             }
         },
         confirmButton = {
-            val amount = amountText.replace(",", ".").toDoubleOrNull() ?: 0.0
+            val wallet = if (walletExplicitlySet) parseDouble(walletText) else 0.0
             Button(
                 onClick = {
                     if (amount > 0) {
-                        onConfirm(
-                            amount,
-                            if (walletExplicitlySet) walletText.replace(",", ".").toDoubleOrNull() ?: 0.0 else null
-                        )
+                        onConfirm(inFlow, dailyAccrual, wallet)
                     }
                 },
                 enabled = amount > 0,
