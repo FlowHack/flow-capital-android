@@ -139,6 +139,40 @@ app/src/main/java/com/example/flowcapital/
 │   ├── proxy/
 │   │   └── ProxyStorage.kt     # Хранение прокси
 │   └── logging/
+���       └── AppLogger.kt       # Логирование
+├── notifications/
+│   └── ReminderWorker.kt       # WorkManager для напоминаний
+├── ui/
+│   ├── screens/
+│   │   ├── browser/           # Встроенный браузер
+│   │   │   └── BrowserScreen.kt
+│   │   ├── calculator/        # Экраны расчётов (РП, ПН, ПСП)
+│   │   │   ├── CalculatorScreen.kt    # Главный экран расчётов
+│   │   │   ├── FlowViewModel.kt        # ViewModel для потоков
+│   │   │   ├── FlowDialogs.kt          # Диалоги (старт, реинвест, прогноз)
+│   │   │   ├── FlowComponents.kt       # UI компоненты (карточки, таблицы)
+│   │   │   └── ScreenUtils.kt          # Утилиты экрана (isNarrowScreen, isWideScreen)
+│   │   └── settings/
+│   │       ├── SettingsScreen.kt       # Экран настроек
+│   │       └── BackupScreen.kt         # Импорт/экспорт
+│   └── theme/
+│       └── FlowColors.kt       # Цветовая палитра
+└── MainActivity.kt             # Точка входа
+```
+app/src/main/java/com/example/flowcapital/
+├── data/
+│   ├── db/                    # Room база данных
+│   │   ├── AppDatabase.kt     # Главная БД
+│   │   ├── FlowEntity.kt      # Сущности потоков
+│   │   ├── FlowDao.kt         # DAO интерфейсы
+│   │   └── FlowRepository.kt  # Репозитории
+│   ├── settings/
+│   │   └── SettingsManager.kt  # Управление настройками
+│   ├── update/
+│   │   └── UpdateChecker.kt    # Проверка обновлений
+│   ├── proxy/
+│   │   └── ProxyStorage.kt     # Хранение прокси
+│   └── logging/
 │       └── AppLogger.kt       # Логирование
 ├── notifications/
 │   └── ReminderWorker.kt       # WorkManager для напоминаний

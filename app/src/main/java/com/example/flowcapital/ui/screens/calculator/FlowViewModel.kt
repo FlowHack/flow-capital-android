@@ -102,23 +102,35 @@ class FlowViewModel(
     /**
      * Добавить реинвест или старт для РП.
      *
-     * @param amount Сумма взноса (с бонусом E-currency)
-     * @param percent Процент вывода (по умолчанию 0.1)
+     * @param amount Сумма взноса (для нового - с бонусом, для существующего - без)
+     * @param percentOrAccrual Процент вывода (для нового) или начисление (для существующего)
      * @param wallet Текущий кошелёк (если null - остаётся без изменений)
+     * @param isExistingFlow true если это перенос существующего потока
      */
-    fun addReinvestOrStart(amount: Double, percent: Double?, wallet: Double?) {
+    fun addReinvestOrStart(amount: Double, percentOrAccrual: Double?, wallet: Double?, isExistingFlow: Boolean = false) {
         viewModelScope.launch {
             val lastEntry = growingRepository.getLastEntry()
-            // Применяем E-currency бонус к сумме
-            val amountToAdd = calculateECurrencyBonus(amount)
+            
             val previousInFlow = lastEntry?.inFlowAmount ?: 0.0
-
-            // Новый поток = старый + новый взнос
-            val newInFlowAmount = previousInFlow + amountToAdd
-            val newPercent = percent ?: startPercent.value
-            // Начисление = поток * процент
-            val newDailyAccrual = newInFlowAmount * (newPercent / 100.0)
             val newWallet = wallet ?: lastEntry?.walletAmount ?: 0.0
+            
+            val newInFlowAmount: Double
+            val newPercent: Double
+            val newDailyAccrual: Double
+            
+            if (isExistingFlow) {
+                // Режим действующего потока - процент рассчитывается из начисления
+                newInFlowAmount = amount
+                val accrual = percentOrAccrual ?: 0.0
+                newPercent = if (amount > 0) (accrual * 100.0) / amount else startPercent.value
+                newDailyAccrual = accrual
+            } else {
+                // Новый поток - применяем бонус
+                val amountToAdd = calculateECurrencyBonus(amount)
+                newInFlowAmount = previousInFlow + amountToAdd
+                newPercent = percentOrAccrual ?: startPercent.value
+                newDailyAccrual = newInFlowAmount * (newPercent / 100.0)
+            }
 
             val newEntry = GrowingFlowEntity(
                 date = System.currentTimeMillis(),
@@ -271,33 +283,26 @@ class FlowViewModel(
     /**
      * Добавить реинвест или старт для ПН.
      *
-     * @param amount Сумма взноса
-     * @param wallet Кошелёк (null - не менять)
-     * @param useECurrency Использовать E-currency бонус (150% от суммы)
+     * @param inFlow Сумма в потоке (уже с бонусом или без)
+     * @param dailyAccrual Начисление (рассчитанное)
+     * @param wallet Кошелёк (0.0 если пустое поле)
+     * @param isFirstEntry true если это старт потока (первая запись)
      */
-    fun addToNoviceFlow(amount: Double, wallet: Double?, useECurrency: Boolean) {
+    fun addToNoviceFlow(inFlow: Double, dailyAccrual: Double, wallet: Double, isFirstEntry: Boolean) {
         viewModelScope.launch {
             val lastEntry = noviceRepository.getLastEntry()
             val previousInFlow = lastEntry?.inFlowAmount ?: 0.0
-
-            val pnBonus = settingsManager.pnBonusPercentFlow.first()
-            val pnDaily = settingsManager.pnDailyPercentFlow.first()
-
-            val amountToAdd = if (useECurrency) amount * (1 + pnBonus / 100.0) else amount
-            val newInFlowAmount = previousInFlow + amountToAdd
-
-            val dailyPercent = pnDaily
-            val newDailyAccrual = newInFlowAmount * (pnDaily / 100.0)
-            val newWallet = wallet ?: lastEntry?.walletAmount ?: 0.0
+            val newInFlowAmount = previousInFlow + inFlow
+            val newWallet = wallet
 
             val newEntry = NoviceFlowEntity(
                 date = System.currentTimeMillis(),
-                percent = dailyPercent,
+                percent = 0.0,
                 inFlowAmount = newInFlowAmount,
-                dailyAccrual = newDailyAccrual,
+                dailyAccrual = dailyAccrual,
                 walletAmount = newWallet,
                 isButtonPressed = false,
-                actionType = if (lastEntry == null) "PN_START" else "PN_REINVEST"
+                actionType = if (lastEntry == null || isFirstEntry) "PN_START" else "PN_REINVEST"
             )
             noviceRepository.insertEntry(newEntry)
         }

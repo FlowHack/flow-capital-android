@@ -10,8 +10,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -19,18 +17,9 @@ import androidx.compose.ui.unit.sp
 import com.example.flowcapital.data.db.GrowingFlowEntity
 import com.example.flowcapital.data.db.NoviceFlowEntity
 import com.example.flowcapital.ui.theme.FlowColors
+import com.example.flowcapital.ui.screens.calculator.isNarrowScreen
 import java.text.SimpleDateFormat
 import java.util.*
-
-/**
- * Проверяет, является ли экран широким (планшет или горизонтальная ориентация).
- * Ширина более 600dp считается широким экраном.
- */
-@Composable
-private fun isWideScreen(): Boolean {
-    val configuration = LocalConfiguration.current
-    return configuration.screenWidthDp >= 600
-}
 
 /**
  * Компонент вкладок для выбора потока.
@@ -98,7 +87,7 @@ fun FlowTabs(
 @Composable
 fun HistoryTable(history: List<GrowingFlowEntity>) {
     val dateFormat = SimpleDateFormat("dd.MM.yy", Locale.getDefault())
-    val dayFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+    val wideScreen = isWideScreen()
 
     val historyWithStep = remember(history) {
         var step = 0
@@ -122,9 +111,11 @@ fun HistoryTable(history: List<GrowingFlowEntity>) {
         ) {
             Text("Дата", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
             Text("%", modifier = Modifier.weight(0.8f), fontSize = 10.sp, textAlign = TextAlign.Center)
-            Text("Поток", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
-            Text("Начисл.", modifier = Modifier.weight(1.2f), fontSize = 10.sp, textAlign = TextAlign.Center)
-            Text("Кошелек", modifier = Modifier.weight(1.2f), fontSize = 10.sp, textAlign = TextAlign.Center)
+            Text("В потоке", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
+            Text("Начисление", modifier = Modifier.weight(1.2f), fontSize = 10.sp, textAlign = TextAlign.Center)
+            if (wideScreen) {
+                Text("Кошелек", modifier = Modifier.weight(1.2f), fontSize = 10.sp, textAlign = TextAlign.Center)
+            }
         }
         historyWithStep.forEach { (entry, step) ->
             val backgroundColor = when (entry.actionType) {
@@ -141,37 +132,44 @@ fun HistoryTable(history: List<GrowingFlowEntity>) {
                     .padding(vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    dateFormat.format(Date(entry.date)),
-                    modifier = Modifier.weight(1f),
-                    fontSize = 10.sp,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    String.format(Locale.US, "%.3f", entry.percent),
-                    modifier = Modifier.weight(0.8f),
-                    fontSize = 10.sp,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    String.format(Locale.US, "%.2f", entry.inFlowAmount),
-                    modifier = Modifier.weight(1.2f),
-                    fontSize = 10.sp,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    String.format(Locale.US, "+%.2f", entry.dailyAccrual),
-                    color = if (entry.actionType == "SUNDAY") Color.Gray else Color(0xFF4CAF50),
-                    modifier = Modifier.weight(1f),
-                    fontSize = 10.sp,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    String.format(Locale.US, "%.2f", entry.walletAmount),
-                    modifier = Modifier.weight(1f),
-                    fontSize = 10.sp,
-                    textAlign = TextAlign.Center
-                )
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    Text(
+                        dateFormat.format(Date(entry.date)),
+                        fontSize = 10.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                Box(modifier = Modifier.weight(0.8f), contentAlignment = Alignment.Center) {
+                    Text(
+                        String.format(Locale.US, "%.3f", entry.percent),
+                        fontSize = 10.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                Box(modifier = Modifier.weight(1.4f), contentAlignment = Alignment.Center) {
+                    Text(
+                        String.format(Locale.US, "%.2f", entry.inFlowAmount),
+                        fontSize = 10.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                Box(modifier = Modifier.weight(1.2f), contentAlignment = Alignment.Center) {
+                    Text(
+                        String.format(Locale.US, "+%.2f", entry.dailyAccrual),
+                        color = if (entry.actionType == "SUNDAY") Color.Gray else Color(0xFF4CAF50),
+                        fontSize = 10.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                if (wideScreen) {
+                    Box(modifier = Modifier.weight(1.2f), contentAlignment = Alignment.Center) {
+                        Text(
+                            String.format(Locale.US, "%.2f", entry.walletAmount),
+                            fontSize = 10.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
         }
@@ -186,6 +184,7 @@ fun HistoryTable(history: List<GrowingFlowEntity>) {
  */
 @Composable
 fun CurrentStatsCard(entry: GrowingFlowEntity?) {
+    val wideScreen = isWideScreen()
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -198,9 +197,11 @@ fun CurrentStatsCard(entry: GrowingFlowEntity?) {
                 .padding(12.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            StatItem("%", if (entry != null) String.format(Locale.US, "%.3f%%", entry.percent) else "0.000%")
-            StatItem("Поток", if (entry != null) String.format(Locale.US, "%.2f", entry.inFlowAmount) else "0.00")
-            StatItem("Начисл.", if (entry != null) String.format(Locale.US, "%.2f", entry.dailyAccrual) else "0.00")
+            StatItem("%", if (entry != null) String.format(Locale.US, "%.3f", entry.percent) else "0.000")
+            StatItem("В потоке", if (entry != null) String.format(Locale.US, "%.2f", entry.inFlowAmount) else "0.00")
+            if (wideScreen) {
+                StatItem("Начисление", if (entry != null) String.format(Locale.US, "%.2f", entry.dailyAccrual) else "0.00")
+            }
             StatItem("Кошелек", if (entry != null) String.format(Locale.US, "%.2f", entry.walletAmount) else "0.00")
         }
     }
@@ -396,6 +397,7 @@ fun NoviceFlowContent(
  */
 @Composable
 fun NoviceStatsCard(entry: NoviceFlowEntity?) {
+    val wideScreen = isWideScreen()
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -408,9 +410,11 @@ fun NoviceStatsCard(entry: NoviceFlowEntity?) {
                 .padding(12.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            StatItem("%", if (entry != null) String.format(Locale.US, "%.2f%%", entry.percent) else "0.00%")
-            StatItem("Поток", if (entry != null) String.format(Locale.US, "%.2f", entry.inFlowAmount) else "0.00")
-            StatItem("Начисл.", if (entry != null) String.format(Locale.US, "%.2f", entry.dailyAccrual) else "0.00")
+            StatItem("%", if (entry != null) String.format(Locale.US, "%.2f", entry.percent) else "0.00")
+            StatItem("В потоке", if (entry != null) String.format(Locale.US, "%.2f", entry.inFlowAmount) else "0.00")
+            if (wideScreen) {
+                StatItem("Начисление", if (entry != null) String.format(Locale.US, "%.2f", entry.dailyAccrual) else "0.00")
+            }
             StatItem("Кошелек", if (entry != null) String.format(Locale.US, "%.2f", entry.walletAmount) else "0.00")
         }
     }
@@ -424,7 +428,6 @@ fun NoviceStatsCard(entry: NoviceFlowEntity?) {
 @Composable
 fun NoviceHistoryTable(history: List<NoviceFlowEntity>) {
     val dateFormat = SimpleDateFormat("dd.MM.yy", Locale.getDefault())
-    val dayFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
     val wideScreen = isWideScreen()
 
     val historyWithStep = remember(history) {
@@ -448,9 +451,9 @@ fun NoviceHistoryTable(history: List<NoviceFlowEntity>) {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text("Дата", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
-            Text("Поток", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
-            Text("Начисл.", modifier = Modifier.weight(1.2f), fontSize = 10.sp, textAlign = TextAlign.Center)
-            if (isWideScreen()) {
+            Text("В потоке", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
+            Text("Начисление", modifier = Modifier.weight(1.2f), fontSize = 10.sp, textAlign = TextAlign.Center)
+            if (wideScreen) {
                 Text("Кошелек", modifier = Modifier.weight(1.2f), fontSize = 10.sp, textAlign = TextAlign.Center)
             }
         }
@@ -469,32 +472,36 @@ fun NoviceHistoryTable(history: List<NoviceFlowEntity>) {
                     .padding(vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    dateFormat.format(Date(entry.date)),
-                    modifier = Modifier.weight(1f),
-                    fontSize = 10.sp,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    String.format(Locale.US, "%.2f", entry.inFlowAmount),
-                    modifier = Modifier.weight(1.4f),
-                    fontSize = 10.sp,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    String.format(Locale.US, "+%.2f", entry.dailyAccrual),
-                    color = if (entry.actionType == "SUNDAY") Color.Gray else Color(0xFF4CAF50),
-                    modifier = Modifier.weight(1f),
-                    fontSize = 10.sp,
-                    textAlign = TextAlign.Center
-                )
-                if (wideScreen) {
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     Text(
-                        String.format(Locale.US, "%.2f", entry.walletAmount),
-                        modifier = Modifier.weight(1f),
+                        dateFormat.format(Date(entry.date)),
                         fontSize = 10.sp,
                         textAlign = TextAlign.Center
                     )
+                }
+                Box(modifier = Modifier.weight(1.4f), contentAlignment = Alignment.Center) {
+                    Text(
+                        String.format(Locale.US, "%.2f", entry.inFlowAmount),
+                        fontSize = 10.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                Box(modifier = Modifier.weight(1.2f), contentAlignment = Alignment.Center) {
+                    Text(
+                        String.format(Locale.US, "+%.2f", entry.dailyAccrual),
+                        color = if (entry.actionType == "SUNDAY") Color.Gray else Color(0xFF4CAF50),
+                        fontSize = 10.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                if (wideScreen) {
+                    Box(modifier = Modifier.weight(1.2f), contentAlignment = Alignment.Center) {
+                        Text(
+                            String.format(Locale.US, "%.2f", entry.walletAmount),
+                            fontSize = 10.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))

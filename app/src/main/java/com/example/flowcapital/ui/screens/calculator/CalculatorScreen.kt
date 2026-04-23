@@ -164,8 +164,8 @@ fun CalculatorScreen() {
     if (showReinvestDialog) {
         ReinvestDialog(
             onDismiss = { showReinvestDialog = false },
-            onConfirm = { amount, percent, wallet ->
-                viewModel.addReinvestOrStart(amount, percent, wallet)
+            onConfirm = { amount, percent, wallet, isExistingFlow ->
+                viewModel.addReinvestOrStart(amount, percent, wallet, isExistingFlow)
                 showReinvestDialog = false
             },
             defaultPercent = startPercent,
@@ -230,8 +230,8 @@ fun CalculatorScreen() {
     if (showNoviceReinvestDialog) {
         NoviceReinvestDialog(
             onDismiss = { showNoviceReinvestDialog = false },
-            onConfirm = { amount, wallet ->
-                viewModel.addToNoviceFlow(amount, wallet, true)
+            onConfirm = { inFlow, dailyAccrual, wallet ->
+                viewModel.addToNoviceFlow(inFlow, dailyAccrual, wallet, true)
                 showNoviceReinvestDialog = false
             },
             bonusPercent = pnBonusPercent,
