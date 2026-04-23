@@ -19,11 +19,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -91,6 +94,8 @@ import com.example.flowcapital.data.db.PremiumStartFlowRepository
 import com.example.flowcapital.data.db.PremiumStartPeriodEntity
 import com.example.flowcapital.data.forecast.calculateFlowForecast
 import com.example.flowcapital.data.forecast.calculateNoviceFlowForecast
+import com.example.flowcapital.data.forecast.calculatePspForecast
+import com.example.flowcapital.data.forecast.PspForecastResult
 import com.example.flowcapital.data.logging.AppLogger
 import com.example.flowcapital.data.proxy.ProxyConfig
 import com.example.flowcapital.data.proxy.ProxyStatus
@@ -710,6 +715,7 @@ private suspend fun exportNoviceFlowToExcel(context: Context, uri: Uri, history:
 fun PremiumStartSettings(settingsManager: SettingsManager, scope: kotlinx.coroutines.CoroutineScope) {
     val context = LocalContext.current
     var showClearDialog by remember { mutableStateOf(false) }
+    var showCalculateDialog by remember { mutableStateOf(false) }
     var pspExpanded by remember { mutableStateOf(false) }
 
     val savedPsp by settingsManager.pspCoefficientsFlow.collectAsState(initial = null)
@@ -804,12 +810,24 @@ fun PremiumStartSettings(settingsManager: SettingsManager, scope: kotlinx.corout
                 enabled = hasPspFlows
             ) { Text("Выгрузить всё в Excel") }
             Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = { showCalculateDialog = true },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Рассчитать поток") }
+            Spacer(modifier = Modifier.height(8.dp))
             OutlinedButton(
                 onClick = { showClearDialog = true },
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                 modifier = Modifier.fillMaxWidth()
             ) { Text("Очистить все ПСП") }
         }
+    }
+
+    if (showCalculateDialog) {
+        CalculatePspDialog(
+            settingsManager = settingsManager,
+            onDismiss = { showCalculateDialog = false }
+        )
     }
 
     if (showClearDialog) {
@@ -2938,4 +2956,200 @@ private suspend fun exportNoviceForecastToExcel(context: Context, uri: Uri, fore
             }
         } catch (e: Exception) { AppLogger.e("SettingsScreen", "Ошибка экспорта прогноза ПН", e) }
     }
+}
+
+/**
+ * Диалог расчёта прогноза ПСП (Премиум Стартовый Поток).
+ */
+@Composable
+private fun CalculatePspDialog(
+    settingsManager: SettingsManager,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    val savedPspCoeffs by settingsManager.pspCoefficientsFlow.collectAsState(initial = null)
+
+    var nominalText by remember { mutableStateOf("") }
+    var startDateMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    var forecastResults by remember { mutableStateOf<List<PspForecastResult>>(emptyList()) }
+    var showResults by remember { mutableStateOf(false) }
+
+    val exportLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        if (uri != null) {
+            scope.launch {
+                exportPspForecastToExcel(context, uri, forecastResults)
+                Toast.makeText(context, "Экспорт завершён", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun parseDouble(text: String): Double = text.replace(",", ".").toDoubleOrNull() ?: 0.0
+
+    val nominal = parseDouble(nominalText)
+    val coefficients = savedPspCoeffs ?: emptyMap()
+    val hasValidNominal = nominal > 0 && coefficients.isNotEmpty()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Рассчитать поток ПСП", fontSize = 18.sp) },
+        text = {
+            Column {
+                Text("Введите параметры потока:", fontSize = 12.sp, color = Color.Gray)
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = nominalText,
+                    onValueChange = { nominalText = it },
+                    label = { Text("Номинал") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+                OutlinedButton(
+                    onClick = { showDatePicker = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Старт: ${dateFormat.format(Date(startDateMillis))}")
+                }
+                if (nominal > 0 && coefficients.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(12.dp))
+                    val totalAccrued = nominal * (coefficients[20] ?: 0.0) / 100.0
+                    Text("Всего периодов: 20", fontSize = 12.sp)
+                    Text("Итого начислено: ${String.format(Locale.US, "%.2f", totalAccrued)}", fontSize = 14.sp, color = Color(0xFF4CAF50))
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                if (hasValidNominal) {
+                    val results = calculatePspForecast(nominal, startDateMillis, coefficients)
+                    forecastResults = results
+                    showResults = true
+                }
+            }, enabled = hasValidNominal) { Text("Рассчитать") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
+    )
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = startDateMillis)
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                Button(onClick = {
+                    datePickerState.selectedDateMillis?.let { startDateMillis = it }
+                    showDatePicker = false
+                }) { Text("Выбрать") }
+            },
+            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Отмена") } }
+        ) { DatePicker(state = datePickerState) }
+    }
+
+    if (showResults && forecastResults.isNotEmpty()) {
+        PspForecastResultsDialog(
+            title = "Прогноз ПСП",
+            forecastList = forecastResults,
+            onDismiss = { showResults = false },
+            onExportToExcel = { exportLauncher.launch("ПСП_Прогноз_${System.currentTimeMillis()}.xlsx") }
+        )
+    }
+}
+
+/**
+ * Экспорт прогноза ПСП в Excel.
+ */
+private suspend fun exportPspForecastToExcel(context: Context, uri: Uri, forecast: List<PspForecastResult>) {
+    withContext(Dispatchers.IO) {
+        try {
+            context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                val workbook = org.dhatim.fastexcel.Workbook(outputStream, "Прогноз ПСП", null)
+                val worksheet = workbook.newWorksheet("ПСП")
+                worksheet.value(0, 0, "Период")
+                worksheet.value(0, 1, "Дата взноса")
+                worksheet.value(0, 2, "Дата закрытия")
+                worksheet.value(0, 3, "Начислено")
+                worksheet.value(0, 4, "%")
+                worksheet.value(0, 5, "Всего получено")
+                val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+                forecast.forEachIndexed { index, entry ->
+                    val row = index + 1
+                    worksheet.value(row, 0, entry.periodNumber)
+                    worksheet.value(row, 1, dateFormat.format(Date(entry.startDate)))
+                    worksheet.value(row, 2, dateFormat.format(Date(entry.endDate)))
+                    worksheet.value(row, 3, entry.accrualAmount)
+                    worksheet.value(row, 4, entry.percent)
+                    worksheet.value(row, 5, entry.totalAccrued)
+                    if (entry.isCompleted) {
+                        (0..5).forEach { col ->
+                            worksheet.style(row, col).fillColor("C8FFC8").set()
+                        }
+                    }
+                }
+                workbook.finish()
+            }
+        } catch (e: Exception) { AppLogger.e("SettingsScreen", "Ошибка экспорта прогноза ПСП", e) }
+    }
+}
+
+/**
+ * Диалог результатов прогноза ПСП.
+ */
+@Composable
+private fun PspForecastResultsDialog(
+    title: String,
+    forecastList: List<PspForecastResult>,
+    onDismiss: () -> Unit,
+    onExportToExcel: () -> Unit
+) {
+    val dateFormat = SimpleDateFormat("dd.MM.yy", Locale.getDefault())
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.fillMaxWidth().fillMaxHeight(0.85f),
+        title = { Text(title, fontSize = 18.sp) },
+        text = {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Пер.", modifier = Modifier.weight(0.5f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    Text("Закрытие", modifier = Modifier.weight(1.2f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    Text("Начислено", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    Text("Всего", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                }
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    items(forecastList.size) { index ->
+                        val entry = forecastList[index]
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Box(modifier = Modifier.weight(0.5f), contentAlignment = Alignment.Center) {
+                                Text(entry.periodNumber.toString(), fontSize = 11.sp, textAlign = TextAlign.Center)
+                            }
+                            Box(modifier = Modifier.weight(1.2f), contentAlignment = Alignment.Center) {
+                                Text(dateFormat.format(Date(entry.endDate)), fontSize = 11.sp, textAlign = TextAlign.Center)
+                            }
+                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                Text(String.format(Locale.US, "%.2f", entry.accrualAmount), fontSize = 11.sp, textAlign = TextAlign.Center, color = Color(0xFF4CAF50))
+                            }
+                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                Text(String.format(Locale.US, "%.2f", entry.totalAccrued), fontSize = 11.sp, textAlign = TextAlign.Center)
+                            }
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+                    }
+                }
+            }
+        },
+        confirmButton = { Button(onClick = onExportToExcel) { Text("Excel", fontSize = 12.sp) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Закрыть") } }
+    )
 }
