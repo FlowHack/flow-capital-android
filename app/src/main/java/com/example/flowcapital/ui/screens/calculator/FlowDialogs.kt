@@ -199,7 +199,7 @@ fun GrowingForecastResultsDialog(
                 ) {
                     Text("Дата", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
                     Text("В потоке", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
-                    if (!narrowScreen) Text("Начисление", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    if (!narrowScreen) Text("Начисление", modifier = Modifier.weight(1.2f), fontSize = 10.sp, textAlign = TextAlign.Center)
                     Text("Кошелек", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
                 }
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -217,31 +217,35 @@ fun GrowingForecastResultsDialog(
                                 .padding(vertical = 6.dp),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(
-                                dateFormat.format(Date(entry.date)),
-                                modifier = Modifier.weight(1f),
-                                fontSize = 10.sp,
-                                textAlign = TextAlign.Center
-                            )
-                            Text(
-                                String.format(Locale.US, "%.2f", entry.inFlowAmount),
-                                modifier = Modifier.weight(1.4f),
-                                fontSize = 10.sp,
-                                textAlign = TextAlign.Center
-                            )
-                            if (!narrowScreen) Text(
-                                String.format(Locale.US, "+%.2f", entry.dailyAccrual),
-                                color = if (isSunday) Color.Gray else if (isDropDay) Color(0xFFEF5350) else Color(0xFF4CAF50),
-                                modifier = Modifier.weight(1f),
-                                fontSize = 10.sp,
-                                textAlign = TextAlign.Center
-                            )
-                            Text(
-                                String.format(Locale.US, "%.2f", entry.walletAmount),
-                                modifier = Modifier.weight(1.4f),
-                                fontSize = 10.sp,
-                                textAlign = TextAlign.Center
-                            )
+                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                Text(
+                                    dateFormat.format(Date(entry.date)),
+                                    fontSize = 10.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                            Box(modifier = Modifier.weight(1.4f), contentAlignment = Alignment.Center) {
+                                Text(
+                                    String.format(Locale.US, "%.2f", entry.inFlowAmount),
+                                    fontSize = 10.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                            if (!narrowScreen) Box(modifier = Modifier.weight(1.2f), contentAlignment = Alignment.Center) {
+                                Text(
+                                    String.format(Locale.US, "+%.2f", entry.dailyAccrual),
+                                    color = if (isSunday) Color.Gray else if (isDropDay) Color(0xFFEF5350) else Color(0xFF4CAF50),
+                                    fontSize = 10.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                            Box(modifier = Modifier.weight(1.4f), contentAlignment = Alignment.Center) {
+                                Text(
+                                    String.format(Locale.US, "%.2f", entry.walletAmount),
+                                    fontSize = 10.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                         HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
                     }
@@ -284,7 +288,7 @@ fun NoviceForecastResultsDialog(
                 ) {
                     Text("Дата", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
                     Text("В потоке", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
-                    if (!narrowScreen) Text("Начисление", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    if (!narrowScreen) Text("Начисление", modifier = Modifier.weight(1.2f), fontSize = 10.sp, textAlign = TextAlign.Center)
                     Text("Кошелек", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
                 }
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -300,31 +304,35 @@ fun NoviceForecastResultsDialog(
                                 .padding(vertical = 6.dp),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(
-                                dateFormat.format(Date(entry.date)),
-                                modifier = Modifier.weight(1f),
-                                fontSize = 10.sp,
-                                textAlign = TextAlign.Center
-                            )
-                            Text(
-                                String.format(Locale.US, "%.2f", entry.inFlowAmount),
-                                modifier = Modifier.weight(1.4f),
-                                fontSize = 10.sp,
-                                textAlign = TextAlign.Center
-                            )
-                            if (!narrowScreen) Text(
-                                String.format(Locale.US, "+%.2f", entry.dailyAccrual),
-                                color = if (isSunday) Color.Gray else Color(0xFF4CAF50),
-                                modifier = Modifier.weight(1f),
-                                fontSize = 10.sp,
-                                textAlign = TextAlign.Center
-                            )
-                            Text(
-                                String.format(Locale.US, "%.2f", entry.walletAmount),
-                                modifier = Modifier.weight(1.4f),
-                                fontSize = 10.sp,
-                                textAlign = TextAlign.Center
-                            )
+                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                Text(
+                                    dateFormat.format(Date(entry.date)),
+                                    fontSize = 10.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                            Box(modifier = Modifier.weight(1.4f), contentAlignment = Alignment.Center) {
+                                Text(
+                                    String.format(Locale.US, "%.2f", entry.inFlowAmount),
+                                    fontSize = 10.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                            if (!narrowScreen) Box(modifier = Modifier.weight(1.2f), contentAlignment = Alignment.Center) {
+                                Text(
+                                    String.format(Locale.US, "+%.2f", entry.dailyAccrual),
+                                    color = if (isSunday) Color.Gray else Color(0xFF4CAF50),
+                                    fontSize = 10.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                            Box(modifier = Modifier.weight(1.4f), contentAlignment = Alignment.Center) {
+                                Text(
+                                    String.format(Locale.US, "%.2f", entry.walletAmount),
+                                    fontSize = 10.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                         HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
                     }
