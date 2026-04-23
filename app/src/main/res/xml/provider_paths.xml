@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Путь к папке с кэшем приложения для хранения APK файлов -->
+    <cache-path
+        name="apk_updates"
+        path="apk_updates/" />
+</paths>

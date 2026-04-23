@@ -1,0 +1,620 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
+package com.example.flowcapital.ui.screens.calculator
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.flowcapital.data.db.GrowingFlowEntity
+import com.example.flowcapital.data.db.NoviceFlowEntity
+import java.text.SimpleDateFormat
+import java.util.*
+
+/**
+ * Диалог старта/реинвеста для Растущего Потока.
+ * Позволяет ввести сумму взноса, процент и текущий кошелёк.
+ *
+ * @param onDismiss Закрытие диалога
+ * @param onConfirm Подтверждение с суммой, процентом и кошельком
+ * @param defaultPercent Значение процента по умолчанию
+ * @param isNewFlow true если это создание нового потока
+ */
+@Composable
+fun ReinvestDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (Double, Double?, Double?) -> Unit,
+    defaultPercent: Double = 0.1,
+    isNewFlow: Boolean = false,
+    eCurrencyBonusPercent: Double = 0.0,
+    onAmountChanged: (String) -> Unit = {}
+) {
+    var amountText by remember { mutableStateOf("") }
+    var percentText by remember { mutableStateOf(defaultPercent.toString()) }
+    var walletText by remember { mutableStateOf("") }
+    var walletExplicitlySet by remember { mutableStateOf(false) }
+
+    val eCurrencyBonus = if (amountText.isNotEmpty()) eCurrencyBonusPercent else 0.0
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (isNewFlow) "Старт РП" else "Реинвест", fontSize = 18.sp) },
+        text = {
+            Column {
+                Text("Процент начинается с ${String.format(Locale.US, "%.3f", defaultPercent)}%", fontSize = 12.sp, color = Color.Gray)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    if (amountText.isNotEmpty()) "Бонус ко взносу по таблице: ${String.format(Locale.US, "%.0f", eCurrencyBonus)}%"
+                    else "Бонус ко взносу по таблице",
+                    fontSize = 12.sp, color = Color.Gray
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = amountText, 
+                    onValueChange = { 
+                        amountText = it
+                        onAmountChanged(it)
+                    },
+                    label = { Text("Сумма взноса *") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = percentText,
+                    onValueChange = { percentText = it },
+                    label = { Text("Процент *") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = walletText, onValueChange = { 
+                        walletText = it
+                        walletExplicitlySet = it.isNotEmpty()
+                    },
+                    label = { Text("В кошельке") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    supportingText = { 
+                        Text(
+                            if (walletExplicitlySet && walletText.isEmpty()) 
+                                "Введите 0, чтобы обнулить кошелёк"
+                            else if (!walletExplicitlySet) 
+                                "Оставьте поле пустым, если в кошельке пусто"
+                            else 
+                                "Введите нужную сумму"
+                        ) 
+                    }
+                )
+            }
+        },
+        confirmButton = {
+            val amount = amountText.replace(",", ".").toDoubleOrNull() ?: 0.0
+            val percent = percentText.replace(",", ".").toDoubleOrNull() ?: defaultPercent
+            Button(
+                onClick = {
+                    if (amount > 0) {
+                        onConfirm(amount, percent, if (walletExplicitlySet) walletText.replace(",", ".").toDoubleOrNull() else null)
+                    }
+                },
+                enabled = amount > 0,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336))
+            ) { Text("Внести") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
+    )
+}
+
+/**
+ * Диалог с результатами прогноза РП.
+ * Отображает таблицу с датами, суммами и начислениями.
+ *
+ * @param title Заголовок диалога
+ * @param forecastList Список записей прогноза
+ * @param onDismiss Закрытие диалога
+ * @param onExportToExcel Экспорт в CSV
+ */
+@Composable
+fun GrowingForecastResultsDialog(
+    title: String,
+    forecastList: List<GrowingFlowEntity>,
+    onDismiss: () -> Unit,
+    onExportToExcel: () -> Unit
+) {
+    val dateFormat = SimpleDateFormat("dd.MM.yy", Locale.getDefault())
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.fillMaxWidth().fillMaxHeight(0.85f),
+        title = { Text(title, fontSize = 18.sp) },
+        text = {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surface)
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Дата", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    Text("Поток", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    Text("Нач.", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    Text("Кош.", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                }
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    items(forecastList) { entry ->
+                        val isSunday = entry.actionType == "SUNDAY"
+                        val isDropDay = entry.actionType == "DROP_DAY"
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    if (isDropDay) Color(0x33F44336)
+                                    else if (isSunday) Color(0xFF2C2C2C)
+                                    else Color.Transparent
+                                )
+                                .padding(vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                dateFormat.format(Date(entry.date)),
+                                modifier = Modifier.weight(1f),
+                                fontSize = 10.sp,
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                String.format(Locale.US, "%.2f", entry.inFlowAmount),
+                                modifier = Modifier.weight(1.4f),
+                                fontSize = 10.sp,
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                String.format(Locale.US, "+%.2f", entry.dailyAccrual),
+                                color = if (isSunday) Color.Gray
+                                else if (isDropDay) Color(0xFFEF5350)
+                                else Color(0xFF4CAF50),
+                                modifier = Modifier.weight(1f),
+                                fontSize = 10.sp,
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                String.format(Locale.US, "%.2f", entry.walletAmount),
+                                modifier = Modifier.weight(1.4f),
+                                fontSize = 10.sp,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+                    }
+                }
+            }
+        },
+        confirmButton = { Button(onClick = onExportToExcel) { Text("Excel", fontSize = 12.sp) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Закрыть") } }
+    )
+}
+
+/**
+ * Диалог с результатами прогноза ПН.
+ *
+ * @param title Заголовок диалога
+ * @param forecastList Список записей прогноза
+ * @param onDismiss Закрытие диалога
+ * @param onExportToExcel Экспорт в CSV
+ */
+@Composable
+fun NoviceForecastResultsDialog(
+    title: String,
+    forecastList: List<NoviceFlowEntity>,
+    onDismiss: () -> Unit,
+    onExportToExcel: () -> Unit
+) {
+    val dateFormat = SimpleDateFormat("dd.MM.yy", Locale.getDefault())
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.fillMaxWidth().fillMaxHeight(0.85f),
+        title = { Text(title, fontSize = 18.sp) },
+        text = {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surface)
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Дата", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    Text("Поток", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    Text("Нач.", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    Text("Кош.", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                }
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    items(forecastList) { entry ->
+                        val isSunday = entry.actionType == "SUNDAY"
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    if (isSunday) Color(0xFF2C2C2C)
+                                    else Color.Transparent
+                                )
+                                .padding(vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                dateFormat.format(Date(entry.date)),
+                                modifier = Modifier.weight(1f),
+                                fontSize = 10.sp,
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                String.format(Locale.US, "%.2f", entry.inFlowAmount),
+                                modifier = Modifier.weight(1.4f),
+                                fontSize = 10.sp,
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                String.format(Locale.US, "+%.2f", entry.dailyAccrual),
+                                color = if (isSunday) Color.Gray else Color(0xFF4CAF50),
+                                modifier = Modifier.weight(1f),
+                                fontSize = 10.sp,
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                String.format(Locale.US, "%.2f", entry.walletAmount),
+                                modifier = Modifier.weight(1.4f),
+                                fontSize = 10.sp,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+                    }
+                }
+            }
+        },
+        confirmButton = { Button(onClick = onExportToExcel) { Text("Excel", fontSize = 12.sp) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Закрыть") } }
+    )
+}
+
+/**
+ * Диалог корректировки значений РП.
+ * Позволяет изменить поток, начисление, кошелёк и состояние кнопки.
+ * Обязательно должно быть изменено хотя бы одно поле относительно текущего состояния.
+ *
+ * @param onDismiss Закрытие диалога
+ * @param onConfirm Подтверждение с новыми значениями
+ * @param currentInFlow Текущее значение потока
+ * @param currentAccrual Текущее начисление
+ * @param currentWallet Текущий кошелёк
+ * @param currentButtonPressed Текущее состояние кнопки
+ * @param currentPercent Текущий процент
+ */
+@Composable
+fun CorrectionDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (Double, Double, Double, Boolean) -> Unit,
+    currentInFlow: Double,
+    currentAccrual: Double,
+    currentWallet: Double,
+    currentButtonPressed: Boolean,
+    currentPercent: Double = 0.1
+) {
+    var flowText by remember { mutableStateOf("") }
+    var accrualText by remember { mutableStateOf("") }
+    var walletText by remember { mutableStateOf("") }
+    var isButtonPressed by remember { mutableStateOf(currentButtonPressed) }
+
+    fun parseDouble(text: String): Double? {
+        return text.replace(",", ".").toDoubleOrNull()
+    }
+
+    val flowChanged = flowText.isNotEmpty() && parseDouble(flowText)?.let { it != currentInFlow } ?: false
+    val accrualChanged = accrualText.isNotEmpty() && parseDouble(accrualText)?.let { it != currentAccrual } ?: false
+    val walletChanged = walletText.isNotEmpty() && parseDouble(walletText)?.let { it != currentWallet } ?: false
+    val checkboxChanged = isButtonPressed != currentButtonPressed
+
+    val hasAnyChange = flowChanged || accrualChanged || walletChanged || checkboxChanged
+
+    val hasSomeInput = flowText.isNotEmpty() || accrualText.isNotEmpty() || walletText.isNotEmpty() || checkboxChanged
+
+    val isEnabled = hasAnyChange && hasSomeInput
+
+    val newFlow = parseDouble(flowText) ?: currentInFlow
+    val newAccrual = parseDouble(accrualText) ?: currentAccrual
+    val newWallet = parseDouble(walletText) ?: currentWallet
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Корректировка РП", fontSize = 18.sp) },
+        text = {
+            Column {
+                Text("Если указано только 'В потоке' - пересчитывается начисление (процент остаётся). Если только 'Начисление' - пересчитывается процент.", fontSize = 11.sp, color = Color.Gray)
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = flowText, onValueChange = { flowText = it },
+                    label = { Text("В потоке") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                    supportingText = { Text("Текущее: ${String.format(Locale.US, "%.2f", currentInFlow)}", fontSize = 10.sp, color = Color.Gray) }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = accrualText, onValueChange = { accrualText = it },
+                    label = { Text("Начисление") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                    supportingText = { Text("Текущее: ${String.format(Locale.US, "%.2f", currentAccrual)}", fontSize = 10.sp, color = Color.Gray) }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = walletText, onValueChange = { walletText = it },
+                    label = { Text("В кошельке") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                    supportingText = { Text("Текущее: ${String.format(Locale.US, "%.2f", currentWallet)}", fontSize = 10.sp, color = Color.Gray) }
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = isButtonPressed,
+                        onCheckedChange = { isButtonPressed = it }
+                    )
+                    Text("Кнопка нажата (было: ${if (currentButtonPressed) "да" else "нет"})")
+                }
+                if (!isEnabled && hasSomeInput && !hasAnyChange) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Хотя бы одно поле должно измениться относительно текущего состояния", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val finalFlow = if (flowText.isNotEmpty()) parseDouble(flowText) ?: currentInFlow else currentInFlow
+                    val finalAccrual = if (accrualText.isNotEmpty()) parseDouble(accrualText) ?: currentAccrual else currentAccrual
+                    val finalWallet = if (walletText.isNotEmpty()) parseDouble(walletText) ?: currentWallet else currentWallet
+                    onConfirm(finalFlow, finalAccrual, finalWallet, isButtonPressed)
+                },
+                enabled = isEnabled
+            ) { Text("Сохранить") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
+    )
+}
+
+/**
+ * Диалог выбора даты для прогноза.
+ *
+ * @param onDismiss Закрытие диалога
+ * @param onDateSelected Выбранная дата (timestamp)
+ */
+@Composable
+fun ForecastDatePickerDialog(
+    onDismiss: () -> Unit,
+    onDateSelected: (Long) -> Unit
+) {
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = System.currentTimeMillis()
+    )
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            Button(onClick = {
+                datePickerState.selectedDateMillis?.let { onDateSelected(it) }
+            }) { Text("Выбрать") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Отмена") }
+        }
+    ) {
+        DatePicker(state = datePickerState)
+    }
+}
+
+/**
+ * Диалог старта/реинвеста для Потока Новичка.
+ * Позволяет ввести сумму взноса и текущий кошелёк.
+ *
+ * @param onDismiss Закрытие диалога
+ * @param onConfirm Подтверждение с суммой и кошельком
+ * @param bonusPercent Бонус за взнос в процентах
+ * @param dailyPercent Ежедневный процент начислений
+ * @param isNewFlow true если это создание нового потока
+ */
+@Composable
+fun NoviceReinvestDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (Double, Double?) -> Unit,
+    bonusPercent: Double = 50.0,
+    dailyPercent: Double = 2.0,
+    isNewFlow: Boolean = false
+) {
+    var amountText by remember { mutableStateOf("") }
+    var walletText by remember { mutableStateOf("") }
+    var walletExplicitlySet by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (isNewFlow) "Старт ПН" else "Реинвест ПН", fontSize = 18.sp) },
+        text = {
+            Column {
+                Text("Бонус ко взносу: ${String.format(Locale.US, "%.0f", bonusPercent)}%", fontSize = 12.sp, color = Color.Gray)
+                Text("Ежедневный процент: ${String.format(Locale.US, "%.0f", dailyPercent)}%", fontSize = 12.sp, color = Color.Gray)
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = amountText, onValueChange = { amountText = it },
+                    label = { Text("Сумма взноса *") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = walletText, onValueChange = { 
+                        walletText = it
+                        walletExplicitlySet = it.isNotEmpty()
+                    },
+                    label = { Text("В кошельке") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    supportingText = { 
+                        Text(
+                            if (walletExplicitlySet && walletText.isEmpty()) 
+                                "Введите 0, чтобы обнулить кошелёк"
+                            else if (!walletExplicitlySet) 
+                                "Оставьте поле пустым, если в кошельке пусто"
+                            else 
+                                "Введите нужную сумму"
+                        ) 
+                    }
+                )
+            }
+        },
+        confirmButton = {
+            val amount = amountText.replace(",", ".").toDoubleOrNull() ?: 0.0
+            Button(
+                onClick = {
+                    if (amount > 0) {
+                        onConfirm(
+                            amount,
+                            if (walletExplicitlySet) walletText.replace(",", ".").toDoubleOrNull() ?: 0.0 else null
+                        )
+                    }
+                },
+                enabled = amount > 0,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336))
+            ) { Text("Внести") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
+    )
+}
+
+/**
+ * Диалог корректировки значений ПН.
+ * Обязательно должно быть изменено хотя бы одно поле относительно текущего состояния.
+ * Начисление пересчитывается автоматически (2% от потока).
+ *
+ * @param onDismiss Закрытие диалога
+ * @param onConfirm Подтверждение с новыми значениями
+ * @param currentInFlow Текущее значение потока
+ * @param currentDailyPercent Текущий дневной процент
+ * @param currentWallet Текущий кошелёк
+ * @param currentButtonPressed Текущее состояние кнопки
+ */
+@Composable
+fun NoviceCorrectionDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (Double, Double, Double?, Boolean) -> Unit,
+    currentInFlow: Double,
+    currentDailyPercent: Double,
+    currentWallet: Double,
+    currentButtonPressed: Boolean
+) {
+    var flowText by remember { mutableStateOf("") }
+    var walletText by remember { mutableStateOf("") }
+    var walletExplicitlySet by remember { mutableStateOf(false) }
+    var isButtonPressed by remember { mutableStateOf(currentButtonPressed) }
+
+    fun parseDouble(text: String): Double? {
+        return text.replace(",", ".").toDoubleOrNull()
+    }
+
+    val flowChanged = flowText.isNotEmpty() && parseDouble(flowText)?.let { it != currentInFlow } ?: false
+    val walletChanged = walletText.isNotEmpty() && parseDouble(walletText)?.let { it != currentWallet } ?: false
+    val checkboxChanged = isButtonPressed != currentButtonPressed
+
+    val hasAnyChange = flowChanged || walletChanged || checkboxChanged
+    val hasSomeInput = flowText.isNotEmpty() || walletText.isNotEmpty() || checkboxChanged
+
+    val isEnabled = hasAnyChange && hasSomeInput
+
+    val newFlowValue = parseDouble(flowText) ?: currentInFlow
+    val newAccrual = newFlowValue * currentDailyPercent / 100.0
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Корректировка ПН", fontSize = 18.sp) },
+        text = {
+            Column {
+                Text("Процент начисления фиксирован: ${String.format(Locale.US, "%.2f%%", currentDailyPercent)}", fontSize = 11.sp, color = Color.Gray)
+                Text("Начисление пересчитывается автоматически", fontSize = 11.sp, color = Color.Gray)
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = flowText, onValueChange = { flowText = it },
+                    label = { Text("В потоке") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                    supportingText = { 
+                        Text(
+                            "Текущее: ${String.format(Locale.US, "%.2f", currentInFlow)}",
+                            fontSize = 10.sp, 
+                            color = Color.Gray
+                        ) 
+                    }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = walletText, onValueChange = { 
+                        walletText = it
+                        walletExplicitlySet = it.isNotEmpty()
+                    },
+                    label = { Text("В кошельке") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    supportingText = { 
+                        Text(
+                            if (walletExplicitlySet && walletText.isEmpty()) 
+                                "Введите 0, чтобы обнулить кошелёк"
+                            else if (!walletExplicitlySet) 
+                                "Оставьте пустым - кошелёк не изменится"
+                            else 
+                                "Введите нужную сумму"
+                        ) 
+                    }
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = isButtonPressed,
+                        onCheckedChange = { isButtonPressed = it }
+                    )
+                    Text("Кнопка нажата (было: ${if (currentButtonPressed) "да" else "нет"})")
+                }
+                if (!isEnabled && hasSomeInput && !hasAnyChange) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Хотя бы одно поле должно измениться относительно текущего состояния", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val finalFlow = if (flowText.isNotEmpty()) parseDouble(flowText) ?: currentInFlow else currentInFlow
+                    val finalAccrual = finalFlow * currentDailyPercent / 100.0
+                    onConfirm(
+                        finalFlow,
+                        finalAccrual,
+                        if (walletExplicitlySet) parseDouble(walletText) else null,
+                        isButtonPressed
+                    )
+                },
+                enabled = isEnabled
+            ) { Text("Сохранить") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
+    )
+}
