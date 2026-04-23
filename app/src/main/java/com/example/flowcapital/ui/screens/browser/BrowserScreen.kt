@@ -1,7 +1,6 @@
 package com.example.flowcapital.ui.screens.browser
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.WebSettings
@@ -17,13 +16,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.webkit.ProxyConfig as WebKitProxyConfig
 import androidx.webkit.ProxyController
 import androidx.webkit.WebViewFeature
 import com.example.flowcapital.data.proxy.ProxyConfig
 import com.example.flowcapital.data.proxy.ProxyStorage
 import timber.log.Timber
 import java.util.concurrent.Executors
+import androidx.webkit.ProxyConfig as WebKitProxyConfig
 
 @SuppressLint("SetJavaScriptEnabled", "DEPRECATION")
 @Composable

@@ -5,14 +5,24 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.flowcapital.data.db.*
+import com.example.flowcapital.data.db.GrowingFlowEntity
+import com.example.flowcapital.data.db.GrowingFlowRepository
+import com.example.flowcapital.data.db.NoviceFlowEntity
+import com.example.flowcapital.data.db.NoviceFlowRepository
 import com.example.flowcapital.data.logging.AppLogger
 import com.example.flowcapital.data.settings.SettingsManager
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 /**
  * ViewModel для управления РП (Растущий Поток) и ПН (Поток Новичка).

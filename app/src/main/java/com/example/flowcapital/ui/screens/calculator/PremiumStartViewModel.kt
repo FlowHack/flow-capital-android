@@ -5,14 +5,22 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.flowcapital.data.db.*
+import com.example.flowcapital.data.db.PremiumStartFlowEntity
+import com.example.flowcapital.data.db.PremiumStartFlowRepository
+import com.example.flowcapital.data.db.PremiumStartPeriodEntity
 import com.example.flowcapital.data.logging.AppLogger
 import com.example.flowcapital.data.settings.SettingsManager
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
 
 /**
  * ViewModel для управления Премиум Стартовым Потоком (ПСП).

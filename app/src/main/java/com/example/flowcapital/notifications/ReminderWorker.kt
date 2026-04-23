@@ -8,7 +8,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.flowcapital.data.db.AppDatabase
 import kotlinx.coroutines.flow.first
-import java.util.*
+import java.util.Calendar
 
 /**
  * Worker для отправки напоминаний о требуемых действиях.

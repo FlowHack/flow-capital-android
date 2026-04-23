@@ -1,9 +1,11 @@
 package com.example.flowcapital
 
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Calendar
+import java.util.Locale
 
 /**
  * Тесты для проверки исправленной логики ПСП (Премиум Стартовый Поток)

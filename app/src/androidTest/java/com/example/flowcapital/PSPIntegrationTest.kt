@@ -4,15 +4,22 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.example.flowcapital.data.db.*
+import com.example.flowcapital.data.db.AppDatabase
+import com.example.flowcapital.data.db.PremiumStartFlowDao
+import com.example.flowcapital.data.db.PremiumStartFlowEntity
+import com.example.flowcapital.data.db.PremiumStartPeriodDao
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.util.*
+import java.util.Calendar
 
 /**
  * Полные интеграционные тесты для ПСП (Премиум Стартовый Поток)

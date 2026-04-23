@@ -4,16 +4,27 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.example.flowcapital.data.db.*
+import com.example.flowcapital.data.db.AppDatabase
+import com.example.flowcapital.data.db.GrowingFlowDao
+import com.example.flowcapital.data.db.GrowingFlowEntity
+import com.example.flowcapital.data.db.NoviceFlowDao
+import com.example.flowcapital.data.db.NoviceFlowEntity
+import com.example.flowcapital.data.db.PremiumStartFlowDao
+import com.example.flowcapital.data.db.PremiumStartFlowEntity
+import com.example.flowcapital.data.db.PremiumStartPeriodDao
+import com.example.flowcapital.data.db.PremiumStartPeriodEntity
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Calendar
+import java.util.Locale
 
 /**
  * E2E тест экспорта данных в Excel.

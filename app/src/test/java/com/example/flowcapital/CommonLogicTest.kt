@@ -2,10 +2,12 @@ package com.example.flowcapital
 
 import androidx.compose.ui.graphics.Color
 import com.example.flowcapital.ui.theme.FlowColors
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Calendar
+import java.util.Locale
 
 /**
  * Unit-тесты общей логики приложения.
