@@ -164,8 +164,8 @@ fun CalculatorScreen() {
     if (showReinvestDialog) {
         ReinvestDialog(
             onDismiss = { showReinvestDialog = false },
-            onConfirm = { amount, percent, wallet ->
-                viewModel.addReinvestOrStart(amount, percent, wallet)
+            onConfirm = { amount, percent, wallet, isExistingFlow ->
+                viewModel.addReinvestOrStart(amount, percent, wallet, isExistingFlow)
                 showReinvestDialog = false
             },
             defaultPercent = startPercent,

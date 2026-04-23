@@ -24,6 +24,7 @@ import java.util.*
 /**
  * Диалог старта/реинвеста для Растущего Потока.
  * Позволяет ввести сумму взноса, процент и текущий кошелёк.
+ * Поддерживает два режима: новый поток и действующий поток.
  *
  * @param onDismiss Закрытие диалога
  * @param onConfirm Подтверждение с суммой, процентом и кошельком
@@ -33,31 +34,66 @@ import java.util.*
 @Composable
 fun ReinvestDialog(
     onDismiss: () -> Unit,
-    onConfirm: (Double, Double?, Double?) -> Unit,
+    onConfirm: (Double, Double?, Double?, Boolean) -> Unit,
     defaultPercent: Double = 0.1,
     isNewFlow: Boolean = false,
     eCurrencyBonusPercent: Double = 0.0,
     onAmountChanged: (String) -> Unit = {}
 ) {
     var amountText by remember { mutableStateOf("") }
-    var percentText by remember { mutableStateOf(defaultPercent.toString()) }
+    var percentText by remember { mutableStateOf(if (isNewFlow) defaultPercent.toString() else "") }
     var walletText by remember { mutableStateOf("") }
     var walletExplicitlySet by remember { mutableStateOf(false) }
+    var isExistingFlow by remember { mutableStateOf(false) }
 
     val eCurrencyBonus = if (amountText.isNotEmpty()) eCurrencyBonusPercent else 0.0
+
+    val currentPercent: Double = if (isExistingFlow && amountText.isNotEmpty() && percentText.isNotEmpty()) {
+        val amount = amountText.replace(",", ".").toDoubleOrNull() ?: 0.0
+        val accrual = percentText.replace(",", ".").toDoubleOrNull() ?: 0.0
+        if (amount > 0) (accrual * 100.0) / amount else 0.0
+    } else defaultPercent
+
+    val isPercentValid = !isExistingFlow || percentText.isNotEmpty()
+    val isAmountValid = amountText.isNotEmpty()
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (isNewFlow) "Старт РП" else "Реинвест", fontSize = 18.sp) },
         text = {
             Column {
-                Text("Процент начинается с ${String.format(Locale.US, "%.3f", defaultPercent)}%", fontSize = 12.sp, color = Color.Gray)
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    if (amountText.isNotEmpty()) "Бонус ко взносу по таблице: ${String.format(Locale.US, "%.0f", eCurrencyBonus)}%"
-                    else "Бонус ко взносу по таблице",
-                    fontSize = 12.sp, color = Color.Gray
-                )
+                if (!isExistingFlow) {
+                    Text("Процент начинается с ${String.format(Locale.US, "%.3f", defaultPercent)}%", fontSize = 12.sp, color = Color.Gray)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        if (amountText.isNotEmpty()) "Бонус ко взносу по таблице: ${String.format(Locale.US, "%.0f", eCurrencyBonus)}%"
+                        else "Бонус ко взносу по таблице",
+                        fontSize = 12.sp, color = Color.Gray
+                    )
+                } else {
+                    Text(
+                        if (amountText.isNotEmpty() && percentText.isNotEmpty()) "Текущий процент: ${String.format(Locale.US, "%.3f", currentPercent)}%"
+                        else "Введите данные для расчёта",
+                        fontSize = 12.sp, color = Color.Gray
+                    )
+                }
+                if (isNewFlow) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = isExistingFlow,
+                            onCheckedChange = { 
+                                isExistingFlow = it
+                                if (it && percentText.isEmpty()) {
+                                    percentText = ""
+                                } else if (!it && percentText.isEmpty()) {
+                                    percentText = defaultPercent.toString()
+                                }
+                            }
+                        )
+                        Text("Поток уже действующий", fontSize = 12.sp)
+                    }
+                }
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(
                     value = amountText, 
@@ -65,19 +101,30 @@ fun ReinvestDialog(
                         amountText = it
                         onAmountChanged(it)
                     },
-                    label = { Text("Сумма взноса *") },
+                    label = { Text(if (!isExistingFlow) "Сумма взноса *" else "В потоке *") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    singleLine = true,
+                    isError = amountText.isEmpty() && isAmountValid
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = percentText,
                     onValueChange = { percentText = it },
-                    label = { Text("Процент *") },
+                    label = { Text(if (!isExistingFlow) "Процент *" else "Начисление *") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    singleLine = true,
+                    isError = isExistingFlow && percentText.isEmpty(),
+                    supportingText = {
+                        if (!isExistingFlow) {
+                            Text("По умолчанию: ${String.format(Locale.US, "%.3f", defaultPercent)}%", fontSize = 10.sp, color = Color.Gray)
+                        } else if (percentText.isEmpty()) {
+                            Text("Обязательно для заполнения", fontSize = 10.sp, color = MaterialTheme.colorScheme.error)
+                        } else {
+                            Text("Будет рассчитан текущий процент", fontSize = 10.sp, color = Color.Gray)
+                        }
+                    }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
@@ -105,13 +152,14 @@ fun ReinvestDialog(
         confirmButton = {
             val amount = amountText.replace(",", ".").toDoubleOrNull() ?: 0.0
             val percent = percentText.replace(",", ".").toDoubleOrNull() ?: defaultPercent
+            val isEnabled = amount > 0 && (!isExistingFlow || percentText.isNotEmpty())
             Button(
                 onClick = {
-                    if (amount > 0) {
-                        onConfirm(amount, percent, if (walletExplicitlySet) walletText.replace(",", ".").toDoubleOrNull() else null)
+                    if (isEnabled) {
+                        onConfirm(amount, percent, if (walletExplicitlySet) walletText.replace(",", ".").toDoubleOrNull() else null, isExistingFlow)
                     }
                 },
-                enabled = amount > 0,
+                enabled = isEnabled,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336))
             ) { Text("Внести") }
         },
@@ -136,6 +184,7 @@ fun GrowingForecastResultsDialog(
     onExportToExcel: () -> Unit
 ) {
     val dateFormat = SimpleDateFormat("dd.MM.yy", Locale.getDefault())
+    val narrowScreen = isNarrowScreen()
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.fillMaxWidth().fillMaxHeight(0.85f),
@@ -149,9 +198,9 @@ fun GrowingForecastResultsDialog(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text("Дата", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
-                    Text("Поток", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
-                    Text("Нач.", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
-                    Text("Кош.", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    Text("В потоке", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    if (!narrowScreen) Text("Начисление", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    Text("Кошелек", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
                 }
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(forecastList) { entry ->
@@ -180,11 +229,9 @@ fun GrowingForecastResultsDialog(
                                 fontSize = 10.sp,
                                 textAlign = TextAlign.Center
                             )
-                            Text(
+                            if (!narrowScreen) Text(
                                 String.format(Locale.US, "+%.2f", entry.dailyAccrual),
-                                color = if (isSunday) Color.Gray
-                                else if (isDropDay) Color(0xFFEF5350)
-                                else Color(0xFF4CAF50),
+                                color = if (isSunday) Color.Gray else if (isDropDay) Color(0xFFEF5350) else Color(0xFF4CAF50),
                                 modifier = Modifier.weight(1f),
                                 fontSize = 10.sp,
                                 textAlign = TextAlign.Center
@@ -222,6 +269,7 @@ fun NoviceForecastResultsDialog(
     onExportToExcel: () -> Unit
 ) {
     val dateFormat = SimpleDateFormat("dd.MM.yy", Locale.getDefault())
+    val narrowScreen = isNarrowScreen()
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.fillMaxWidth().fillMaxHeight(0.85f),
@@ -235,9 +283,9 @@ fun NoviceForecastResultsDialog(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text("Дата", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
-                    Text("Поток", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
-                    Text("Нач.", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
-                    Text("Кош.", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    Text("В потоке", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    if (!narrowScreen) Text("Начисление", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    Text("Кошелек", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
                 }
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(forecastList) { entry ->
@@ -264,7 +312,7 @@ fun NoviceForecastResultsDialog(
                                 fontSize = 10.sp,
                                 textAlign = TextAlign.Center
                             )
-                            Text(
+                            if (!narrowScreen) Text(
                                 String.format(Locale.US, "+%.2f", entry.dailyAccrual),
                                 color = if (isSunday) Color.Gray else Color(0xFF4CAF50),
                                 modifier = Modifier.weight(1f),

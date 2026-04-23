@@ -10,8 +10,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -19,18 +17,9 @@ import androidx.compose.ui.unit.sp
 import com.example.flowcapital.data.db.GrowingFlowEntity
 import com.example.flowcapital.data.db.NoviceFlowEntity
 import com.example.flowcapital.ui.theme.FlowColors
+import com.example.flowcapital.ui.screens.calculator.isNarrowScreen
 import java.text.SimpleDateFormat
 import java.util.*
-
-/**
- * Проверяет, является ли экран широким (планшет или горизонтальная ориентация).
- * Ширина более 600dp считается широким экраном.
- */
-@Composable
-private fun isWideScreen(): Boolean {
-    val configuration = LocalConfiguration.current
-    return configuration.screenWidthDp >= 600
-}
 
 /**
  * Компонент вкладок для выбора потока.
