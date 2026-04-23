@@ -12,6 +12,7 @@ import com.example.flowcapital.data.db.NoviceFlowRepository
 import com.example.flowcapital.data.logging.AppLogger
 import com.example.flowcapital.data.settings.SettingsManager
 import kotlinx.coroutines.Dispatchers
+import timber.log.Timber
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -120,6 +121,8 @@ class FlowViewModel(
     fun addReinvestOrStart(amount: Double, percentOrAccrual: Double?, wallet: Double?, isExistingFlow: Boolean = false) {
         viewModelScope.launch {
             val lastEntry = growingRepository.getLastEntry()
+
+            Timber.tag("FlowViewModel").d("addReinvestOrStart: amount=%.2f, exists=%b, isExistingFlow=%b", amount, lastEntry != null, isExistingFlow)
             
             val previousInFlow = lastEntry?.inFlowAmount ?: 0.0
             val newWallet = wallet ?: lastEntry?.walletAmount ?: 0.0
@@ -134,12 +137,14 @@ class FlowViewModel(
                 val accrual = percentOrAccrual ?: 0.0
                 newPercent = if (amount > 0) (accrual * 100.0) / amount else startPercent.value
                 newDailyAccrual = accrual
+                Timber.tag("FlowViewModel").d("Режим действующего: inFlow=%.2f, percent=%.3f, accrual=%.2f", newInFlowAmount, newPercent, newDailyAccrual)
             } else {
                 // Новый поток - применяем бонус
                 val amountToAdd = calculateECurrencyBonus(amount)
                 newInFlowAmount = previousInFlow + amountToAdd
                 newPercent = percentOrAccrual ?: startPercent.value
                 newDailyAccrual = newInFlowAmount * (newPercent / 100.0)
+                Timber.tag("FlowViewModel").d("Новый поток: bonus=%.2f, inFlow=%.2f, percent=%.3f, accrual=%.2f", amountToAdd, newInFlowAmount, newPercent, newDailyAccrual)
             }
 
             val newEntry = GrowingFlowEntity(
