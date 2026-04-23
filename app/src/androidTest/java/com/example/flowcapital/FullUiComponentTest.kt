@@ -1,11 +1,20 @@
 package com.example.flowcapital
 
-import androidx.compose.ui.test.*
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
 import com.example.flowcapital.data.db.GrowingFlowEntity
 import com.example.flowcapital.data.db.NoviceFlowEntity
-import com.example.flowcapital.ui.screens.calculator.*
-import org.junit.Assert.*
+import com.example.flowcapital.ui.screens.calculator.CorrectionDialog
+import com.example.flowcapital.ui.screens.calculator.CurrentStatsCard
+import com.example.flowcapital.ui.screens.calculator.FlowTabs
+import com.example.flowcapital.ui.screens.calculator.GrowingFlowContent
+import com.example.flowcapital.ui.screens.calculator.NoviceCorrectionDialog
+import com.example.flowcapital.ui.screens.calculator.NoviceFlowContent
+import com.example.flowcapital.ui.screens.calculator.NoviceReinvestDialog
+import com.example.flowcapital.ui.screens.calculator.NoviceStatsCard
+import com.example.flowcapital.ui.screens.calculator.ReinvestDialog
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 

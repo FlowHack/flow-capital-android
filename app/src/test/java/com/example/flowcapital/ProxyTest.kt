@@ -1,7 +1,14 @@
 package com.example.flowcapital
 
-import com.example.flowcapital.data.proxy.*
-import org.junit.Assert.*
+import com.example.flowcapital.data.proxy.ProxyConfig
+import com.example.flowcapital.data.proxy.ProxyECurrencyBonus
+import com.example.flowcapital.data.proxy.ProxyStatus
+import com.example.flowcapital.data.proxy.ProxyType
+import com.example.flowcapital.data.proxy.ProxyValidator
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProxyTest {
