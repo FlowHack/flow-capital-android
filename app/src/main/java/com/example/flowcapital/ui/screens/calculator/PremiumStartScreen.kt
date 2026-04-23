@@ -290,11 +290,15 @@ fun PremiumStartScreen() {
     if (showCorrectionDialog) {
         CorrectionPSPDialog(
             onDismiss = { showCorrectionDialog = false },
-            onConfirm = { newTotalAccrued ->
+            onConfirm = { newTotalAccrued, newEndDate ->
                 viewModel.correctTotalAccrued(newTotalAccrued)
+                if (newEndDate != null) {
+                    viewModel.correctPeriodEndDate(newEndDate)
+                }
                 showCorrectionDialog = false
             },
-            currentTotalAccrued = currentFlow?.totalAccrued ?: 0.0
+            currentTotalAccrued = currentFlow?.totalAccrued ?: 0.0,
+            currentPeriod = currentPeriod
         )
     }
 
@@ -750,17 +754,24 @@ fun CreatePSPDialog(
 @Composable
 fun CorrectionPSPDialog(
     onDismiss: () -> Unit,
-    onConfirm: (Double) -> Unit,
-    currentTotalAccrued: Double
+    onConfirm: (Double, Long?) -> Unit,
+    currentTotalAccrued: Double,
+    currentPeriod: PremiumStartPeriodEntity?
 ) {
     var totalAccruedText by remember { mutableStateOf(currentTotalAccrued.toString()) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    val initialEndDate: Long = currentPeriod?.endDate ?: 0L
+    var newEndDate by remember { mutableStateOf(initialEndDate) }
+
+    val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+    val hasEndDate = initialEndDate > 0
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Корректировка ПСП") },
         text = {
             Column {
-                Text("Редактируется только поле 'Всего получено'", fontSize = 12.sp, color = Color.Gray)
+                Text("Редактируется 'Всего получено' и дата закрытия периода", fontSize = 12.sp, color = Color.Gray)
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(
                     value = totalAccruedText,
@@ -770,16 +781,45 @@ fun CorrectionPSPDialog(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
+                if (hasEndDate) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Дата закрытия текущего периода:", fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedButton(
+                        onClick = { showDatePicker = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(dateFormat.format(Date(newEndDate)))
+                    }
+                }
             }
         },
         confirmButton = {
             Button(onClick = {
                 val amount = totalAccruedText.replace(",", ".").toDoubleOrNull() ?: currentTotalAccrued
-                onConfirm(amount)
+                onConfirm(amount, if (hasEndDate) newEndDate else null)
             }) { Text("Сохранить") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
     )
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = newEndDate)
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                Button(onClick = {
+                    datePickerState.selectedDateMillis?.let { newEndDate = it }
+                    showDatePicker = false
+                }) { Text("Выбрать") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Отмена") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
 }
 
 @Composable

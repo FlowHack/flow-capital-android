@@ -294,6 +294,15 @@ class PremiumStartViewModel(
         }
     }
 
+    fun correctPeriodEndDate(newEndDate: Long) {
+        viewModelScope.launch {
+            val period = _currentPeriod.value ?: return@launch
+            val updatedPeriod = period.copy(endDate = newEndDate)
+            flowRepository.updatePeriod(updatedPeriod)
+            _currentPeriod.value = updatedPeriod
+        }
+    }
+
     fun updateFlow(flow: PremiumStartFlowEntity) {
         viewModelScope.launch {
             flowRepository.updateFlow(flow)
