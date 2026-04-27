@@ -23,44 +23,33 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * ViewModel для управления Премиум Стартовым Потоком (ПСП).
- *
- * Особенности логики:
- * - ПСП работает 20 периодов по 14 дней каждый (10 месяцев)
- * - При создании можно указать текущий период для восстановления истории
- * - Коэффициенты периодов загружаются из настроек
- * - Взнос номинала возможен только когда период завершён (endDate <= now)
+ * ViewModel для ПСП (Премиум Стартовый Поток).
+ * 20 периодов по 14 дней. Коэффициенты из настроек.
  */
 class PremiumStartViewModel(
     private val flowRepository: PremiumStartFlowRepository,
     private val settingsManager: SettingsManager
 ) : ViewModel() {
 
-    /** Все созданные ПСП */
+    /** Все ПСП потоки */
     val allFlows = flowRepository.allFlows
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    /** Индекс текущего выбранного потока */
     private val _currentFlowIndex = MutableStateFlow(0)
     val currentFlowIndex: StateFlow<Int> = _currentFlowIndex
 
-    /** Текущий выбранный поток */
     private val _currentFlow = MutableStateFlow<PremiumStartFlowEntity?>(null)
     val currentFlow: StateFlow<PremiumStartFlowEntity?> = _currentFlow
 
-    /** Текущий активный период выбранного потока */
     private val _currentPeriod = MutableStateFlow<PremiumStartPeriodEntity?>(null)
     val currentPeriod: StateFlow<PremiumStartPeriodEntity?> = _currentPeriod
 
-    /** Все периоды текущего потока */
     private val _periods = MutableStateFlow<List<PremiumStartPeriodEntity>>(emptyList())
     val periods: StateFlow<List<PremiumStartPeriodEntity>> = _periods
 
-    /** Периоды для прогноза (оставшиеся от текущего) */
     private val _forecastResults = MutableStateFlow<List<PremiumStartPeriodEntity>>(emptyList())
     val forecastResults: StateFlow<List<PremiumStartPeriodEntity>> = _forecastResults
 
-    /** История взносов (периоды где isContributionMade = true) */
     private val _contributionHistory = MutableStateFlow<List<PremiumStartPeriodEntity>>(emptyList())
     val contributionHistory: StateFlow<List<PremiumStartPeriodEntity>> = _contributionHistory
 
@@ -69,7 +58,7 @@ class PremiumStartViewModel(
         flows.sumOf { it.totalAccrued }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, 0.0)
 
-    /** Коэффициенты периодов из настроек - используем Flow для актуальных значений */
+    /** Коэффициенты периодов из настроек (1-20) */
     private val pspCoefficientsFlow = settingsManager.pspCoefficientsFlow
         .stateIn(viewModelScope, SharingStarted.Eagerly, 
             mapOf(1 to 30.0, 2 to 55.8, 3 to 78.0, 4 to 97.07, 5 to 113.48, 6 to 127.59, 
@@ -98,27 +87,22 @@ class PremiumStartViewModel(
         
         viewModelScope.launch {
             settingsManager.pspCoefficientsFlow.collect { coefficients ->
-                AppLogger.log("PremiumStartViewModel", "PSP coefficients updated: $coefficients")
+                AppLogger.d("PremiumStartViewModel", "Коэффициенты ПСП обновлены: $coefficients")
             }
         }
     }
 
-    /**
-     * Переключает на другой поток по индексу.
-     * @param index Индекс в списке allFlows
-     */
+    /** Переключение на поток по индексу в allFlows */
     fun selectFlow(index: Int) {
         val flows = allFlows.value
         if (flows.isNotEmpty() && index in flows.indices) {
+            AppLogger.d("PremiumStartViewModel", "Переключение на поток: index=$index")
             _currentFlowIndex.value = index
             loadFlowData(flows[index].id)
         }
     }
 
-    /**
-     * Загружает данные потока и его периодов.
-     * @param flowId ID потока
-     */
+    /** Загрузка данных потока и периодов */
     private fun loadFlowData(flowId: Int) {
         viewModelScope.launch {
             try {
@@ -126,6 +110,8 @@ class PremiumStartViewModel(
                 _currentPeriod.value = flowRepository.getCurrentPeriod(flowId)
                 _periods.value = flowRepository.getPeriodsByFlowId(flowId).first()
                 _contributionHistory.value = _periods.value.filter { it.isContributionMade }
+                AppLogger.d("PremiumStartViewModel", "Загружен поток $flowId: " +
+                        "периодов=${_periods.value.size}, текущий=${_currentPeriod.value?.periodNumber}")
             } catch (e: Exception) {
                 AppLogger.e("PremiumStartViewModel", "Ошибка загрузки ПСП", e)
                 _currentFlow.value = null
@@ -137,24 +123,19 @@ class PremiumStartViewModel(
     }
 
     /**
-     * Создаёт новый ПСП.
-     *
-     * Логика создания периодов:
-     * - Всего 20 периодов по 14 дней
-     * - Периоды 1..currentPeriod создаются как уже завершённые (isContributionMade=true)
-     * - Даты периодов рассчитываются последовательно от firstPeriodStart
-     * - Для текущего периода используется указанная дата currentPeriodStart
-     * - totalAccrued включает начисления всех завершённых периодов
-     *
-     * @param nominalAmount Номинал потока
+     * Создание нового ПСП.
+     * @param nominalAmount Номинал
      * @param currentPeriod Текущий период (1-20)
-     * @param firstPeriodStart Дата начала первого периода
+     * @param firstPeriodStart Дата начала 1-го периода
      * @param currentPeriodStart Дата начала текущего периода (null если период=1)
      */
     fun createFlow(nominalAmount: Double, currentPeriod: Int, firstPeriodStart: Long, currentPeriodStart: Long?) {
         viewModelScope.launch {
+            AppLogger.d("PremiumStartViewModel", "Создание ПСП: номинал=$nominalAmount, " +
+                    "период=$currentPeriod, start1=$firstPeriodStart, startCurrent=$currentPeriodStart")
             val periodDuration = 14L * 24 * 60 * 60 * 1000
 
+            // Считаем начисления за прошлые периоды (1..currentPeriod-1)
             var completedAccruals = 0.0
             for (periodNum in 1 until currentPeriod) {
                 val percent = pspCoefficientsFlow.value[periodNum] ?: 100.0
@@ -171,6 +152,7 @@ class PremiumStartViewModel(
             )
             val flowId = flowRepository.insertFlow(flow)
 
+            // Генерируем все 20 периодов с датами
             var currentCalcStartDate = firstPeriodStart
             val periods = (1..20).map { periodNum ->
                 val percent = pspCoefficientsFlow.value[periodNum] ?: 100.0
@@ -204,21 +186,16 @@ class PremiumStartViewModel(
     }
 
     /**
-     * Делает взнос номинала за текущий период.
-     *
-     * При взносе:
-     * - Начисление за период падает в кошелёк
-     * - Пользователь решает сколько отправить в копилку (Всего получено)
-     * - totalAccrued = Всего получено = только то что ушло в копилку
-     * - Период помечается как завершённый
-     * - Если это не последний период, переходим к следующему
-     *
-     * @param toPiggyBankAmount Сумма для копилки
+     * Взнос номинала за текущий период.
+     * @param toPiggyBankAmount Сумма в копилку (Всего получено)
      */
     fun makeContribution(toPiggyBankAmount: Double) {
         viewModelScope.launch {
             val flow = _currentFlow.value ?: return@launch
             val period = _currentPeriod.value ?: return@launch
+
+            AppLogger.d("PremiumStartViewModel", "Взнос ПСП: поток=${flow.id}, " +
+                    "период=${period.periodNumber}, вКопилку=$toPiggyBankAmount")
 
             val contributionDate = System.currentTimeMillis()
             val updatedPeriod = period.copy(
@@ -232,6 +209,7 @@ class PremiumStartViewModel(
             val isLastPeriod = period.periodNumber == 20
 
             if (isLastPeriod) {
+                // 20-й период - закрываем поток
                 val updatedFlow = flow.copy(
                     totalAccrued = newTotalAccrued,
                     currentPeriod = 20,
@@ -239,7 +217,9 @@ class PremiumStartViewModel(
                 )
                 flowRepository.updateFlow(updatedFlow)
                 _currentFlow.value = updatedFlow
+                AppLogger.i("PremiumStartViewModel", "ПСП закрыт: поток=${flow.id}")
             } else {
+                // Переходим к следующему периоду
                 val newCurrentPeriodNum = period.periodNumber + 1
                 val periodDuration = 14L * 24 * 60 * 60 * 1000
                 val endDate = contributionDate + periodDuration
@@ -258,6 +238,7 @@ class PremiumStartViewModel(
                     contributionDate = null,
                     isCompleted = false
                 )
+                // Обновляем существующий или создаём новый период
                 val existingPeriod = _periods.value.find { it.periodNumber == newCurrentPeriodNum }
                 if (existingPeriod != null) {
                     flowRepository.updatePeriod(nextPeriod.copy(id = existingPeriod.id))
@@ -278,6 +259,7 @@ class PremiumStartViewModel(
         }
     }
 
+    /** Корректировка периода (сохранение) */
     fun updatePeriod(period: PremiumStartPeriodEntity) {
         viewModelScope.launch {
             flowRepository.updatePeriod(period)
@@ -285,24 +267,29 @@ class PremiumStartViewModel(
         }
     }
 
+    /** Корректировка "Всего получено" */
     fun correctTotalAccrued(newTotalAccrued: Double) {
         viewModelScope.launch {
             val flow = _currentFlow.value ?: return@launch
+            AppLogger.d("PremiumStartViewModel", "Корректировка totalAccrued: $newTotalAccrued")
             val updatedFlow = flow.copy(totalAccrued = newTotalAccrued)
             flowRepository.updateFlow(updatedFlow)
             _currentFlow.value = updatedFlow
         }
     }
 
+    /** Корректировка даты закрытия периода */
     fun correctPeriodEndDate(newEndDate: Long) {
         viewModelScope.launch {
             val period = _currentPeriod.value ?: return@launch
+            AppLogger.d("PremiumStartViewModel", "Корректировка даты периода: ${Date(newEndDate)}")
             val updatedPeriod = period.copy(endDate = newEndDate)
             flowRepository.updatePeriod(updatedPeriod)
             _currentPeriod.value = updatedPeriod
         }
     }
 
+    /** Обновление потока */
     fun updateFlow(flow: PremiumStartFlowEntity) {
         viewModelScope.launch {
             flowRepository.updateFlow(flow)
@@ -311,30 +298,33 @@ class PremiumStartViewModel(
         }
     }
 
-    /**
-     * Генерирует прогноз - оставшиеся периоды для начислений.
-     */
+    /** Генерирует прогноз - оставшиеся периоды */
     fun generateForecast() {
         viewModelScope.launch {
             val flow = _currentFlow.value ?: return@launch
             val allPeriods = _periods.value
             val remainingPeriods = allPeriods.filter { it.periodNumber >= flow.currentPeriod }
             _forecastResults.value = remainingPeriods
+            AppLogger.d("PremiumStartViewModel", "Прогноз сгенерирован: ${remainingPeriods.size} периодов")
         }
     }
 
+    /** Удаление текущего потока */
     fun deleteCurrentFlow() {
         viewModelScope.launch {
             val flow = _currentFlow.value ?: return@launch
+            AppLogger.d("PremiumStartViewModel", "Удаление потока: ${flow.id}")
             flowRepository.deleteFlow(flow.id)
         }
     }
 
+    /** Закрытие потока (20-й период) */
     fun closeCurrentFlow() {
         viewModelScope.launch {
             val flow = _currentFlow.value ?: return@launch
             val period = _currentPeriod.value ?: return@launch
             
+            AppLogger.d("PremiumStartViewModel", "Закрытие потока: ${flow.id}")
             val updatedPeriod = period.copy(
                 isContributionMade = true,
                 contributionDate = System.currentTimeMillis(),
@@ -356,9 +346,7 @@ class PremiumStartViewModel(
         _forecastResults.value = emptyList()
     }
 
-/**
-     * Экспорт прогноза в Excel.
-     */
+    /** Экспорт прогноза в Excel */
     fun exportForecastToExcel(context: Context, uri: Uri) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -366,7 +354,7 @@ class PremiumStartViewModel(
                 context.contentResolver.openOutputStream(uri)?.use { outputStream ->
                     val workbook = org.dhatim.fastexcel.Workbook(outputStream, "Прогноз ПСП", null)
                     val worksheet = workbook.newWorksheet("Прогноз")
-                    val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+                    val dateFormat = SimpleDateFormat("dd.MM.yy", Locale.getDefault())
 
                     worksheet.value(0, 0, "Период")
                     worksheet.value(0, 1, "Процент")
@@ -390,6 +378,7 @@ class PremiumStartViewModel(
 
                     workbook.finish()
                 }
+                AppLogger.i("PremiumStartViewModel", "Прогноз экспортирован: ${forecastList.size} периодов")
             } catch (e: Exception) { AppLogger.e("PremiumStartViewModel", "Ошибка экспорта PSP прогноза", e) }
         }
     }

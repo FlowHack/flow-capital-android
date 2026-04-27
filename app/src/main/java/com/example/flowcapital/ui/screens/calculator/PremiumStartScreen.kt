@@ -69,6 +69,7 @@ import com.example.flowcapital.data.db.AppDatabase
 import com.example.flowcapital.data.db.PremiumStartFlowEntity
 import com.example.flowcapital.data.db.PremiumStartFlowRepository
 import com.example.flowcapital.data.db.PremiumStartPeriodEntity
+import com.example.flowcapital.data.logging.AppLogger
 import com.example.flowcapital.data.settings.SettingsManager
 import com.example.flowcapital.ui.theme.FlowColors
 import java.text.SimpleDateFormat
@@ -76,9 +77,27 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
+private const val TAG_PSP_SCREEN = "PremiumStartScreen"
+
+/**
+ * Основной экран вкладки "Премиум Стартовый Поток" (ПСП).
+ *
+ * Отображает информацию о созданных потоках, позволяет:
+ * - Создавать новые потоки (через диалог [CreatePSPDialog])
+ * - Делать взносы номинала ([ContributionDialog])
+ * - Корректировать данные текущего потока ([CorrectionPSPDialog])
+ * - Просматривать прогноз начислений ([ForecastPSPDialog])
+ * - Удалять потоки
+ *
+ * Особенности:
+ * - Поддерживается переключение между несколькими потоками (стрелками)
+ * - Автоматически рассчитывается "Всего накапало" по всем потокам
+ * - Потоки живут 20 периодов по 14 дней каждый
+ */
 @Composable
 fun PremiumStartScreen() {
-    val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()) }
+    AppLogger.d(TAG_PSP_SCREEN, "Инициализация экрана ПСП")
+    val dateFormat = remember { SimpleDateFormat("dd.MM.yy", Locale.getDefault()) }
     val context = LocalContext.current
     val database = remember { AppDatabase.getDatabase(context) }
     val flowRepository = remember {
@@ -107,6 +126,10 @@ fun PremiumStartScreen() {
     var showCorrectionDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showForecastDialog by remember { mutableStateOf(false) }
+
+    // Логирование состояния
+    AppLogger.d(TAG_PSP_SCREEN, "Текущее состояние: потоков=${flows.size}, " +
+            "текущий индекс=$currentIndex, есть поток=${currentFlow != null}")
 
     val isFlowClosed = currentFlow?.isActive == false
     val isLastPeriod = currentPeriod?.periodNumber == 20
@@ -372,9 +395,10 @@ fun PremiumStartScreen() {
     }
 }
 
+/** Карточка инфо ПСП: номинал, период, начисление, % */
 @Composable
 fun PSPInfoCard(flow: PremiumStartFlowEntity, period: PremiumStartPeriodEntity) {
-    val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+    val dateFormat = SimpleDateFormat("dd.MM.yy", Locale.getDefault())
 
     val closeDateText = if (period.isContributionMade) {
         period.contributionDate?.let { dateFormat.format(Date(it)) } ?: "Взнос сделан"
@@ -455,8 +479,24 @@ fun PSPButtonsRow(
     }
 }
 
+/**
+ * История взносов Премиум Стартового Потока (ПСП).
+ *
+ * Отображает таблицу всех периодов, где был сделан взнос (isContributionMade = true).
+ * Если история пуста, показывает соответствующее сообщение.
+ *
+ * Особенности:
+ * - Заголовок "История взносов" по центру
+ * - Колонки: Период, Дата, Начислено, %
+ * - Цвет начисления - зелёный (0xFF4CAF50)
+ * - Даты в формате dd.MM.yy
+ * - Скрывается при ширине экрана < 600dp (isWideScreen)
+ *
+ * @param history Список периодов с выполненными взносами
+ */
 @Composable
 fun PSPContributionHistory(history: List<PremiumStartPeriodEntity>) {
+    AppLogger.d(TAG_PSP_SCREEN, "Отображение истории взносов: ${history.size} записей")
     val dateFormat = SimpleDateFormat("dd.MM.yy", Locale.getDefault())
 
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
@@ -523,11 +563,17 @@ fun PSPContributionHistory(history: List<PremiumStartPeriodEntity>) {
     }
 }
 
+/**
+ * Диалог создания нового ПСП.
+ * @param onDismiss закрытие без сохранения
+ * @param onConfirm (номинал, период, дата1, датаТек)
+ */
 @Composable
 fun CreatePSPDialog(
     onDismiss: () -> Unit,
     onConfirm: (Double, Int, Long, Long?) -> Unit
 ) {
+    AppLogger.d(TAG_PSP_SCREEN, "Открыт диалог создания ПСП")
     var nominalText by remember { mutableStateOf("5000") }
     var currentPeriod by remember { mutableIntStateOf(1) }
     var firstPeriodStart by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -536,7 +582,7 @@ fun CreatePSPDialog(
     var showCurrentDatePicker by remember { mutableStateOf(false) }
 
     val datePickerState = rememberDatePickerState()
-    val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+    val dateFormat = SimpleDateFormat("dd.MM.yy", Locale.getDefault())
 
     if (showFirstDatePicker) {
         DatePickerDialog(
@@ -806,11 +852,12 @@ fun CorrectionPSPDialog(
     val initialEndDate: Long = currentPeriod?.endDate ?: 0L
     var newEndDate by remember { mutableStateOf(initialEndDate) }
 
-    val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+    val dateFormat = SimpleDateFormat("dd.MM.yy", Locale.getDefault())
     val hasEndDate = initialEndDate > 0
-
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+
+    AppLogger.d(TAG_PSP_SCREEN, "Открыт диалог корректировки: totalAccrued=$currentTotalAccrued")
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -822,7 +869,7 @@ fun CorrectionPSPDialog(
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth(if (isLandscape) 0.8f else 0.9f)
+                .fillMaxWidth(if (isLandscape) 0.8f else 0.8f)
                 .wrapContentHeight()
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
                 .padding(16.dp)
@@ -887,8 +934,17 @@ fun CorrectionPSPDialog(
     }
 }
 
+/** Взнос номинала ПСП: toWalletAll или сумма в копилку */
 @Composable
-fun ContributionDialog(accrualForPeriod: Double, onDismiss: () -> Unit, onConfirm: (Double) -> Unit) {
+fun ContributionDialog(
+    /** Начисление за период */
+    accrualForPeriod: Double,
+    /** Закрыть без сохранения */
+    onDismiss: () -> Unit,
+    /** Подтвердить взнос (сумма в копилку) */
+    onConfirm: (Double) -> Unit
+) {
+    AppLogger.d(TAG_PSP_SCREEN, "Открыт диалог взноса: начисление=$accrualForPeriod")
     var toWalletAll by remember { mutableStateOf(true) }
     var piggyBankText by remember { mutableStateOf("") }
     val piggyBankAmount = piggyBankText.replace(",", ".").toDoubleOrNull() ?: 0.0
@@ -907,7 +963,7 @@ fun ContributionDialog(accrualForPeriod: Double, onDismiss: () -> Unit, onConfir
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth(if (isLandscape) 0.8f else 0.9f)
+                .fillMaxWidth(if (isLandscape) 0.8f else 0.8f)
                 .wrapContentHeight()
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
                 .padding(16.dp)
@@ -959,12 +1015,17 @@ fun ContributionDialog(accrualForPeriod: Double, onDismiss: () -> Unit, onConfir
     }
 }
 
+/** Прогноз ПСП: оставшиеся периоды, кнопки Закрыть/Excel */
 @Composable
 fun ForecastPSPDialog(
+    /** Список периодов для прогноза */
     periods: List<PremiumStartPeriodEntity>,
+    /** ViewModel для экспорта в Excel */
     viewModel: PremiumStartViewModel,
+    /** Закрыть без сохранения */
     onDismiss: () -> Unit
 ) {
+    AppLogger.d(TAG_PSP_SCREEN, "Открыт прогноз ПСП: ${periods.size} периодов")
     val context = LocalContext.current
     val dateFormat = SimpleDateFormat("dd.MM.yy", Locale.getDefault())
     val exportLauncher = rememberLauncherForActivityResult(
@@ -992,7 +1053,7 @@ fun ForecastPSPDialog(
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth(if (isLandscape) 0.8f else 0.9f)
+                .fillMaxWidth(if (isLandscape) 0.8f else 0.8f)
                 .fillMaxHeight(0.9f)
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
                 .padding(16.dp)
