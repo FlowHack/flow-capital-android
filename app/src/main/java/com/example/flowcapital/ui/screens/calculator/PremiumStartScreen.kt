@@ -827,13 +827,13 @@ fun ContributionDialog(accrualForPeriod: Double, onDismiss: () -> Unit, onConfir
     var toWalletAll by remember { mutableStateOf(true) }
     var piggyBankText by remember { mutableStateOf("") }
     val piggyBankAmount = piggyBankText.replace(",", ".").toDoubleOrNull() ?: 0.0
-    val isPiggyBankError = !toWalletAll && piggyBankAmount > accrualForPeriod
+val isPiggyBankError = !toWalletAll && piggyBankAmount > accrualForPeriod
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Взнос номинала") },
         text = {
-            Column {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -842,7 +842,7 @@ fun ContributionDialog(accrualForPeriod: Double, onDismiss: () -> Unit, onConfir
                         checked = toWalletAll,
                         onCheckedChange = { toWalletAll = it }
                     )
-                    Text("В кошелек пойдет всё начисление", fontSize = 14.sp)
+                    Text("В кошелёк пойдёт всё начисление", fontSize = 14.sp)
                 }
                 if (!toWalletAll) {
                     Spacer(modifier = Modifier.height(8.dp))

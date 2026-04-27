@@ -14,10 +14,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -88,11 +91,30 @@ fun ReinvestDialog(
     val isPercentValid = !isExistingFlow || percentText.isNotEmpty()
     val isAmountValid = amountText.isNotEmpty()
 
-    AlertDialog(
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (isNewFlow) "Старт РП" else "Реинвест", fontSize = 18.sp) },
-        text = {
-            Column {
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(if (isLandscape) 0.8f else 0.8f)
+                .wrapContentHeight()
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+                .padding(16.dp)
+        ) {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    if (isNewFlow) "Старт РП" else "Реинвест",
+                    fontSize = 18.sp,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
                 if (!isExistingFlow) {
                     Text("Процент начинается с ${String.format(Locale.US, "%.3f", defaultPercent)}%", fontSize = 12.sp, color = Color.Gray)
                     Spacer(modifier = Modifier.height(4.dp))
@@ -178,24 +200,29 @@ fun ReinvestDialog(
                         ) 
                     }
                 )
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Отмена") }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    val amount = amountText.replace(",", ".").toDoubleOrNull() ?: 0.0
+                    val percent = percentText.replace(",", ".").toDoubleOrNull() ?: defaultPercent
+                    val isEnabled = amount > 0 && (!isExistingFlow || percentText.isNotEmpty())
+                    Button(
+                        onClick = {
+                            if (isEnabled) {
+                                onConfirm(amount, percent, if (walletExplicitlySet) walletText.replace(",", ".").toDoubleOrNull() else null, isExistingFlow)
+                            }
+                        },
+                        enabled = isEnabled,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336))
+                    ) { Text("Внести") }
+                }
             }
-        },
-        confirmButton = {
-            val amount = amountText.replace(",", ".").toDoubleOrNull() ?: 0.0
-            val percent = percentText.replace(",", ".").toDoubleOrNull() ?: defaultPercent
-            val isEnabled = amount > 0 && (!isExistingFlow || percentText.isNotEmpty())
-            Button(
-                onClick = {
-                    if (isEnabled) {
-                        onConfirm(amount, percent, if (walletExplicitlySet) walletText.replace(",", ".").toDoubleOrNull() else null, isExistingFlow)
-                    }
-                },
-                enabled = isEnabled,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336))
-            ) { Text("Внести") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
-    )
+        }
+    }
 }
 
 /**
@@ -238,8 +265,8 @@ fun GrowingForecastResultsDialog(
             modifier = Modifier
                 .fillMaxWidth(
                     when {
-                        isLandscape -> 0.9f
-                        wideScreen -> 0.9f
+                        isLandscape -> 0.8f
+                        wideScreen -> 0.8f
                         else -> 0.8f
                     }
                 )
@@ -383,8 +410,8 @@ fun NoviceForecastResultsDialog(
             modifier = Modifier
                 .fillMaxWidth(
                     when {
-                        isLandscape -> 0.9f
-                        wideScreen -> 0.9f
+                        isLandscape -> 0.8f
+                        wideScreen -> 0.8f
                         else -> 0.8f
                     }
                 )
@@ -518,11 +545,26 @@ fun CorrectionDialog(
     val newAccrual = parseDouble(accrualText) ?: currentAccrual
     val newWallet = parseDouble(walletText) ?: currentWallet
 
-    AlertDialog(
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text("Корректировка РП", fontSize = 18.sp) },
-        text = {
-            Column {
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(if (isLandscape) 0.8f else 0.8f)
+                .wrapContentHeight()
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+                .padding(16.dp)
+        ) {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text("Корректировка РП", fontSize = 18.sp, modifier = Modifier.padding(bottom = 16.dp))
                 Text("Если указано только 'В потоке' - пересчитывается начисление (процент остаётся). Если только 'Начисление' - пересчитывается процент.", fontSize = 11.sp, color = Color.Gray)
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(
@@ -560,21 +602,26 @@ fun CorrectionDialog(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("Хотя бы одно поле должно измениться относительно текущего состояния", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
                 }
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Отмена") }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            val finalFlow = if (flowText.isNotEmpty()) parseDouble(flowText) ?: currentInFlow else currentInFlow
+                            val finalAccrual = if (accrualText.isNotEmpty()) parseDouble(accrualText) ?: currentAccrual else currentAccrual
+                            val finalWallet = if (walletText.isNotEmpty()) parseDouble(walletText) ?: currentWallet else currentWallet
+                            onConfirm(finalFlow, finalAccrual, finalWallet, isButtonPressed)
+                        },
+                        enabled = isEnabled
+                    ) { Text("Сохранить") }
+                }
             }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val finalFlow = if (flowText.isNotEmpty()) parseDouble(flowText) ?: currentInFlow else currentInFlow
-                    val finalAccrual = if (accrualText.isNotEmpty()) parseDouble(accrualText) ?: currentAccrual else currentAccrual
-                    val finalWallet = if (walletText.isNotEmpty()) parseDouble(walletText) ?: currentWallet else currentWallet
-                    onConfirm(finalFlow, finalAccrual, finalWallet, isButtonPressed)
-                },
-                enabled = isEnabled
-            ) { Text("Сохранить") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
-    )
+        }
+    }
 }
 
 /**
@@ -635,11 +682,30 @@ fun NoviceReinvestDialog(
     val inFlow = if (isExistingFlow) amount else amount + amount * bonusPercent / 100.0
     val dailyAccrual = inFlow * dailyPercent / 100.0
 
-    AlertDialog(
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (isNewFlow) "Старт ПН" else "Реинвест ПН", fontSize = 18.sp) },
-        text = {
-            Column {
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(if (isLandscape) 0.8f else 0.8f)
+                .wrapContentHeight()
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+                .padding(16.dp)
+        ) {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    if (isNewFlow) "Старт ПН" else "Реинвест ПН",
+                    fontSize = 18.sp,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
                 if (isExistingFlow) {
                     Text(
                         "Начисление: ${String.format(Locale.US, "%.2f", dailyAccrual)} руб.",
@@ -706,22 +772,27 @@ fun NoviceReinvestDialog(
                         )
                     }
                 )
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Отмена") }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    val wallet = if (walletExplicitlySet) parseDouble(walletText) else 0.0
+                    Button(
+                        onClick = {
+                            if (amount > 0) {
+                                onConfirm(inFlow, dailyAccrual, wallet)
+                            }
+                        },
+                        enabled = amount > 0,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336))
+                    ) { Text("Внести") }
+                }
             }
-        },
-        confirmButton = {
-            val wallet = if (walletExplicitlySet) parseDouble(walletText) else 0.0
-            Button(
-                onClick = {
-                    if (amount > 0) {
-                        onConfirm(inFlow, dailyAccrual, wallet)
-                    }
-                },
-                enabled = amount > 0,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336))
-            ) { Text("Внести") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
-    )
+        }
+    }
 }
 
 /**
@@ -766,11 +837,26 @@ fun NoviceCorrectionDialog(
     val newFlowValue = parseDouble(flowText) ?: currentInFlow
     val newAccrual = newFlowValue * currentDailyPercent / 100.0
 
-    AlertDialog(
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text("Корректировка ПН", fontSize = 18.sp) },
-        text = {
-            Column {
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(if (isLandscape) 0.8f else 0.8f)
+                .wrapContentHeight()
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+                .padding(16.dp)
+        ) {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text("Корректировка ПН", fontSize = 18.sp, modifier = Modifier.padding(bottom = 16.dp))
                 Text("Процент начисления фиксирован: ${String.format(Locale.US, "%.2f%%", currentDailyPercent)}", fontSize = 11.sp, color = Color.Gray)
                 Text("Начисление пересчитывается автоматически", fontSize = 11.sp, color = Color.Gray)
                 Spacer(modifier = Modifier.height(12.dp))
@@ -779,17 +865,17 @@ fun NoviceCorrectionDialog(
                     label = { Text("В потоке") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
-                    supportingText = { 
+                    supportingText = {
                         Text(
                             "Текущее: ${String.format(Locale.US, "%.2f", currentInFlow)}",
-                            fontSize = 10.sp, 
+                            fontSize = 10.sp,
                             color = Color.Gray
-                        ) 
+                        )
                     }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
-                    value = walletText, onValueChange = { 
+                    value = walletText, onValueChange = {
                         walletText = it
                         walletExplicitlySet = it.isNotEmpty()
                     },
@@ -797,15 +883,15 @@ fun NoviceCorrectionDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    supportingText = { 
+                    supportingText = {
                         Text(
-                            if (walletExplicitlySet && walletText.isEmpty()) 
+                            if (walletExplicitlySet && walletText.isEmpty())
                                 "Введите 0, чтобы обнулить кошелёк"
-                            else if (!walletExplicitlySet) 
+                            else if (!walletExplicitlySet)
                                 "Оставьте пустым - кошелёк не изменится"
-                            else 
+                            else
                                 "Введите нужную сумму"
-                        ) 
+                        )
                     }
                 )
                 Spacer(modifier = Modifier.height(12.dp))
@@ -820,23 +906,28 @@ fun NoviceCorrectionDialog(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("Хотя бы одно поле должно измениться относительно текущего состояния", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
                 }
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Отмена") }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            val finalFlow = if (flowText.isNotEmpty()) parseDouble(flowText) ?: currentInFlow else currentInFlow
+                            val finalAccrual = finalFlow * currentDailyPercent / 100.0
+                            onConfirm(
+                                finalFlow,
+                                finalAccrual,
+                                if (walletExplicitlySet) parseDouble(walletText) else null,
+                                isButtonPressed
+                            )
+                        },
+                        enabled = isEnabled
+                    ) { Text("Сохранить") }
+                }
             }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val finalFlow = if (flowText.isNotEmpty()) parseDouble(flowText) ?: currentInFlow else currentInFlow
-                    val finalAccrual = finalFlow * currentDailyPercent / 100.0
-                    onConfirm(
-                        finalFlow,
-                        finalAccrual,
-                        if (walletExplicitlySet) parseDouble(walletText) else null,
-                        isButtonPressed
-                    )
-                },
-                enabled = isEnabled
-            ) { Text("Сохранить") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
-    )
+        }
+    }
 }
