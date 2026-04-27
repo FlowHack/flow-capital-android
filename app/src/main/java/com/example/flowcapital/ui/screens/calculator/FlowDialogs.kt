@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3Api::class)
 
 package com.example.flowcapital.ui.screens.calculator
 
@@ -13,8 +13,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -37,10 +39,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.flowcapital.data.db.GrowingFlowEntity
 import com.example.flowcapital.data.db.NoviceFlowEntity
 import java.text.SimpleDateFormat
@@ -212,26 +217,59 @@ fun GrowingForecastResultsDialog(
 ) {
     val dateFormat = SimpleDateFormat("dd.MM.yy", Locale.getDefault())
     val wideScreen = isWideScreen()
-    AlertDialog(
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+
+    val weightDate = if (isLandscape) 1.2f else 1.1f
+    val weightInFlow = if (isLandscape) 2f else 1.4f
+    val weightWallet = if (isLandscape) 2f else 1.4f
+    val weightAccrual = if (isLandscape) 1.8f else 1.2f
+    val tableFontSize = if (isLandscape) 12.sp else 11.sp
+
+    Dialog(
         onDismissRequest = onDismiss,
-        modifier = Modifier.fillMaxWidth().fillMaxHeight(0.85f),
-        title = { Text(title, fontSize = 18.sp) },
-        text = {
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(
+                    when {
+                        isLandscape -> 0.9f
+                        wideScreen -> 0.9f
+                        else -> 0.8f
+                    }
+                )
+                .fillMaxHeight(0.9f)
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+                .padding(16.dp)
+        ) {
             Column(modifier = Modifier.fillMaxSize()) {
+                Box(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                    Text(title, fontSize = 18.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                }
                 Row(
-                    modifier = Modifier.fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surface)
-                        .padding(4.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(6.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Дата", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
-                    Text("В потоке", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
-                    if (!isBestDateDialog) Text("Кошелек", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
-                    if (wideScreen && !isBestDateDialog) Text("Начисление", modifier = Modifier.weight(1.2f), fontSize = 10.sp, textAlign = TextAlign.Center)
-                    if (isBestDateDialog) Text("Начисление", modifier = Modifier.weight(1.2f), fontSize = 10.sp, textAlign = TextAlign.Center)
-                    if (wideScreen && isBestDateDialog) Text("Кошелек", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    Text("Дата", modifier = Modifier.weight(weightDate), fontSize = tableFontSize, textAlign = TextAlign.Center)
+                    Text("В потоке", modifier = Modifier.weight(weightInFlow), fontSize = tableFontSize, textAlign = TextAlign.Center)
+                    if (!isBestDateDialog) Text("Кошелек", modifier = Modifier.weight(weightWallet), fontSize = tableFontSize, textAlign = TextAlign.Center)
+                    if (wideScreen && !isBestDateDialog) Text("Начисление", modifier = Modifier.weight(weightAccrual), fontSize = tableFontSize, textAlign = TextAlign.Center)
+                    if (isBestDateDialog) Text("Начисление", modifier = Modifier.weight(weightAccrual), fontSize = tableFontSize, textAlign = TextAlign.Center)
+                    if (wideScreen && isBestDateDialog) Text("Кошелек", modifier = Modifier.weight(weightWallet), fontSize = tableFontSize, textAlign = TextAlign.Center)
                 }
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                ) {
                     items(forecastList) { entry ->
                         val isSunday = entry.actionType == "SUNDAY"
                         val isDropDay = entry.actionType == "DROP_DAY"
@@ -246,47 +284,47 @@ fun GrowingForecastResultsDialog(
                                 .padding(vertical = 6.dp),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                            Box(modifier = Modifier.weight(weightDate), contentAlignment = Alignment.Center) {
                                 Text(
                                     dateFormat.format(Date(entry.date)),
-                                    fontSize = 10.sp,
+                                    fontSize = tableFontSize,
                                     textAlign = TextAlign.Center
                                 )
                             }
-                            Box(modifier = Modifier.weight(1.4f), contentAlignment = Alignment.Center) {
+                            Box(modifier = Modifier.weight(weightInFlow), contentAlignment = Alignment.Center) {
                                 Text(
                                     String.format(Locale.US, "%.2f", entry.inFlowAmount),
-                                    fontSize = 10.sp,
+                                    fontSize = tableFontSize,
                                     textAlign = TextAlign.Center
                                 )
                             }
-                            if (!isBestDateDialog) Box(modifier = Modifier.weight(1.4f), contentAlignment = Alignment.Center) {
+                            if (!isBestDateDialog) Box(modifier = Modifier.weight(weightWallet), contentAlignment = Alignment.Center) {
                                 Text(
                                     String.format(Locale.US, "%.2f", entry.walletAmount),
-                                    fontSize = 10.sp,
+                                    fontSize = tableFontSize,
                                     textAlign = TextAlign.Center
                                 )
                             }
-                            if (wideScreen && !isBestDateDialog) Box(modifier = Modifier.weight(1.2f), contentAlignment = Alignment.Center) {
+                            if (wideScreen && !isBestDateDialog) Box(modifier = Modifier.weight(weightAccrual), contentAlignment = Alignment.Center) {
                                 Text(
                                     String.format(Locale.US, "+%.2f", entry.dailyAccrual),
                                     color = if (isSunday) Color.Gray else if (isDropDay) Color(0xFFEF5350) else Color(0xFF4CAF50),
-                                    fontSize = 10.sp,
+                                    fontSize = tableFontSize,
                                     textAlign = TextAlign.Center
                                 )
                             }
-                            if (isBestDateDialog) Box(modifier = Modifier.weight(1.2f), contentAlignment = Alignment.Center) {
+                            if (isBestDateDialog) Box(modifier = Modifier.weight(weightAccrual), contentAlignment = Alignment.Center) {
                                 Text(
                                     String.format(Locale.US, "+%.2f", entry.dailyAccrual),
                                     color = if (isSunday) Color.Gray else if (isDropDay) Color(0xFFEF5350) else Color(0xFF4CAF50),
-                                    fontSize = 10.sp,
+                                    fontSize = tableFontSize,
                                     textAlign = TextAlign.Center
                                 )
                             }
-                            if (wideScreen && isBestDateDialog) Box(modifier = Modifier.weight(1.4f), contentAlignment = Alignment.Center) {
+                            if (wideScreen && isBestDateDialog) Box(modifier = Modifier.weight(weightWallet), contentAlignment = Alignment.Center) {
                                 Text(
                                     String.format(Locale.US, "%.2f", entry.walletAmount),
-                                    fontSize = 10.sp,
+                                    fontSize = tableFontSize,
                                     textAlign = TextAlign.Center
                                 )
                             }
@@ -294,11 +332,17 @@ fun GrowingForecastResultsDialog(
                         HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
                     }
                 }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Закрыть") }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(onClick = onExportToExcel) { Text("Excel", fontSize = 12.sp) }
+                }
             }
-        },
-        confirmButton = { Button(onClick = onExportToExcel) { Text("Excel", fontSize = 12.sp) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Закрыть") } }
-    )
+        }
+    }
 }
 
 /**
@@ -321,7 +365,7 @@ fun NoviceForecastResultsDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.fillMaxWidth().fillMaxHeight(0.85f),
-        title = { Text(title, fontSize = 18.sp) },
+        title = { Text(title, fontSize = 18.sp, textAlign = TextAlign.Center) },
         text = {
             Column(modifier = Modifier.fillMaxSize()) {
                 Row(
