@@ -207,10 +207,11 @@ fun GrowingForecastResultsDialog(
     title: String,
     forecastList: List<GrowingFlowEntity>,
     onDismiss: () -> Unit,
-    onExportToExcel: () -> Unit
+    onExportToExcel: () -> Unit,
+    isBestDateDialog: Boolean = false
 ) {
     val dateFormat = SimpleDateFormat("dd.MM.yy", Locale.getDefault())
-    val narrowScreen = isNarrowScreen()
+    val wideScreen = isWideScreen()
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.fillMaxWidth().fillMaxHeight(0.85f),
@@ -225,8 +226,10 @@ fun GrowingForecastResultsDialog(
                 ) {
                     Text("Дата", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
                     Text("В потоке", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
-                    if (!narrowScreen) Text("Начисление", modifier = Modifier.weight(1.2f), fontSize = 10.sp, textAlign = TextAlign.Center)
-                    Text("Кошелек", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    if (!isBestDateDialog) Text("Кошелек", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    if (wideScreen && !isBestDateDialog) Text("Начисление", modifier = Modifier.weight(1.2f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    if (isBestDateDialog) Text("Начисление", modifier = Modifier.weight(1.2f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    if (wideScreen && isBestDateDialog) Text("Кошелек", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
                 }
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(forecastList) { entry ->
@@ -257,7 +260,14 @@ fun GrowingForecastResultsDialog(
                                     textAlign = TextAlign.Center
                                 )
                             }
-                            if (!narrowScreen) Box(modifier = Modifier.weight(1.2f), contentAlignment = Alignment.Center) {
+                            if (!isBestDateDialog) Box(modifier = Modifier.weight(1.4f), contentAlignment = Alignment.Center) {
+                                Text(
+                                    String.format(Locale.US, "%.2f", entry.walletAmount),
+                                    fontSize = 10.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                            if (wideScreen && !isBestDateDialog) Box(modifier = Modifier.weight(1.2f), contentAlignment = Alignment.Center) {
                                 Text(
                                     String.format(Locale.US, "+%.2f", entry.dailyAccrual),
                                     color = if (isSunday) Color.Gray else if (isDropDay) Color(0xFFEF5350) else Color(0xFF4CAF50),
@@ -265,7 +275,15 @@ fun GrowingForecastResultsDialog(
                                     textAlign = TextAlign.Center
                                 )
                             }
-                            Box(modifier = Modifier.weight(1.4f), contentAlignment = Alignment.Center) {
+                            if (isBestDateDialog) Box(modifier = Modifier.weight(1.2f), contentAlignment = Alignment.Center) {
+                                Text(
+                                    String.format(Locale.US, "+%.2f", entry.dailyAccrual),
+                                    color = if (isSunday) Color.Gray else if (isDropDay) Color(0xFFEF5350) else Color(0xFF4CAF50),
+                                    fontSize = 10.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                            if (wideScreen && isBestDateDialog) Box(modifier = Modifier.weight(1.4f), contentAlignment = Alignment.Center) {
                                 Text(
                                     String.format(Locale.US, "%.2f", entry.walletAmount),
                                     fontSize = 10.sp,
@@ -299,7 +317,7 @@ fun NoviceForecastResultsDialog(
     onExportToExcel: () -> Unit
 ) {
     val dateFormat = SimpleDateFormat("dd.MM.yy", Locale.getDefault())
-    val narrowScreen = isNarrowScreen()
+    val wideScreen = isWideScreen()
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = Modifier.fillMaxWidth().fillMaxHeight(0.85f),
@@ -314,8 +332,8 @@ fun NoviceForecastResultsDialog(
                 ) {
                     Text("Дата", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
                     Text("В потоке", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
-                    if (!narrowScreen) Text("Начисление", modifier = Modifier.weight(1.2f), fontSize = 10.sp, textAlign = TextAlign.Center)
-                    Text("Кошелек", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    Text("Начисление", modifier = Modifier.weight(1.2f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    if (wideScreen) Text("Кошелек", modifier = Modifier.weight(1.4f), fontSize = 10.sp, textAlign = TextAlign.Center)
                 }
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(forecastList) { entry ->
@@ -344,7 +362,7 @@ fun NoviceForecastResultsDialog(
                                     textAlign = TextAlign.Center
                                 )
                             }
-                            if (!narrowScreen) Box(modifier = Modifier.weight(1.2f), contentAlignment = Alignment.Center) {
+                            Box(modifier = Modifier.weight(1.2f), contentAlignment = Alignment.Center) {
                                 Text(
                                     String.format(Locale.US, "+%.2f", entry.dailyAccrual),
                                     color = if (isSunday) Color.Gray else Color(0xFF4CAF50),
@@ -352,7 +370,7 @@ fun NoviceForecastResultsDialog(
                                     textAlign = TextAlign.Center
                                 )
                             }
-                            Box(modifier = Modifier.weight(1.4f), contentAlignment = Alignment.Center) {
+                            if (wideScreen) Box(modifier = Modifier.weight(1.4f), contentAlignment = Alignment.Center) {
                                 Text(
                                     String.format(Locale.US, "%.2f", entry.walletAmount),
                                     fontSize = 10.sp,

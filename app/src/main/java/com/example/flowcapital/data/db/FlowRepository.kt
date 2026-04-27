@@ -25,6 +25,8 @@ class NoviceFlowRepository(private val dao: NoviceFlowDao) {
 
     suspend fun insertEntry(entry: NoviceFlowEntity) = dao.insert(entry)
 
+    suspend fun getAllEntries(): List<NoviceFlowEntity> = dao.getAllEntries()
+
     suspend fun clearHistory() = dao.clearAll()
 }
 

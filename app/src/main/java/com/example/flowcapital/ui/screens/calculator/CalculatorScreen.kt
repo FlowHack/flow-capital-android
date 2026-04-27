@@ -148,6 +148,7 @@ fun CalculatorScreen() {
             0 -> NoviceFlowContent(
                 lastEntry = noviceHistory.firstOrNull(),
                 history = noviceHistory,
+                dailyPercent = pnDailyPercent,
                 onReinvestClick = { showNoviceReinvestDialog = true },
                 onCorrectionClick = { showNoviceCorrectionDialog = true },
                 onForecastClick = { showNoviceDatePicker = true },
@@ -233,7 +234,8 @@ fun CalculatorScreen() {
             title = "Лучшая дата: $bestDateStr",
             forecastList = bestDateData,
             onDismiss = { viewModel.clearBestDateForecast() },
-            onExportToExcel = { exportLauncher.launch("Potok_BestDate_${System.currentTimeMillis()}.xlsx") }
+            onExportToExcel = { exportLauncher.launch("Potok_BestDate_${System.currentTimeMillis()}.xlsx") },
+            isBestDateDialog = true
         )
     }
 

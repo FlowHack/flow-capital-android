@@ -296,10 +296,11 @@ fun NoviceActionButtonsRow(
 
 /**
  * Контент экрана Потока Новичка.
- * Показывает кнопку старта (если истории нет) или полный интерфейс с кнопками и историей.
+ * Отображает кнопки действий, текущую статистику, кнопку ежедневного начисления и историю.
  *
  * @param lastEntry Последняя запись истории
  * @param history Вся история
+ * @param dailyPercent Фиксированный ежедневный процент из БД настроек
  * @param onReinvestClick Нажатие на Старт/Реинвест
  * @param onCorrectionClick Нажатие на Коррекция
  * @param onForecastClick Нажатие на Прогноз
@@ -310,6 +311,7 @@ fun NoviceActionButtonsRow(
 fun NoviceFlowContent(
     lastEntry: NoviceFlowEntity?,
     history: List<NoviceFlowEntity>,
+    dailyPercent: Double,
     onReinvestClick: () -> Unit,
     onCorrectionClick: () -> Unit,
     onForecastClick: () -> Unit,
@@ -351,28 +353,32 @@ fun NoviceFlowContent(
     )
 
     Spacer(modifier = Modifier.height(12.dp))
-    NoviceStatsCard(lastEntry)
+    NoviceStatsCard(lastEntry, dailyPercent)
     Spacer(modifier = Modifier.height(12.dp))
 
     val isSunday = Calendar.getInstance().get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
-    val today = Calendar.getInstance()
-    val isActionDoneToday = history.any { entry ->
-        val entryDate = Calendar.getInstance().apply { timeInMillis = entry.date }
-        val isToday = today.get(Calendar.YEAR) == entryDate.get(Calendar.YEAR) &&
-                today.get(Calendar.DAY_OF_YEAR) == entryDate.get(Calendar.DAY_OF_YEAR)
-        isToday && entry.isButtonPressed && entry.actionType != "SUNDAY"
-    }
+    val todayStart = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
+    val newestEntry = history.firstOrNull()
+    val newestEntryDay = newestEntry?.date?.let { Calendar.getInstance().apply { timeInMillis = it }.apply {
+        set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+    }.timeInMillis } ?: 0L
+    val isNewestEntryToday = newestEntryDay == todayStart
+    val isActionDoneToday = isNewestEntryToday && newestEntry?.isButtonPressed == true && newestEntry?.actionType != "SUNDAY"
     val isFlowZero = lastEntry?.inFlowAmount ?: 0.0 <= 0
     val isButtonDisabled = isSunday || isActionDoneToday || isFlowZero
 
     val buttonContainerColor = when {
         isFlowZero -> Color(0xFF333333)
         isSunday -> Color(0xFF9C27B0)
+        isActionDoneToday -> Color(0xFF444444)
         else -> FlowColors.PN_COLOR
     }
     val buttonContentColor = when {
         isFlowZero -> Color.LightGray
         isSunday -> Color.White
+        isActionDoneToday -> Color.Gray
         else -> Color.White
     }
 
@@ -395,12 +401,12 @@ fun NoviceFlowContent(
             text = when {
                 isFlowZero -> "СДЕЛАЙТЕ РЕИНВЕСТ"
                 isSunday -> "ВОСКРЕСЕНЬЕ - ВЫХОДНОЙ"
-                isActionDoneToday -> "НАЧИСЛЕНИЕ ВЫПОЛНЕНО"
+                isButtonDisabled -> "НАЧИСЛЕНИЕ ВЫПОЛНЕНО"
                 else -> "Я СЕГОДНЯ НАЖАЛ НА КНОПКУ"
             },
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
-            color = buttonContentColor
+            color = if (isButtonDisabled) Color.LightGray else buttonContentColor
         )
     }
 
@@ -410,11 +416,13 @@ fun NoviceFlowContent(
 
 /**
  * Карточка с текущей статистикой ПН.
+ * Процент показывается из БД настроек (фиксированный), а не из lastEntry.
  *
  * @param entry Последняя запись истории (null если истории нет)
+ * @param dailyPercent Фиксированный ежедневный процент из БД настроек
  */
 @Composable
-fun NoviceStatsCard(entry: NoviceFlowEntity?) {
+fun NoviceStatsCard(entry: NoviceFlowEntity?, dailyPercent: Double) {
     val wideScreen = isWideScreen()
     Card(
         modifier = Modifier
@@ -428,7 +436,7 @@ fun NoviceStatsCard(entry: NoviceFlowEntity?) {
                 .padding(12.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            StatItem("%", if (entry != null) String.format(Locale.US, "%.2f", entry.percent) else "0.00")
+            StatItem("%", String.format(Locale.US, "%.2f", dailyPercent))
             StatItem("В потоке", if (entry != null) String.format(Locale.US, "%.2f", entry.inFlowAmount) else "0.00")
             if (wideScreen) {
                 StatItem("Начисление", if (entry != null) String.format(Locale.US, "%.2f", entry.dailyAccrual) else "0.00")
@@ -610,21 +618,31 @@ fun GrowingFlowContent(
     Spacer(modifier = Modifier.height(12.dp))
 
     val isSunday = Calendar.getInstance().get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
-    val today = Calendar.getInstance()
-    val isActionDoneToday = history.any { entry ->
-        val entryDate = Calendar.getInstance().apply { timeInMillis = entry.date }
-        val isToday = today.get(Calendar.YEAR) == entryDate.get(Calendar.YEAR) &&
-                today.get(Calendar.DAY_OF_YEAR) == entryDate.get(Calendar.DAY_OF_YEAR)
-        isToday && entry.isButtonPressed && entry.actionType != "SUNDAY"
-    }
+    val todayStart = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
+    val newestEntry = history.firstOrNull()
+    val newestEntryDay = newestEntry?.date?.let { Calendar.getInstance().apply { timeInMillis = it }.apply {
+        set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+    }.timeInMillis } ?: 0L
+    val isNewestEntryToday = newestEntryDay == todayStart
+    val isActionDoneToday = isNewestEntryToday && newestEntry?.isButtonPressed == true && newestEntry?.actionType != "SUNDAY"
     val isFlowZero = lastEntry?.inFlowAmount ?: 0.0 <= 0
     val isButtonDisabled = isSunday || isActionDoneToday || isFlowZero
+
+    val buttonContainerColor = when {
+        isFlowZero -> Color(0xFF333333)
+        isSunday -> Color(0xFF9C27B0)
+        isActionDoneToday -> Color(0xFF444444)
+        else -> MaterialTheme.colorScheme.primary
+    }
 
     Button(
         onClick = onDailyButtonClick,
         enabled = !isButtonDisabled,
         colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary,
+            containerColor = buttonContainerColor,
+            contentColor = Color.White,
             disabledContainerColor = Color(0xFF333333),
             disabledContentColor = Color.LightGray
         ),
@@ -638,7 +656,7 @@ fun GrowingFlowContent(
             text = when {
                 isFlowZero -> "СДЕЛАЙТЕ РЕИНВЕСТ"
                 isSunday -> "ВОСКРЕСЕНЬЕ - ВЫХОДНОЙ"
-                isActionDoneToday -> "НАЧИСЛЕНИЕ ВЫПОЛНЕНО"
+                isButtonDisabled -> "НАЧИСЛЕНИЕ ВЫПОЛНЕНО"
                 else -> "Я СЕГОДНЯ НАЖАЛ НА КНОПКУ"
             },
             fontSize = 13.sp,

@@ -43,6 +43,9 @@ interface NoviceFlowDao {
 
     @Query("DELETE FROM novice_flow_history")
     suspend fun clearAll()
+
+    @Query("SELECT * FROM novice_flow_history")
+    suspend fun getAllEntries(): List<NoviceFlowEntity>
 }
 
 /**
