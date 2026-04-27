@@ -49,6 +49,8 @@ import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -72,6 +74,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -2993,11 +2996,14 @@ private fun CalculatePspDialog(
     val coefficients = savedPspCoeffs ?: emptyMap()
     val hasValidNominal = nominal > 0 && coefficients.isNotEmpty()
 
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Рассчитать поток ПСП", fontSize = 18.sp) },
         text = {
-            Column {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Text("Введите параметры потока:", fontSize = 12.sp, color = Color.Gray)
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(
@@ -3009,7 +3015,7 @@ private fun CalculatePspDialog(
                     singleLine = true
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+                val dateFormat = SimpleDateFormat("dd.MM.yy", Locale.getDefault())
                 OutlinedButton(
                     onClick = { showDatePicker = true },
                     modifier = Modifier.fillMaxWidth()
@@ -3109,47 +3115,98 @@ private fun PspForecastResultsDialog(
     onExportToExcel: () -> Unit
 ) {
     val dateFormat = SimpleDateFormat("dd.MM.yy", Locale.getDefault())
-    AlertDialog(
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+    val tableFontSize = if (isLandscape) 12.sp else 11.sp
+
+    val weightPeriod = 0.6f
+    val weightDate = 1.4f
+    val weightAccrual = 1.2f
+    val weightTotal = 1.2f
+
+    Dialog(
         onDismissRequest = onDismiss,
-        modifier = Modifier.fillMaxWidth().fillMaxHeight(0.85f),
-        title = { Text(title, fontSize = 18.sp) },
-        text = {
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(if (isLandscape) 0.8f else 0.85f)
+                .fillMaxHeight(0.85f)
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+                .padding(16.dp)
+        ) {
             Column(modifier = Modifier.fillMaxSize()) {
+                Box(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                    Text(title, fontSize = 18.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                }
                 Row(
-                    modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(4.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Пер.", modifier = Modifier.weight(0.5f), fontSize = 10.sp, textAlign = TextAlign.Center)
-                    Text("Закрытие", modifier = Modifier.weight(1.2f), fontSize = 10.sp, textAlign = TextAlign.Center)
-                    Text("Начислено", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
-                    Text("Всего", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    Text("Пер.", modifier = Modifier.weight(weightPeriod), fontSize = tableFontSize, textAlign = TextAlign.Center)
+                    Text("Закрытие", modifier = Modifier.weight(weightDate), fontSize = tableFontSize, textAlign = TextAlign.Center)
+                    Text("Начислено", modifier = Modifier.weight(weightAccrual), fontSize = tableFontSize, textAlign = TextAlign.Center)
+                    Text("Всего", modifier = Modifier.weight(weightTotal), fontSize = tableFontSize, textAlign = TextAlign.Center)
                 }
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(forecastList.size) { index ->
                         val entry = forecastList[index]
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    if (entry.isCompleted) Color(0x33C8FFC8) else Color.Transparent
+                                )
+                                .padding(vertical = 6.dp),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Box(modifier = Modifier.weight(0.5f), contentAlignment = Alignment.Center) {
-                                Text(entry.periodNumber.toString(), fontSize = 11.sp, textAlign = TextAlign.Center)
+                            Box(modifier = Modifier.weight(weightPeriod), contentAlignment = Alignment.Center) {
+                                Text(entry.periodNumber.toString(), fontSize = tableFontSize, textAlign = TextAlign.Center)
                             }
-                            Box(modifier = Modifier.weight(1.2f), contentAlignment = Alignment.Center) {
-                                Text(dateFormat.format(Date(entry.endDate)), fontSize = 11.sp, textAlign = TextAlign.Center)
+                            Box(modifier = Modifier.weight(weightDate), contentAlignment = Alignment.Center) {
+                                Text(dateFormat.format(Date(entry.endDate)), fontSize = tableFontSize, textAlign = TextAlign.Center)
                             }
-                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                                Text(String.format(Locale.US, "%.2f", entry.accrualAmount), fontSize = 11.sp, textAlign = TextAlign.Center, color = Color(0xFF4CAF50))
+                            Box(modifier = Modifier.weight(weightAccrual), contentAlignment = Alignment.Center) {
+                                Text(
+                                    String.format(Locale.US, "%.2f", entry.accrualAmount),
+                                    fontSize = tableFontSize,
+                                    textAlign = TextAlign.Center,
+                                    color = if (entry.isCompleted) Color(0xFF4CAF50) else Color(0xFF4CAF50)
+                                )
                             }
-                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                                Text(String.format(Locale.US, "%.2f", entry.totalAccrued), fontSize = 11.sp, textAlign = TextAlign.Center)
+                            Box(modifier = Modifier.weight(weightTotal), contentAlignment = Alignment.Center) {
+                                Text(
+                                    String.format(Locale.US, "%.2f", entry.totalAccrued),
+                                    fontSize = tableFontSize,
+                                    textAlign = TextAlign.Center
+                                )
                             }
                         }
                         HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
                     }
                 }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Закрыть") }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = onExportToExcel,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFE53935),
+                            contentColor = Color.White
+                        )
+                    ) { Text("Excel", fontSize = 12.sp) }
+                }
             }
-        },
-        confirmButton = { Button(onClick = onExportToExcel) { Text("Excel", fontSize = 12.sp) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Закрыть") } }
-    )
+        }
+    }
 }

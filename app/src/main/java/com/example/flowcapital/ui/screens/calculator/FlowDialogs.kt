@@ -2,6 +2,7 @@
 
 package com.example.flowcapital.ui.screens.calculator
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -65,6 +66,7 @@ import java.util.Locale
  * @param defaultPercent Значение процента по умолчанию
  * @param isNewFlow true если это создание нового потока
  */
+@SuppressLint("ConfigurationScreenWidthHeight")
 @Composable
 fun ReinvestDialog(
     onDismiss: () -> Unit,

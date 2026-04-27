@@ -431,77 +431,65 @@ fun PSPButtonsRow(
 fun PSPContributionHistory(history: List<PremiumStartPeriodEntity>) {
     val dateFormat = SimpleDateFormat("dd.MM.yy", Locale.getDefault())
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text("История взносов", fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-            Spacer(modifier = Modifier.height(8.dp))
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        Text("История взносов", fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+        Spacer(modifier = Modifier.height(8.dp))
 
-            if (history.isEmpty()) {
-                Text("Нет взносов", fontSize = 12.sp, color = Color.Gray)
-            } else {
+        if (history.isEmpty()) {
+            Text("Нет взносов", fontSize = 12.sp, color = Color.Gray)
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Пер.", modifier = Modifier.weight(0.5f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                Text("Дата взноса", modifier = Modifier.weight(1.2f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                Text("Начислено", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                Text("%", modifier = Modifier.weight(0.6f), fontSize = 10.sp, textAlign = TextAlign.Center)
+            }
+
+            history.forEachIndexed { index, period ->
+                val periodText = if (period.isContributionMade) {
+                    "${period.periodNumber}"
+                } else {
+                    "${period.periodNumber - 1}"
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
-                        .padding(8.dp),
+                        .padding(vertical = 6.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Пер.", modifier = Modifier.weight(0.5f), fontSize = 10.sp, textAlign = TextAlign.Center)
-                    Text("Дата взноса", modifier = Modifier.weight(1.2f), fontSize = 10.sp, textAlign = TextAlign.Center)
-                    Text("Начислено", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
-                    Text("%", modifier = Modifier.weight(0.6f), fontSize = 10.sp, textAlign = TextAlign.Center)
+                    Text(
+                        periodText,
+                        modifier = Modifier.weight(0.5f),
+                        fontSize = 11.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        period.contributionDate?.let { dateFormat.format(Date(it)) } ?: "-",
+                        modifier = Modifier.weight(1.2f),
+                        fontSize = 11.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        String.format(Locale.US, "%.2f", period.accrualAmount),
+                        modifier = Modifier.weight(1f),
+                        fontSize = 11.sp,
+                        textAlign = TextAlign.Center,
+                        color = Color(0xFF4CAF50)
+                    )
+                    Text(
+                        String.format(Locale.US, "%.2f", period.percent),
+                        modifier = Modifier.weight(0.6f),
+                        fontSize = 11.sp,
+                        textAlign = TextAlign.Center
+                    )
                 }
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 300.dp)
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    history.forEachIndexed { index, period ->
-                        val periodText = if (period.isContributionMade) {
-                            "${period.periodNumber}"
-                        } else {
-                            "${period.periodNumber - 1}"
-                        }
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 6.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                periodText,
-                                modifier = Modifier.weight(0.5f),
-                                fontSize = 11.sp,
-                                textAlign = TextAlign.Center
-                            )
-                            Text(
-                                period.contributionDate?.let { dateFormat.format(Date(it)) } ?: "-",
-                                modifier = Modifier.weight(1.2f),
-                                fontSize = 11.sp,
-                                textAlign = TextAlign.Center
-                            )
-                            Text(
-                                String.format(Locale.US, "%.2f", period.accrualAmount),
-                                modifier = Modifier.weight(1f),
-                                fontSize = 11.sp,
-                                textAlign = TextAlign.Center,
-                                color = Color(0xFF4CAF50)
-                            )
-                            Text(
-                                String.format(Locale.US, "%.2f", period.percent),
-                                modifier = Modifier.weight(0.6f),
-                                fontSize = 11.sp,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
-                    }
-                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
             }
         }
     }
