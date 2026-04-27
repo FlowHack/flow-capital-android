@@ -365,7 +365,9 @@ fun NoviceFlowContent(
         set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
     }.timeInMillis } ?: 0L
     val isNewestEntryToday = newestEntryDay == todayStart
-    val isActionDoneToday = isNewestEntryToday && newestEntry?.isButtonPressed == true && newestEntry?.actionType != "SUNDAY"
+    val isActionDoneToday = if (isNewestEntryToday && newestEntry != null) {
+        newestEntry.isButtonPressed && newestEntry.actionType != "SUNDAY"
+    } else false
     val isFlowZero = lastEntry?.inFlowAmount ?: 0.0 <= 0
     val isButtonDisabled = isSunday || isActionDoneToday || isFlowZero
 
@@ -616,7 +618,7 @@ fun GrowingFlowContent(
     Spacer(modifier = Modifier.height(12.dp))
     CurrentStatsCard(lastEntry)
     Spacer(modifier = Modifier.height(12.dp))
-
+    
     val isSunday = Calendar.getInstance().get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
     val todayStart = Calendar.getInstance().apply {
         set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
@@ -626,7 +628,9 @@ fun GrowingFlowContent(
         set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
     }.timeInMillis } ?: 0L
     val isNewestEntryToday = newestEntryDay == todayStart
-    val isActionDoneToday = isNewestEntryToday && newestEntry?.isButtonPressed == true && newestEntry?.actionType != "SUNDAY"
+    val isActionDoneToday = if (isNewestEntryToday && newestEntry != null) {
+        newestEntry.isButtonPressed && newestEntry.actionType != "SUNDAY"
+    } else false
     val isFlowZero = lastEntry?.inFlowAmount ?: 0.0 <= 0
     val isButtonDisabled = isSunday || isActionDoneToday || isFlowZero
 
