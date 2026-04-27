@@ -14,8 +14,11 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -23,7 +26,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -53,12 +55,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.flowcapital.data.db.AppDatabase
 import com.example.flowcapital.data.db.PremiumStartFlowEntity
@@ -315,21 +320,44 @@ fun PremiumStartScreen() {
     }
 
     if (showDeleteDialog) {
-        AlertDialog(
+        val configuration = LocalConfiguration.current
+        val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+        Dialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Удалить ПСП?") },
-            text = { Text("Текущий ПСП будет удалён. Это действие нельзя отменить.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.deleteCurrentFlow()
-                        showDeleteDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) { Text("Удалить") }
-            },
-            dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text("Отмена") } }
-        )
+            properties = DialogProperties(
+                dismissOnBackPress = true,
+                dismissOnClickOutside = true,
+                usePlatformDefaultWidth = false
+            )
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(if (isLandscape) 0.8f else 0.9f)
+                    .wrapContentHeight()
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+                    .padding(16.dp)
+            ) {
+                Column {
+                    Text("Удалить ПСП?", fontSize = 18.sp, modifier = Modifier.padding(bottom = 16.dp))
+                    Text("Текущий ПСП будет удалён. Это действие нельзя отменить.")
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { showDeleteDialog = false }) { Text("Отмена") }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                viewModel.deleteCurrentFlow()
+                                showDeleteDialog = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                        ) { Text("Удалить") }
+                    }
+                }
+            }
+        }
     }
 
     if (showForecastDialog && forecastResults.isNotEmpty()) {
@@ -544,11 +572,27 @@ fun CreatePSPDialog(
         }
     }
 
-    AlertDialog(
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+    val wideScreen = isWideScreen()
+
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text("Создать ПСП") },
-        text = {
-            Column {
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(if (isLandscape) 0.8f else 0.9f)
+                .wrapContentHeight()
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+                .padding(16.dp)
+        ) {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text("Создать ПСП", fontSize = 18.sp, modifier = Modifier.padding(bottom = 16.dp))
                 Text("Номинал ПСП", fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
@@ -563,52 +607,57 @@ fun CreatePSPDialog(
 
                 Text("Текущий период", fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    (1..5).forEach { period ->
-                        FilterChip(
-                            selected = currentPeriod == period,
-                            onClick = { currentPeriod = period },
-                            label = { Text("$period") }
-                        )
+
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
+                    ) {
+                        (1..5).forEach { period ->
+                            FilterChip(
+                                selected = currentPeriod == period,
+                                onClick = { currentPeriod = period },
+                                label = { Text("$period") }
+                            )
+                        }
                     }
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    (6..10).forEach { period ->
-                        FilterChip(
-                            selected = currentPeriod == period,
-                            onClick = { currentPeriod = period },
-                            label = { Text("$period") }
-                        )
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
+                    ) {
+                        (6..10).forEach { period ->
+                            FilterChip(
+                                selected = currentPeriod == period,
+                                onClick = { currentPeriod = period },
+                                label = { Text("$period") }
+                            )
+                        }
                     }
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    (11..15).forEach { period ->
-                        FilterChip(
-                            selected = currentPeriod == period,
-                            onClick = { currentPeriod = period },
-                            label = { Text("$period") }
-                        )
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
+                    ) {
+                        (11..15).forEach { period ->
+                            FilterChip(
+                                selected = currentPeriod == period,
+                                onClick = { currentPeriod = period },
+                                label = { Text("$period") }
+                            )
+                        }
                     }
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    (16..20).forEach { period ->
-                        FilterChip(
-                            selected = currentPeriod == period,
-                            onClick = { currentPeriod = period },
-                            label = { Text("$period") }
-                        )
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
+                    ) {
+                        (16..20).forEach { period ->
+                            FilterChip(
+                                selected = currentPeriod == period,
+                                onClick = { currentPeriod = period },
+                                label = { Text("$period") }
+                            )
+                        }
                     }
                 }
 
@@ -689,54 +738,60 @@ fun CreatePSPDialog(
                     fontSize = 12.sp,
                     color = Color.Gray
                 )
-            }
-        },
-        confirmButton = {
-            val nominal = nominalText.replace(",", ".").toDoubleOrNull() ?: 0.0
-            val isNominalValid = nominal > 0
-            val minDaysRequired = (currentPeriod - 1) * 14
-            val today = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59) }.timeInMillis
-            val isFirstDateInFuture = firstPeriodStart > today
-            val isCurrentDateInFuture = currentPeriod > 1 && currentPeriodStart > today
-            val daysBetween = if (currentPeriod > 1) {
-                val diff = currentPeriodStart - firstPeriodStart
-                (diff / (24 * 60 * 60 * 1000)).toInt()
-            } else 0
-            val isDateValid = currentPeriod == 1 || daysBetween >= minDaysRequired
-            val isFormValid = isNominalValid && isDateValid && !isFirstDateInFuture && !isCurrentDateInFuture
 
-            if (isFirstDateInFuture || isCurrentDateInFuture) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE))
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(
-                            "Ошибка в датах!",
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFC62828),
-                            fontSize = 13.sp
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            "Даты не могут быть больше текущей даты.",
-                            fontSize = 11.sp,
-                            color = Color(0xFFC62828)
-                        )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                val nominal = nominalText.replace(",", ".").toDoubleOrNull() ?: 0.0
+                val isNominalValid = nominal > 0
+                val minDaysRequired2 = (currentPeriod - 1) * 14
+                val today = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59) }.timeInMillis
+                val isFirstDateInFuture = firstPeriodStart > today
+                val isCurrentDateInFuture = currentPeriod > 1 && currentPeriodStart > today
+                val daysBetween2 = if (currentPeriod > 1) {
+                    val diff = currentPeriodStart - firstPeriodStart
+                    (diff / (24 * 60 * 60 * 1000)).toInt()
+                } else 0
+                val isDateValid2 = currentPeriod == 1 || daysBetween2 >= minDaysRequired2
+                val isFormValid = isNominalValid && isDateValid2 && !isFirstDateInFuture && !isCurrentDateInFuture
+
+                if (isFirstDateInFuture || isCurrentDateInFuture) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE))
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                "Ошибка в датах!",
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFC62828),
+                                fontSize = 13.sp
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                "Даты не могут быть больше текущей даты.",
+                                fontSize = 11.sp,
+                                color = Color(0xFFC62828)
+                            )
+                        }
                     }
                 }
-            }
 
-            Button(
-                onClick = {
-                    onConfirm(nominal, currentPeriod, firstPeriodStart, if (currentPeriod > 1) currentPeriodStart else null)
-                },
-                enabled = isFormValid
-            ) { Text("Создать") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
-    )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Отмена") }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            onConfirm(nominal, currentPeriod, firstPeriodStart, if (currentPeriod > 1) currentPeriodStart else null)
+                        },
+                        enabled = isFormValid
+                    ) { Text("Создать") }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -754,11 +809,26 @@ fun CorrectionPSPDialog(
     val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
     val hasEndDate = initialEndDate > 0
 
-    AlertDialog(
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text("Корректировка ПСП") },
-        text = {
-            Column {
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(if (isLandscape) 0.8f else 0.9f)
+                .wrapContentHeight()
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+                .padding(16.dp)
+        ) {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text("Корректировка ПСП", fontSize = 18.sp, modifier = Modifier.padding(bottom = 16.dp))
                 Text("Редактируется 'Всего получено' и дата закрытия периода", fontSize = 12.sp, color = Color.Gray)
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(
@@ -780,16 +850,23 @@ fun CorrectionPSPDialog(
                         Text(dateFormat.format(Date(newEndDate)))
                     }
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Отмена") }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(onClick = {
+                        val amount = totalAccruedText.replace(",", ".").toDoubleOrNull() ?: currentTotalAccrued
+                        onConfirm(amount, if (hasEndDate) newEndDate else null)
+                    }) { Text("Сохранить") }
+                }
             }
-        },
-        confirmButton = {
-            Button(onClick = {
-                val amount = totalAccruedText.replace(",", ".").toDoubleOrNull() ?: currentTotalAccrued
-                onConfirm(amount, if (hasEndDate) newEndDate else null)
-            }) { Text("Сохранить") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
-    )
+        }
+    }
 
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = newEndDate)
@@ -815,13 +892,28 @@ fun ContributionDialog(accrualForPeriod: Double, onDismiss: () -> Unit, onConfir
     var toWalletAll by remember { mutableStateOf(true) }
     var piggyBankText by remember { mutableStateOf("") }
     val piggyBankAmount = piggyBankText.replace(",", ".").toDoubleOrNull() ?: 0.0
-val isPiggyBankError = !toWalletAll && piggyBankAmount > accrualForPeriod
+    val isPiggyBankError = !toWalletAll && piggyBankAmount > accrualForPeriod
 
-    AlertDialog(
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text("Взнос номинала") },
-        text = {
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(if (isLandscape) 0.8f else 0.9f)
+                .wrapContentHeight()
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+                .padding(16.dp)
+        ) {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text("Взнос номинала", fontSize = 18.sp, modifier = Modifier.padding(bottom = 16.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -847,17 +939,24 @@ val isPiggyBankError = !toWalletAll && piggyBankAmount > accrualForPeriod
                         } else null
                     )
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Отмена") }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    val amountToPass = if (toWalletAll) 0.0 else piggyBankAmount
+                    Button(
+                        onClick = { onConfirm(amountToPass) },
+                        enabled = !isPiggyBankError
+                    ) { Text("Подтвердить") }
+                }
             }
-        },
-        confirmButton = {
-            val amountToPass = if (toWalletAll) 0.0 else piggyBankAmount
-            Button(
-                onClick = { onConfirm(amountToPass) },
-                enabled = !isPiggyBankError
-            ) { Text("Подтвердить") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
-    )
+        }
+    }
 }
 
 @Composable
@@ -867,88 +966,123 @@ fun ForecastPSPDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+    val dateFormat = SimpleDateFormat("dd.MM.yy", Locale.getDefault())
     val exportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/octet-stream")
+        contract = ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     ) { uri ->
         uri?.let { viewModel.exportForecastToExcel(context, it) }
     }
 
-    AlertDialog(
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+    val wideScreen = isWideScreen()
+    val tableFontSize = when {
+        isLandscape -> 12.sp
+        wideScreen -> 11.sp
+        else -> 10.sp
+    }
+
+    Dialog(
         onDismissRequest = onDismiss,
-        modifier = Modifier.fillMaxWidth().fillMaxHeight(0.8f),
-        title = { Text("Прогноз ПСП", fontSize = 18.sp) },
-        text = {
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(if (isLandscape) 0.8f else 0.9f)
+                .fillMaxHeight(0.9f)
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+                .padding(16.dp)
+        ) {
             Column(modifier = Modifier.fillMaxSize()) {
+                Text(
+                    "Прогноз ПСП",
+                    fontSize = 18.sp,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                    textAlign = TextAlign.Center
+                )
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surface)
-                        .padding(8.dp),
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(6.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Период", modifier = Modifier.weight(0.6f), fontSize = 11.sp, textAlign = TextAlign.Center)
-                    Text("Дата", modifier = Modifier.weight(1f), fontSize = 11.sp, textAlign = TextAlign.Center)
-                    Text("Начисл.", modifier = Modifier.weight(1f), fontSize = 11.sp, textAlign = TextAlign.Center)
+                    Text("Период", modifier = Modifier.weight(0.6f), fontSize = tableFontSize, textAlign = TextAlign.Center)
+                    Text("Дата", modifier = Modifier.weight(1f), fontSize = tableFontSize, textAlign = TextAlign.Center)
+                    Text("Начислено", modifier = Modifier.weight(1f), fontSize = tableFontSize, textAlign = TextAlign.Center)
                 }
 
-                Column(
+                LazyColumn(
                     modifier = Modifier
+                        .fillMaxWidth()
                         .weight(1f)
-                        .verticalScroll(rememberScrollState())
                 ) {
-                    periods.forEach { period ->
+                    items(periods) { period ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 8.dp),
+                                .padding(vertical = 6.dp),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(
-                                "${period.periodNumber}/20",
-                                modifier = Modifier.weight(0.6f),
-                                fontSize = 11.sp,
-                                textAlign = TextAlign.Center
-                            )
-                            Text(
-                                dateFormat.format(Date(period.endDate)),
-                                modifier = Modifier.weight(1f),
-                                fontSize = 11.sp,
-                                textAlign = TextAlign.Center
-                            )
-                            Text(
-                                String.format(Locale.US, "%.2f₽", period.accrualAmount),
-                                modifier = Modifier.weight(1f),
-                                fontSize = 11.sp,
-                                textAlign = TextAlign.Center,
-                                color = Color(0xFF4CAF50)
-                            )
+                            Box(modifier = Modifier.weight(0.6f), contentAlignment = Alignment.Center) {
+                                Text(
+                                    "${period.periodNumber}/20",
+                                    fontSize = tableFontSize,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                Text(
+                                    dateFormat.format(Date(period.endDate)),
+                                    fontSize = tableFontSize,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                Text(
+                                    String.format(Locale.US, "%.2f", period.accrualAmount),
+                                    fontSize = tableFontSize,
+                                    textAlign = TextAlign.Center,
+                                    color = Color(0xFF4CAF50)
+                                )
+                            }
                         }
-                        HorizontalDivider()
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
                     }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
                 val total = periods.sumOf { it.accrualAmount }
                 Text(
-                    "Итого: ${String.format(Locale.US, "%.2f₽", total)}",
+                    "Итого: ${String.format(Locale.US, "%.2f", total)}",
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Center,
                     color = FlowColors.PSP_COLOR
                 )
-            }
-        },
-        confirmButton = {
-            Row {
-                TextButton(onClick = { exportLauncher.launch("PSP_Forecast_${System.currentTimeMillis()}.xlsx") }) {
-                    Text("Экспорт", color = FlowColors.PSP_COLOR)
-                }
-                TextButton(onClick = onDismiss) {
-                    Text("Закрыть")
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Закрыть") }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = { exportLauncher.launch("PSP_Forecast_${System.currentTimeMillis()}.xlsx") },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))
+                    ) {
+                        Text("Excel", fontSize = 12.sp)
+                    }
                 }
             }
         }
-    )
+    }
 }
