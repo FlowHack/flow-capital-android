@@ -137,7 +137,10 @@ fun PremiumStartScreen() {
     val today = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis
     val periodEnd = currentPeriod?.endDate ?: 0L
     val isPeriodEndDateReached = today >= periodEnd
-    val canClose = isLastPeriod && periodIsCompleted && isPeriodEndDateReached
+    // Для 20-го периода кнопка "ЗАКРЫТЬ ПОТОК" когда дата закрытия подошла (независимо от взноса)
+    // Для остальных периодов - кнопка "СДЕЛАТЬ ВЗНОС" когда дата подошла и взнос не сделан
+    val canClose = isLastPeriod && isPeriodEndDateReached
+    val canContribute = !isLastPeriod && isPeriodEndDateReached && !periodIsCompleted
 
     Column(
         modifier = Modifier
