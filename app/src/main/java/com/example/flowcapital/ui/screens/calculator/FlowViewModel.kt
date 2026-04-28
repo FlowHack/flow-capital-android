@@ -559,8 +559,8 @@ class FlowViewModel(
             currentCal.add(Calendar.DAY_OF_YEAR, 1)
             var safetyCounter = 0
 
-            // Цикл до исчерпания потока или 730 дней (защита от бесконечного цикла)
-            while (simInFlow > 1 && safetyCounter < 730) {
+            // Цикл до исчерпания потока (когда остаток <= 0.005, что округляется до 0.00) или 730 дней
+            while (simInFlow > 0.005 && safetyCounter < 730) {
                 val isSunday = currentCal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
 
                 if (isSunday) {
