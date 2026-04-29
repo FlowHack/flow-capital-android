@@ -20,6 +20,7 @@ import java.util.Calendar
  * @param startDateMillis Дата старта (timestamp)
  * @param targetDateMillis Дата окончания прогноза (timestamp)
  * @param dailyAddition Ежедневный добавочный процент
+ * @param isExistingFlow true если это расчет действующего потока (START в текущий день, DAILY только со следующего)
  * @return Список записей GrowingFlowEntity для совместимости с БД
  */
 fun calculateFlowForecast(
@@ -28,7 +29,8 @@ fun calculateFlowForecast(
     wallet: Double,
     startDateMillis: Long,
     targetDateMillis: Long,
-    dailyAddition: Double
+    dailyAddition: Double,
+    isExistingFlow: Boolean = false
 ): List<GrowingFlowEntity> {
     Timber.d("Начало прогноза: inFlow=%.2f, percent=%.3f, wallet=%.2f", inFlow, percent, wallet)
     Timber.d("Период: ${formatDate(startDateMillis)} - ${formatDate(targetDateMillis)}")
@@ -62,8 +64,9 @@ fun calculateFlowForecast(
     Timber.v("START: step=%d, percent=%.3f, inFlow=%.2f, accrual=%.3f, wallet=%.2f",
         step, simPercent, simInFlow, simAccrual, simWallet)
 
-    // Если не воскресенье - сразу делаем DAILY в день старта
-    if (calendar.get(Calendar.DAY_OF_WEEK) != Calendar.SUNDAY) {
+    // Для нового потока: если не воскресенье - сразу делаем DAILY в день старта
+    // Для действующего потока: DAILY начинается только со следующего дня
+    if (!isExistingFlow && calendar.get(Calendar.DAY_OF_WEEK) != Calendar.SUNDAY) {
         val actualAccrual = minOf(simInFlow, simAccrual)
         simInFlow -= actualAccrual
         if (simInFlow < 0) simInFlow = 0.0
