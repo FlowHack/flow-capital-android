@@ -15,6 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -22,6 +23,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -69,10 +73,26 @@ fun CalculatorScreen() {
         factory = FlowViewModelFactory(growingRepository, noviceRepository, settingsManager)
     )
 
-    // Генерация пропущенных дней для РП при открытии вкладки
+    // Генерация пропущенных дней для РП при открытии вкладки или возобновлении приложения
     LaunchedEffect(selectedTabIndex) {
         if (selectedTabIndex == 3) { // РП вкладка
             viewModel.generateMissedDaysForGrowingFlow()
+        }
+    }
+    
+    // Также слушаем возобновление приложения (onResume) через Lifecycle
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                if (selectedTabIndex == 3) { // РП вкладка
+                    viewModel.generateMissedDaysForGrowingFlow()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
