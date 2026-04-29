@@ -698,12 +698,7 @@ fun NoviceForecastConfigDialog(
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Text("Прогноз ПН", fontSize = 18.sp, modifier = Modifier.padding(bottom = 16.dp))
 
-                // Выбор даты
-                DatePicker(state = datePickerState)
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Чекбокс сложного процента
+                // Чекбокс сложного процента (ПЕРЕД календарем)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -734,6 +729,11 @@ fun NoviceForecastConfigDialog(
                         isError = !isReinvestAmountValid
                     )
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Выбор даты (ПОСЛЕ чекбокса)
+                DatePicker(state = datePickerState)
 
                 Spacer(modifier = Modifier.height(16.dp))
 

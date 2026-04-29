@@ -3145,7 +3145,8 @@ private fun CalculateNoviceFlowDialog(
                         startDateMillis = startDateMillis,
                         targetDateMillis = targetDateMillis,
                         compoundInterest = compoundInterest,
-                        reinvestAmount = if (compoundInterest) reinvestAmount else 2000.0
+                        reinvestAmount = if (compoundInterest) reinvestAmount else 2000.0,
+                        bonusPercent = savedBonusPercent
                     )
                     forecastResults = results
                     showResults = true
@@ -3209,6 +3210,7 @@ private fun CalculateExistingNoviceFlowDialog(
     val scope = rememberCoroutineScope()
 
     val savedDailyPercent by settingsManager.pnDailyPercentFlow.collectAsState(initial = 2.0)
+    val savedBonusPercent by settingsManager.pnBonusPercentFlow.collectAsState(initial = 50.0)
 
     var inFlowText by remember { mutableStateOf("") }
     var walletText by remember { mutableStateOf("") }
@@ -3334,7 +3336,8 @@ private fun CalculateExistingNoviceFlowDialog(
                             targetDateMillis = targetDateMillis,
                             isExistingFlow = true,
                             compoundInterest = compoundInterest,
-                            reinvestAmount = if (compoundInterest) reinvestAmount else 2000.0
+                            reinvestAmount = if (compoundInterest) reinvestAmount else 2000.0,
+                            bonusPercent = savedBonusPercent
                         )
                         forecastResults = results
                         showResults = true

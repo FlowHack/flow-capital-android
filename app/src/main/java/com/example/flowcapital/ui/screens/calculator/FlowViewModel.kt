@@ -430,11 +430,13 @@ class FlowViewModel(
       * @param targetDateMillis Дата окончания прогноза
       * @param compoundInterest Включить сложный процент (реинвест при накоплении)
       * @param reinvestAmount Сумма для реинвеста (по умолчанию 2000)
+      * @param bonusPercent Процент бонуса за взнос (из настроек)
       */
      fun generateNoviceForecast(
          targetDateMillis: Long,
          compoundInterest: Boolean = false,
-         reinvestAmount: Double = 2000.0
+         reinvestAmount: Double = 2000.0,
+         bonusPercent: Double = 50.0
      ) {
          viewModelScope.launch {
              val lastEntry = noviceRepository.getLastEntry() ?: return@launch
@@ -545,7 +547,9 @@ class FlowViewModel(
                      // Сложный процент: проверяем, нужно ли делать реинвест
                      if (compoundInterest && simWallet >= reinvestAmount) {
                          val reinvestAmountActual = simWallet
-                         simInFlow += reinvestAmountActual
+                         // Реинвест с учётом бонуса (как при обычном взносе)
+                         val withBonus = reinvestAmountActual + reinvestAmountActual * (bonusPercent / 100.0)
+                         simInFlow += withBonus
                          simWallet = 0.0
                          simAccrual = if (simInFlow > 0) simInFlow * (dailyPercent / 100.0) else 0.0
                          step++
@@ -860,29 +864,31 @@ class FlowViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                    val workbook = org.dhatim.fastexcel.Workbook(outputStream, "Прогноз ПН", null)
-                    val worksheet = workbook.newWorksheet("ПН")
-                    worksheet.value(0, 0, "Шаг")
-                    worksheet.value(0, 1, "Дата")
-                    worksheet.value(0, 2, "В потоке")
-                    worksheet.value(0, 3, "Начисление")
-                    worksheet.value(0, 4, "Кошелек")
-                    val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
-                    var step = 0
-                    forecastList.forEachIndexed { index, entry ->
-                        val row = index + 1
-                        val isActiveAction = entry.actionType in listOf("PN_START", "PN_DAILY", "PN_FORECAST", "PN_REINVEST")
-                        if (isActiveAction) {
-                            step++
-                            worksheet.value(row, 0, step)
-                        } else {
-                            worksheet.value(row, 0, "-")
-                        }
-                        worksheet.value(row, 1, dateFormat.format(Date(entry.date)))
-                        worksheet.value(row, 2, entry.inFlowAmount)
-                        worksheet.value(row, 3, entry.dailyAccrual)
-                        worksheet.value(row, 4, entry.walletAmount)
+                val workbook = org.dhatim.fastexcel.Workbook(outputStream, "Прогноз ПН", null)
+                val worksheet = workbook.newWorksheet("ПН")
+                worksheet.value(0, 0, "Шаг")
+                worksheet.value(0, 1, "Дата")
+                worksheet.value(0, 2, "В потоке")
+                worksheet.value(0, 3, "Начисление")
+                worksheet.value(0, 4, "Кошелек")
+                worksheet.value(0, 5, "Действие")
+                val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+                var step = 0
+                forecastList.forEachIndexed { index, entry ->
+                    val row = index + 1
+                    val isActiveAction = entry.actionType in listOf("PN_START", "PN_DAILY", "PN_FORECAST", "PN_REINVEST")
+                    if (isActiveAction) {
+                        step++
+                        worksheet.value(row, 0, step)
+                    } else {
+                        worksheet.value(row, 0, "-")
                     }
+                    worksheet.value(row, 1, dateFormat.format(Date(entry.date)))
+                    worksheet.value(row, 2, entry.inFlowAmount)
+                    worksheet.value(row, 3, entry.dailyAccrual)
+                    worksheet.value(row, 4, entry.walletAmount)
+                    worksheet.value(row, 5, entry.actionType)
+                }
                     workbook.finish()
                 }
             } catch (e: Exception) { AppLogger.e("FlowViewModel", "Ошибка экспорта NoviceFlow прогноза", e) }

@@ -27,6 +27,7 @@ import java.util.Calendar
  * @param isExistingFlow true если это расчет действующего потока
  * @param compoundInterest true чтобы включить сложный процент (реинвест при накоплении)
  * @param reinvestAmount Сумма в кошельке, при достижении которой происходит реинвест (по умолчанию 2000)
+ * @param bonusPercent Процент бонуса за взнос (из настроек), используется при реинвесте
  * @return Список записей прогноза NoviceFlowEntity
  */
 fun calculateNoviceFlowForecast(
@@ -37,7 +38,8 @@ fun calculateNoviceFlowForecast(
     targetDateMillis: Long,
     isExistingFlow: Boolean = false,
     compoundInterest: Boolean = false,
-    reinvestAmount: Double = 2000.0
+    reinvestAmount: Double = 2000.0,
+    bonusPercent: Double = 50.0
 ): List<NoviceFlowEntity> {
     Timber.d("Начало прогноза ПН: inFlow=%.2f, percent=%.2f, wallet=%.2f", inFlow, dailyPercent, wallet)
     Timber.d("Период: ${formatDate(startDateMillis)} - ${formatDate(targetDateMillis)}")
@@ -140,9 +142,10 @@ fun calculateNoviceFlowForecast(
 
             // Сложный процент: проверяем, нужно ли делать реинвест
             if (compoundInterest && simWallet >= reinvestAmount) {
-                // Реинвест на всю сумму в кошельке
+                // Реинвест с учётом бонуса (как при обычном взносе)
                 val reinvestAmountActual = simWallet
-                simInFlow += reinvestAmountActual
+                val withBonus = reinvestAmountActual + reinvestAmountActual * (bonusPercent / 100.0)
+                simInFlow += withBonus
                 simWallet = 0.0
                 simAccrual = if (simInFlow > 0) simInFlow * (dailyPercent / 100.0) else 0.0
 
@@ -157,8 +160,8 @@ fun calculateNoviceFlowForecast(
                     isButtonPressed = true,
                     actionType = "PN_REINVEST"
                 ))
-                Timber.v("REINVEST ПН (сложный процент): step=%d, reinvest=%.2f, newInFlow=%.2f, newAccrual=%.2f",
-                    step, reinvestAmountActual, simInFlow, simAccrual)
+                Timber.v("REINVEST ПН (сложный процент): step=%d, reinvest=%.2f (с бонусом %.0f%% -> %.2f), newInFlow=%.2f, newAccrual=%.2f",
+                    step, reinvestAmountActual, bonusPercent, withBonus, simInFlow, simAccrual)
             }
         }
         calendar.add(Calendar.DAY_OF_YEAR, 1)

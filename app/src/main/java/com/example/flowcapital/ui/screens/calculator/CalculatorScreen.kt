@@ -275,7 +275,8 @@ fun CalculatorScreen() {
                 viewModel.generateNoviceForecast(
                     targetDateMillis = selectedDateMillis,
                     compoundInterest = compoundInterest,
-                    reinvestAmount = reinvestAmount
+                    reinvestAmount = reinvestAmount,
+                    bonusPercent = pnBonusPercent
                 )
             }
         )
