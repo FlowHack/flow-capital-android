@@ -288,15 +288,41 @@ class FlowViewModel(
             // Идем назад по дням, пока не дойдем до дня ПЕРЕД стартом (startDate - 1)
             // ТЗ: цикл продолжается пока checkDate >= startDate (включительно)
             while (!checkDate.isBefore(startDate)) {
-                // Пропускаем воскресенья
-                if (checkDate.dayOfWeek == DayOfWeek.SUNDAY) {
-                    checkDate = checkDate.minusDays(1)
-                    continue
-                }
-                
                 val dayStart = checkDate.atStartOfDay(zoneId).toInstant().toEpochMilli()
                 val dayEnd = checkDate.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
                 val entriesForDate = growingRepository.getEntriesForDateRange(dayStart, dayEnd)
+                
+                // Воскресенье - создаем SUNDAY запись (если еще нет)
+                if (checkDate.dayOfWeek == DayOfWeek.SUNDAY) {
+                    val hasSunday = entriesForDate.any { it.actionType == "SUNDAY" }
+                    if (!hasSunday) {
+                        // Получаем последнюю запись перед этим днем для значений
+                        val previousEntry = growingRepository.getLastEntryBeforeDate(dayStart) 
+                            ?: firstStartEntry
+                        
+                        // Определяем дату для SUNDAY: если в этот день уже есть записи,
+                        // ставим SUNDAY после них (на 1 мс после последней записи дня)
+                        val sundayDate = if (entriesForDate.isNotEmpty()) {
+                            entriesForDate.maxOf { it.date } + 1
+                        } else {
+                            dayStart
+                        }
+                        
+                        val sundayEntry = GrowingFlowEntity(
+                            date = sundayDate,
+                            percent = previousEntry.percent,
+                            inFlowAmount = previousEntry.inFlowAmount,
+                            dailyAccrual = previousEntry.dailyAccrual,
+                            walletAmount = previousEntry.walletAmount,
+                            isButtonPressed = false,
+                            actionType = "SUNDAY"
+                        )
+                        growingRepository.insertEntry(sundayEntry)
+                        AppLogger.d("FlowViewModel", "Создана запись SUNDAY за ${checkDate}")
+                    }
+                    checkDate = checkDate.minusDays(1)
+                    continue
+                }
                 
                 // Проверяем ТОЛЬКО DAILY (не START!)
                 val hasDaily = entriesForDate.any { it.actionType == "DAILY" }
