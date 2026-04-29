@@ -295,12 +295,20 @@ class FlowViewModel(
                 // В день старта может быть START, но если нет DAILY - все равно создаем MISSED
                 val hasMissed = entriesForDate.any { it.actionType == "MISSED" }
                 if (!hasMissed) {
-                    // Берем последнюю запись перед этим днем для значений
+                    // Получаем последнюю запись перед этим днем для значений
                     val previousEntry = growingRepository.getLastEntryBeforeDate(dayStart) 
                         ?: firstStartEntry
                     
+                    // Определяем дату для MISSED: если в этот день уже есть записи (например START),
+                    // ставим MISSED после них (на 1 мс после последней записи дня)
+                    val missedDate = if (entriesForDate.isNotEmpty()) {
+                        entriesForDate.maxOf { it.date } + 1
+                    } else {
+                        dayStart
+                    }
+                    
                     val missedEntry = GrowingFlowEntity(
-                        date = dayStart,
+                        date = missedDate,
                         percent = previousEntry.percent,
                         inFlowAmount = previousEntry.inFlowAmount,
                         dailyAccrual = previousEntry.dailyAccrual,
