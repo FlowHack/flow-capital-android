@@ -169,8 +169,8 @@ class FlowViewModel(
      *
      * Логика:
      * - В воскресенье создаётся запись SUNDAY (значения не меняются)
-     * - При пропуске дня создаётся запись MISSED
      * - При нажатии: уменьшается поток, увеличивается кошелёк, растёт процент
+     * - Пропущенные дни обрабатываются через generateMissedDaysForGrowingFlow()
      */
     fun pressDailyButton() {
         viewModelScope.launch {
@@ -197,20 +197,6 @@ class FlowViewModel(
                 return@launch
             }
 
-            // Пропущенный день - создаём MISSED запись (дата +1 день от последней записи)
-            if (!isSameDay && !lastEntry.isButtonPressed) {
-                val missedEntry = GrowingFlowEntity(
-                    date = lastEntry.date + (24 * 60 * 60 * 1000),
-                    percent = lastEntry.percent,
-                    inFlowAmount = lastEntry.inFlowAmount,
-                    dailyAccrual = lastEntry.dailyAccrual,
-                    walletAmount = lastEntry.walletAmount,
-                    isButtonPressed = false,
-                    actionType = "MISSED"
-                )
-                growingRepository.insertEntry(missedEntry)
-            }
-
             // Уже нажато сегодня - выходим
             if (isSameDay && lastEntry.isButtonPressed) return@launch
 
@@ -231,16 +217,44 @@ class FlowViewModel(
             // Пересчитываем начисление для нового потока
             val newDailyAccrual = if (newInFlow > 0) newInFlow * (newPercent / 100.0) else 0.0
 
-            val newEntry = GrowingFlowEntity(
-                date = System.currentTimeMillis(),
-                percent = newPercent,
-                inFlowAmount = newInFlow,
-                dailyAccrual = newDailyAccrual,
-                walletAmount = newWallet,
-                isButtonPressed = true,
-                actionType = "DAILY"
-            )
-            growingRepository.insertEntry(newEntry)
+            // Проверяем, есть ли MISSED на сегодня (созданный generateMissedDaysForGrowingFlow)
+            val todayStart = Calendar.getInstance().apply {
+                timeInMillis = System.currentTimeMillis()
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+            val todayEnd = todayStart + (24 * 60 * 60 * 1000)
+
+            val todayEntries = growingRepository.getEntriesForDateRange(todayStart, todayEnd)
+            val missedEntry = todayEntries.find { it.actionType == "MISSED" }
+
+            if (missedEntry != null) {
+                // Обновляем MISSED в DAILY (не создаём новую запись!)
+                val updatedEntry = missedEntry.copy(
+                    date = System.currentTimeMillis(),
+                    percent = newPercent,
+                    inFlowAmount = newInFlow,
+                    dailyAccrual = newDailyAccrual,
+                    walletAmount = newWallet,
+                    isButtonPressed = true,
+                    actionType = "DAILY"
+                )
+                growingRepository.updateEntry(updatedEntry)
+            } else {
+                // Нет MISSED - создаём новую DAILY запись
+                val newEntry = GrowingFlowEntity(
+                    date = System.currentTimeMillis(),
+                    percent = newPercent,
+                    inFlowAmount = newInFlow,
+                    dailyAccrual = newDailyAccrual,
+                    walletAmount = newWallet,
+                    isButtonPressed = true,
+                    actionType = "DAILY"
+                )
+                growingRepository.insertEntry(newEntry)
+            }
         }
     }
 

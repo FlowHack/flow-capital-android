@@ -12,6 +12,8 @@ class GrowingFlowRepository(private val dao: GrowingFlowDao) {
 
     suspend fun insertEntry(entry: GrowingFlowEntity) = dao.insert(entry)
 
+    suspend fun updateEntry(entry: GrowingFlowEntity) = dao.update(entry)
+
     suspend fun clearHistory() = dao.clearAll()
 
     suspend fun getEntriesForDateRange(startDate: Long, endDate: Long): List<GrowingFlowEntity> =

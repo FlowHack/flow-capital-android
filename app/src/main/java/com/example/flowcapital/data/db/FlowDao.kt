@@ -20,6 +20,9 @@ interface GrowingFlowDao {
     @Insert
     suspend fun insert(flowEntity: GrowingFlowEntity)
 
+    @Update
+    suspend fun update(flowEntity: GrowingFlowEntity)
+
     @Query("DELETE FROM growing_flow_history")
     suspend fun clearAll()
 
