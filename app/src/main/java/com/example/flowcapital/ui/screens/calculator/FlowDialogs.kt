@@ -397,6 +397,7 @@ fun NoviceForecastResultsDialog(
 
     val weightDate = if (isLandscape) 1.2f else 1.1f
     val weightInFlow = if (isLandscape) 2f else 1.4f
+    val weightAccrual = if (isLandscape) 1.8f else 1.2f
     val weightWallet = if (isLandscape) 2f else 1.4f
     val tableFontSize = if (isLandscape) 12.sp else 11.sp
 
@@ -415,13 +416,7 @@ fun NoviceForecastResultsDialog(
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth(
-                    when {
-                        isLandscape -> 0.9f
-                        wideScreen -> 0.9f
-                        else -> 0.95f
-                    }
-                )
+                .fillMaxWidth(0.8f)  // Всегда 0.8f
                 .fillMaxHeight(0.9f)
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
                 .padding(16.dp)
@@ -439,6 +434,7 @@ fun NoviceForecastResultsDialog(
                 ) {
                     Text("Дата", modifier = Modifier.weight(weightDate), fontSize = tableFontSize, textAlign = TextAlign.Center)
                     Text("В потоке", modifier = Modifier.weight(weightInFlow), fontSize = tableFontSize, textAlign = TextAlign.Center)
+                    if (wideScreen) Text("Начисление", modifier = Modifier.weight(weightAccrual), fontSize = tableFontSize, textAlign = TextAlign.Center)
                     Text("Кошелек", modifier = Modifier.weight(weightWallet), fontSize = tableFontSize, textAlign = TextAlign.Center)
                 }
                 LazyColumn(
@@ -473,6 +469,14 @@ fun NoviceForecastResultsDialog(
                             Box(modifier = Modifier.weight(weightInFlow), contentAlignment = Alignment.Center) {
                                 Text(
                                     String.format(Locale.US, "%.2f", entry.inFlowAmount),
+                                    fontSize = tableFontSize,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                            if (wideScreen) Box(modifier = Modifier.weight(weightAccrual), contentAlignment = Alignment.Center) {
+                                Text(
+                                    String.format(Locale.US, "+%.2f", entry.dailyAccrual),
+                                    color = if (isSunday) Color.Gray else Color(0xFF4CAF50),
                                     fontSize = tableFontSize,
                                     textAlign = TextAlign.Center
                                 )

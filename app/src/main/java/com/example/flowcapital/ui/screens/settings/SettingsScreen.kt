@@ -3387,7 +3387,6 @@ private suspend fun exportExistingNoviceForecastToExcel(context: Context, uri: U
                 worksheet.value(0, 2, "В потоке")
                 worksheet.value(0, 3, "Начисление")
                 worksheet.value(0, 4, "Кошелек")
-                worksheet.value(0, 5, "Действие")
                 val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
                 var currentStep = 0
                 forecast.forEachIndexed { index, entry ->
@@ -3401,14 +3400,13 @@ private suspend fun exportExistingNoviceForecastToExcel(context: Context, uri: U
                     worksheet.value(row, 2, entry.inFlowAmount)
                     worksheet.value(row, 3, entry.dailyAccrual)
                     worksheet.value(row, 4, entry.walletAmount)
-                    worksheet.value(row, 5, entry.actionType)
                     val fillColor = when (entry.actionType) {
                         "PN_START", "PN_DAILY" -> "C8FFC8"
                         "SUNDAY" -> "E6C8FF"
                         else -> null
                     }
                     if (fillColor != null) {
-                        (0..5).forEach { col ->
+                        (0..4).forEach { col ->
                             worksheet.style(row, col).fillColor(fillColor).set()
                         }
                     }
@@ -3433,7 +3431,6 @@ private suspend fun exportNoviceForecastToExcel(context: Context, uri: Uri, fore
                 worksheet.value(0, 2, "В потоке")
                 worksheet.value(0, 3, "Начисление")
                 worksheet.value(0, 4, "Кошелек")
-                worksheet.value(0, 5, "Действие")
                 val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
                 var currentStep = 0
                 forecast.forEachIndexed { index, entry ->
@@ -3447,14 +3444,13 @@ private suspend fun exportNoviceForecastToExcel(context: Context, uri: Uri, fore
                     worksheet.value(row, 2, entry.inFlowAmount)
                     worksheet.value(row, 3, entry.dailyAccrual)
                     worksheet.value(row, 4, entry.walletAmount)
-                    worksheet.value(row, 5, entry.actionType)
                     val fillColor = when (entry.actionType) {
                         "PN_START", "PN_DAILY" -> "C8FFC8"
                         "SUNDAY" -> "E6C8FF"
                         else -> null
                     }
                     if (fillColor != null) {
-                        (0..5).forEach { col ->
+                        (0..4).forEach { col ->
                             worksheet.style(row, col).fillColor(fillColor).set()
                         }
                     }

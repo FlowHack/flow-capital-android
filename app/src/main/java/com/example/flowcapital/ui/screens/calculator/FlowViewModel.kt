@@ -871,7 +871,6 @@ class FlowViewModel(
                 worksheet.value(0, 2, "В потоке")
                 worksheet.value(0, 3, "Начисление")
                 worksheet.value(0, 4, "Кошелек")
-                worksheet.value(0, 5, "Действие")
                 val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
                 var step = 0
                 forecastList.forEachIndexed { index, entry ->
@@ -887,7 +886,6 @@ class FlowViewModel(
                     worksheet.value(row, 2, entry.inFlowAmount)
                     worksheet.value(row, 3, entry.dailyAccrual)
                     worksheet.value(row, 4, entry.walletAmount)
-                    worksheet.value(row, 5, entry.actionType)
                 }
                     workbook.finish()
                 }
