@@ -31,6 +31,9 @@ interface GrowingFlowDao {
 
     @Query("SELECT * FROM growing_flow_history WHERE date < :date ORDER BY date DESC LIMIT 1")
     suspend fun getLastEntryBeforeDate(date: Long): GrowingFlowEntity?
+
+    @Query("SELECT * FROM growing_flow_history WHERE actionType = 'START' ORDER BY date ASC LIMIT 1")
+    suspend fun getFirstStartEntry(): GrowingFlowEntity?
 }
 
 /**

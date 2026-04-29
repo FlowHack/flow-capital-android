@@ -19,6 +19,9 @@ class GrowingFlowRepository(private val dao: GrowingFlowDao) {
 
     suspend fun getLastEntryBeforeDate(date: Long): GrowingFlowEntity? =
         dao.getLastEntryBeforeDate(date)
+
+    suspend fun getFirstStartEntry(): GrowingFlowEntity? =
+        dao.getFirstStartEntry()
 }
 
 /**

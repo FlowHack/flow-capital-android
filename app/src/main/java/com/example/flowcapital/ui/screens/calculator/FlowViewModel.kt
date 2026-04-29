@@ -246,52 +246,58 @@ class FlowViewModel(
 
     /**
      * Генерация пропущенных дней для РП при отрисовке таблицы истории.
-     * Согласно ТЗ О1: проверяем с D-1 (вчера) и создаем записи MISSED за пропущенные дни.
+     * Согласно ТЗ О1:
+     * - Проверяем с D-1 (вчера) и идем назад до дня старта потока (START) включительно
+     * - Создаем записи MISSED за пропущенные дни, где нет DAILY
+     * - В день старта потока кнопка также активна - если нет DAILY, создаем MISSED (будет 2 записи: START и MISSED)
+     * - Цикл прерывается ТОЛЬКО при нахождении DAILY (не START!)
+     * - Учитываем, что могут быть реинвесты/корректировки, но DAILY должен быть каждый день (кроме воскресенья)
      */
     fun generateMissedDaysForGrowingFlow() {
         viewModelScope.launch {
-            val lastEntry = growingRepository.getLastEntry() ?: return@launch
             val zoneId = ZoneId.systemDefault()
-            
-            // Текущая дата (00:00 локального времени)
             val today = LocalDate.now(zoneId)
-            // Последняя дата записи в истории
-            val lastDate = Instant.ofEpochMilli(lastEntry.date).atZone(zoneId).toLocalDate()
+            
+            // Получаем дату первой записи START (начало потока)
+            val firstStartEntry = growingRepository.getFirstStartEntry() ?: return@launch
+            val startDate = Instant.ofEpochMilli(firstStartEntry.date).atZone(zoneId).toLocalDate()
             
             // Начинаем проверку со вчера
             var checkDate = today.minusDays(1)
             
-            // Если последняя запись - воскресенье, проверяем еще на день назад
-            var checkDateToUse = checkDate
-            if (lastDate.dayOfWeek == DayOfWeek.SUNDAY) {
-                checkDateToUse = checkDate.minusDays(1)
+            // Если вчера было воскресенье - проверяем еще на день назад (с субботы)
+            if (checkDate.dayOfWeek == DayOfWeek.SUNDAY) {
+                checkDate = checkDate.minusDays(1)
             }
             
-            // Идем назад по дням, пока не найдем запись DAILY или START, или не дойдем до начала потока
-            while (checkDateToUse.isAfter(lastDate) || checkDateToUse.isEqual(lastDate)) {
+            // Идем назад по дням, пока не дойдем до дня ПЕРЕД стартом (startDate - 1)
+            // ТЗ: цикл продолжается пока checkDate >= startDate (включительно)
+            while (!checkDate.isBefore(startDate)) {
                 // Пропускаем воскресенья
-                if (checkDateToUse.dayOfWeek == DayOfWeek.SUNDAY) {
-                    checkDateToUse = checkDateToUse.minusDays(1)
+                if (checkDate.dayOfWeek == DayOfWeek.SUNDAY) {
+                    checkDate = checkDate.minusDays(1)
                     continue
                 }
                 
-                // Проверяем, есть ли запись за этот день
-                val dayStart = checkDateToUse.atStartOfDay(zoneId).toInstant().toEpochMilli()
-                val dayEnd = checkDateToUse.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
+                val dayStart = checkDate.atStartOfDay(zoneId).toInstant().toEpochMilli()
+                val dayEnd = checkDate.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
                 val entriesForDate = growingRepository.getEntriesForDateRange(dayStart, dayEnd)
                 
-                val hasDaily = entriesForDate.any { it.actionType in listOf("DAILY", "START") }
+                // Проверяем ТОЛЬКО DAILY (не START!)
+                val hasDaily = entriesForDate.any { it.actionType == "DAILY" }
                 
                 if (hasDaily) {
-                    // Нашли день с DAILY/START - завершаем проверку
+                    // Нашли DAILY - завершаем проверку
                     break
                 }
                 
-                // Нет записи DAILY - создаем MISSED
+                // Нет DAILY - создаем MISSED (если еще нет)
+                // В день старта может быть START, но если нет DAILY - все равно создаем MISSED
                 val hasMissed = entriesForDate.any { it.actionType == "MISSED" }
                 if (!hasMissed) {
-                    // Берем последнюю запись перед этим днем
-                    val previousEntry = growingRepository.getLastEntryBeforeDate(dayStart) ?: lastEntry
+                    // Берем последнюю запись перед этим днем для значений
+                    val previousEntry = growingRepository.getLastEntryBeforeDate(dayStart) 
+                        ?: firstStartEntry
                     
                     val missedEntry = GrowingFlowEntity(
                         date = dayStart,
@@ -303,11 +309,10 @@ class FlowViewModel(
                         actionType = "MISSED"
                     )
                     growingRepository.insertEntry(missedEntry)
-                    AppLogger.d("FlowViewModel", "Создана запись MISSED за ${checkDateToUse}")
+                    AppLogger.d("FlowViewModel", "Создана запись MISSED за ${checkDate}")
                 }
                 
-                // Переходим к предыдущему дню
-                checkDateToUse = checkDateToUse.minusDays(1)
+                checkDate = checkDate.minusDays(1)
             }
         }
     }
