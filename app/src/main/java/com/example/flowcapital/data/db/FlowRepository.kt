@@ -13,6 +13,12 @@ class GrowingFlowRepository(private val dao: GrowingFlowDao) {
     suspend fun insertEntry(entry: GrowingFlowEntity) = dao.insert(entry)
 
     suspend fun clearHistory() = dao.clearAll()
+
+    suspend fun getEntriesForDateRange(startDate: Long, endDate: Long): List<GrowingFlowEntity> =
+        dao.getEntriesForDateRange(startDate, endDate)
+
+    suspend fun getLastEntryBeforeDate(date: Long): GrowingFlowEntity? =
+        dao.getLastEntryBeforeDate(date)
 }
 
 /**

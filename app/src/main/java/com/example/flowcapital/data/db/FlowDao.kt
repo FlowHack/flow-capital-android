@@ -25,6 +25,12 @@ interface GrowingFlowDao {
 
     @Query("SELECT COUNT(*) FROM growing_flow_history")
     suspend fun getRecordsCount(): Int
+
+    @Query("SELECT * FROM growing_flow_history WHERE date >= :startDate AND date < :endDate ORDER BY date ASC")
+    suspend fun getEntriesForDateRange(startDate: Long, endDate: Long): List<GrowingFlowEntity>
+
+    @Query("SELECT * FROM growing_flow_history WHERE date < :date ORDER BY date DESC LIMIT 1")
+    suspend fun getLastEntryBeforeDate(date: Long): GrowingFlowEntity?
 }
 
 /**

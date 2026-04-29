@@ -21,6 +21,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.time.DayOfWeek
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -237,6 +241,74 @@ class FlowViewModel(
                 actionType = "DAILY"
             )
             growingRepository.insertEntry(newEntry)
+        }
+    }
+
+    /**
+     * Генерация пропущенных дней для РП при отрисовке таблицы истории.
+     * Согласно ТЗ О1: проверяем с D-1 (вчера) и создаем записи MISSED за пропущенные дни.
+     */
+    fun generateMissedDaysForGrowingFlow() {
+        viewModelScope.launch {
+            val lastEntry = growingRepository.getLastEntry() ?: return@launch
+            val zoneId = ZoneId.systemDefault()
+            
+            // Текущая дата (00:00 локального времени)
+            val today = LocalDate.now(zoneId)
+            // Последняя дата записи в истории
+            val lastDate = Instant.ofEpochMilli(lastEntry.date).atZone(zoneId).toLocalDate()
+            
+            // Начинаем проверку со вчера
+            var checkDate = today.minusDays(1)
+            
+            // Если последняя запись - воскресенье, проверяем еще на день назад
+            var checkDateToUse = checkDate
+            if (lastDate.dayOfWeek == DayOfWeek.SUNDAY) {
+                checkDateToUse = checkDate.minusDays(1)
+            }
+            
+            // Идем назад по дням, пока не найдем запись DAILY или START, или не дойдем до начала потока
+            while (checkDateToUse.isAfter(lastDate) || checkDateToUse.isEqual(lastDate)) {
+                // Пропускаем воскресенья
+                if (checkDateToUse.dayOfWeek == DayOfWeek.SUNDAY) {
+                    checkDateToUse = checkDateToUse.minusDays(1)
+                    continue
+                }
+                
+                // Проверяем, есть ли запись за этот день
+                val dayStart = checkDateToUse.atStartOfDay(zoneId).toInstant().toEpochMilli()
+                val dayEnd = checkDateToUse.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
+                val entriesForDate = growingRepository.getEntriesForDateRange(dayStart, dayEnd)
+                
+                val hasDaily = entriesForDate.any { it.actionType in listOf("DAILY", "START") }
+                
+                if (hasDaily) {
+                    // Нашли день с DAILY/START - завершаем проверку
+                    break
+                }
+                
+                // Нет записи DAILY - создаем MISSED
+                val hasMissed = entriesForDate.any { it.actionType == "MISSED" }
+                if (!hasMissed) {
+                    // Берем последнюю запись перед этим днем
+                    val previousEntry = growingRepository.getLastEntryBeforeDate(dayStart) ?: lastEntry
+                    
+                    val missedEntry = GrowingFlowEntity(
+                        date = dayStart,
+                        percent = previousEntry.percent,
+                        inFlowAmount = previousEntry.inFlowAmount,
+                        dailyAccrual = previousEntry.dailyAccrual,
+                        walletAmount = previousEntry.walletAmount,
+                        isButtonPressed = false,
+                        actionType = "MISSED"
+                    )
+                    growingRepository.insertEntry(missedEntry)
+                    AppLogger.d("FlowViewModel", "Создана запись MISSED за ${checkDateToUse}")
+                }
+                
+                // Переходим к предыдущему дню
+                checkDateToUse = checkDateToUse.minusDays(1)
+            }
         }
     }
 

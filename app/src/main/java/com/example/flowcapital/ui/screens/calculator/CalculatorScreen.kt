@@ -69,6 +69,13 @@ fun CalculatorScreen() {
         factory = FlowViewModelFactory(growingRepository, noviceRepository, settingsManager)
     )
 
+    // Генерация пропущенных дней для РП при открытии вкладки
+    LaunchedEffect(selectedTabIndex) {
+        if (selectedTabIndex == 3) { // РП вкладка
+            viewModel.generateMissedDaysForGrowingFlow()
+        }
+    }
+
     val growingHistory by viewModel.growingHistory.collectAsState(initial = emptyList())
     val noviceHistory by viewModel.noviceHistory.collectAsState(initial = emptyList())
 
