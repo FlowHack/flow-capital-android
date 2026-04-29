@@ -277,13 +277,38 @@ class FlowViewModel(
             val firstStartEntry = growingRepository.getFirstStartEntry() ?: return@launch
             val startDate = Instant.ofEpochMilli(firstStartEntry.date).atZone(zoneId).toLocalDate()
             
-            // Начинаем проверку со вчера
-            var checkDate = today.minusDays(1)
-            
-            // Если вчера было воскресенье - проверяем еще на день назад (с субботы)
-            if (checkDate.dayOfWeek == DayOfWeek.SUNDAY) {
-                checkDate = checkDate.minusDays(1)
+            // ШАГ 1: Проверяем текущий день - если воскресенье, создаём SUNDAY
+            if (today.dayOfWeek == DayOfWeek.SUNDAY) {
+                val todayStart = today.atStartOfDay(zoneId).toInstant().toEpochMilli()
+                val todayEnd = today.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
+                val entriesForToday = growingRepository.getEntriesForDateRange(todayStart, todayEnd)
+                val hasSundayToday = entriesForToday.any { it.actionType == "SUNDAY" }
+                
+                if (!hasSundayToday) {
+                    val previousEntry = growingRepository.getLastEntryBeforeDate(todayStart) ?: firstStartEntry
+                    
+                    val sundayDate = if (entriesForToday.isNotEmpty()) {
+                        entriesForToday.maxOf { it.date } + 1
+                    } else {
+                        todayStart
+                    }
+                    
+                    val sundayEntry = GrowingFlowEntity(
+                        date = sundayDate,
+                        percent = previousEntry.percent,
+                        inFlowAmount = previousEntry.inFlowAmount,
+                        dailyAccrual = previousEntry.dailyAccrual,
+                        walletAmount = previousEntry.walletAmount,
+                        isButtonPressed = false,
+                        actionType = "SUNDAY"
+                    )
+                    growingRepository.insertEntry(sundayEntry)
+                    AppLogger.d("FlowViewModel", "Создана запись SUNDAY за сегодня (${today})")
+                }
             }
+            
+            // ШАГ 2: Начинаем проверку со вчера
+            var checkDate = today.minusDays(1)
             
             // Идем назад по дням, пока не дойдем до дня ПЕРЕД стартом (startDate - 1)
             // ТЗ: цикл продолжается пока checkDate >= startDate (включительно)
