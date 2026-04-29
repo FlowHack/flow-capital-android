@@ -30,6 +30,7 @@ import com.example.flowcapital.data.db.AppDatabase
 import com.example.flowcapital.data.db.GrowingFlowRepository
 import com.example.flowcapital.data.db.NoviceFlowRepository
 import com.example.flowcapital.data.settings.SettingsManager
+import com.example.flowcapital.ui.screens.calculator.NoviceForecastConfigDialog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -92,7 +93,7 @@ fun CalculatorScreen() {
     var showDatePicker by remember { mutableStateOf(false) }
     var showNoviceReinvestDialog by remember { mutableStateOf(false) }
     var showNoviceCorrectionDialog by remember { mutableStateOf(false) }
-    var showNoviceDatePicker by remember { mutableStateOf(false) }
+    var showNoviceForecastConfig by remember { mutableStateOf(false) }
 
     // Данные прогнозов из ViewModel
     val forecastData by viewModel.forecastResults.collectAsState()
@@ -151,7 +152,7 @@ fun CalculatorScreen() {
                 dailyPercent = pnDailyPercent,
                 onReinvestClick = { showNoviceReinvestDialog = true },
                 onCorrectionClick = { showNoviceCorrectionDialog = true },
-                onForecastClick = { showNoviceDatePicker = true },
+                onForecastClick = { showNoviceForecastConfig = true },
                 onCycleEndClick = { viewModel.generateNoviceCycleEndForecast() },
                 onDailyButtonClick = { viewModel.pressNoviceButton() }
             )
@@ -266,12 +267,16 @@ fun CalculatorScreen() {
             currentButtonPressed = lastEntry?.isButtonPressed ?: false
         )
     }
-    if (showNoviceDatePicker) {
-        ForecastDatePickerDialog(
-            onDismiss = { showNoviceDatePicker = false },
-            onDateSelected = { selectedDateMillis ->
-                showNoviceDatePicker = false
-                viewModel.generateNoviceForecast(selectedDateMillis)
+    if (showNoviceForecastConfig) {
+        NoviceForecastConfigDialog(
+            onDismiss = { showNoviceForecastConfig = false },
+            onConfirm = { selectedDateMillis, compoundInterest, reinvestAmount ->
+                showNoviceForecastConfig = false
+                viewModel.generateNoviceForecast(
+                    targetDateMillis = selectedDateMillis,
+                    compoundInterest = compoundInterest,
+                    reinvestAmount = reinvestAmount
+                )
             }
         )
     }

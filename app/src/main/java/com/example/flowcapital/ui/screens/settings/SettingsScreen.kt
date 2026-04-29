@@ -560,6 +560,7 @@ fun NoviceFlowSettings(
     var dailyPercentText by remember { mutableStateOf("") }
     var showClearDialog by remember { mutableStateOf(false) }
     var showCalculateDialog by remember { mutableStateOf(false) }
+    var showCalculateExistingDialog by remember { mutableStateOf(false) }
 
     val isMathChanged = remember(bonusPercentText, dailyPercentText, savedBonusPercent, savedDailyPercent) {
         bonusPercentText != savedBonusPercent.toString() || dailyPercentText != savedDailyPercent.toString()
@@ -640,6 +641,11 @@ fun NoviceFlowSettings(
                 modifier = Modifier.fillMaxWidth()
             ) { Text("Рассчитать поток") }
             Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = { showCalculateExistingDialog = true },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Рассчитать действующий поток") }
+            Spacer(modifier = Modifier.height(8.dp))
             OutlinedButton(
                 onClick = { showClearDialog = true },
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
@@ -652,6 +658,13 @@ fun NoviceFlowSettings(
         CalculateNoviceFlowDialog(
             settingsManager = settingsManager,
             onDismiss = { showCalculateDialog = false }
+        )
+    }
+
+    if (showCalculateExistingDialog) {
+        CalculateExistingNoviceFlowDialog(
+            settingsManager = settingsManager,
+            onDismiss = { showCalculateExistingDialog = false }
         )
     }
 
@@ -3042,6 +3055,11 @@ private fun CalculateNoviceFlowDialog(
     val inFlow = if (contribution > 0) contribution + contribution * bonusPercent / 100.0 else contribution
     val dailyAccrual = if (inFlow > 0) inFlow * (savedDailyPercent / 100.0) else 0.0
 
+    var compoundInterest by remember { mutableStateOf(false) }
+    var reinvestAmountText by remember { mutableStateOf("2000") }
+    val reinvestAmount = reinvestAmountText.replace(",", ".").toDoubleOrNull() ?: 0.0
+    val isReinvestAmountValid = !compoundInterest || (compoundInterest && reinvestAmount > 0)
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Рассчитать поток ПН", fontSize = 18.sp) },
@@ -3077,6 +3095,40 @@ private fun CalculateNoviceFlowDialog(
                 OutlinedButton(onClick = { showTargetDatePicker = true }, modifier = Modifier.fillMaxWidth()) {
                     Text("До: ${dateFormat.format(Date(targetDateMillis))}")
                 }
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Чекбокс сложного процента
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = compoundInterest,
+                        onCheckedChange = { compoundInterest = it }
+                    )
+                    Text("Включить сложный процент", fontSize = 14.sp)
+                }
+
+                if (compoundInterest) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = reinvestAmountText,
+                        onValueChange = { reinvestAmountText = it },
+                        label = { Text("Сумма для реинвеста") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth(),
+                        supportingText = {
+                            if (!isReinvestAmountValid) {
+                                Text("Сумма не может быть пустой или нулевой", color = Color.Red, fontSize = 10.sp)
+                            } else {
+                                Text("По умолчанию 2000", fontSize = 10.sp, color = Color.Gray)
+                            }
+                        },
+                        isError = !isReinvestAmountValid,
+                        singleLine = true
+                    )
+                }
+
                 if (contribution > 0) {
                     Spacer(modifier = Modifier.height(12.dp))
                     Text("После старта: В потоке=${String.format(Locale.US, "%.2f", inFlow)}, Начисление=${String.format(Locale.US, "%.2f", dailyAccrual)}", fontSize = 12.sp)
@@ -3085,12 +3137,20 @@ private fun CalculateNoviceFlowDialog(
         },
         confirmButton = {
             Button(onClick = {
-                if (contribution > 0) {
-                    val results = calculateNoviceFlowForecast(inFlow, savedDailyPercent, wallet, startDateMillis, targetDateMillis)
+                if (contribution > 0 && isReinvestAmountValid) {
+                    val results = calculateNoviceFlowForecast(
+                        inFlow = inFlow,
+                        dailyPercent = savedDailyPercent,
+                        wallet = wallet,
+                        startDateMillis = startDateMillis,
+                        targetDateMillis = targetDateMillis,
+                        compoundInterest = compoundInterest,
+                        reinvestAmount = if (compoundInterest) reinvestAmount else 2000.0
+                    )
                     forecastResults = results
                     showResults = true
                 }
-            }, enabled = contribution > 0) { Text("Рассчитать") }
+            }, enabled = contribution > 0 && isReinvestAmountValid) { Text("Рассчитать") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
     )
@@ -3130,6 +3190,229 @@ private fun CalculateNoviceFlowDialog(
             onDismiss = { showResults = false },
             onExportToExcel = { exportLauncher.launch("ПН_Прогноз_${System.currentTimeMillis()}.xlsx") }
         )
+    }
+}
+
+/**
+ * Диалог расчёта действующего потока ПН.
+ * Поля: "В потоке"; "В кошельке"; "До даты".
+ * Расчёт идёт с текущей даты, без даты "С".
+ * В начале прогноза создаётся запись START с указанными параметрами,
+ * затем обычный расчёт со следующего дня (isExistingFlow=true).
+ */
+@Composable
+private fun CalculateExistingNoviceFlowDialog(
+    settingsManager: SettingsManager,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    val savedDailyPercent by settingsManager.pnDailyPercentFlow.collectAsState(initial = 2.0)
+
+    var inFlowText by remember { mutableStateOf("") }
+    var walletText by remember { mutableStateOf("") }
+    var targetDateMillis by remember { mutableStateOf(System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000) }
+    var showTargetDatePicker by remember { mutableStateOf(false) }
+
+    var forecastResults by remember { mutableStateOf<List<NoviceFlowEntity>>(emptyList()) }
+    var showResults by remember { mutableStateOf(false) }
+
+    val exportLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        if (uri != null) {
+            scope.launch {
+                exportExistingNoviceForecastToExcel(context, uri, forecastResults)
+                Toast.makeText(context, "Экспорт завершён", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun parseDouble(text: String): Double = text.replace(",", ".").toDoubleOrNull() ?: 0.0
+
+    val inFlow = parseDouble(inFlowText)
+    val wallet = if (walletText.isBlank()) 0.0 else parseDouble(walletText)
+    val dailyPercent = savedDailyPercent
+
+    var compoundInterest by remember { mutableStateOf(false) }
+    var reinvestAmountText by remember { mutableStateOf("2000") }
+    val reinvestAmount = reinvestAmountText.replace(",", ".").toDoubleOrNull() ?: 0.0
+    val isReinvestAmountValid = !compoundInterest || (compoundInterest && reinvestAmount > 0)
+
+    val isFormValid = inFlow > 0 && dailyPercent > 0 && isReinvestAmountValid
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Рассчитать действующий поток ПН", fontSize = 18.sp) },
+        text = {
+            Column {
+                Text("Введите параметры текущего состояния потока:", fontSize = 12.sp, color = Color.Gray)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = inFlowText,
+                    onValueChange = { inFlowText = it },
+                    label = { Text("В потоке *") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = walletText,
+                    onValueChange = { walletText = it },
+                    label = { Text("В кошельке") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    supportingText = { Text("Оставьте пустым, если в кошельке пусто", fontSize = 10.sp, color = Color.Gray) }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+                OutlinedButton(
+                    onClick = { showTargetDatePicker = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("До: ${dateFormat.format(Date(targetDateMillis))}")
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Чекбокс сложного процента
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = compoundInterest,
+                        onCheckedChange = { compoundInterest = it }
+                    )
+                    Text("Включить сложный процент", fontSize = 14.sp)
+                }
+
+                if (compoundInterest) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = reinvestAmountText,
+                        onValueChange = { reinvestAmountText = it },
+                        label = { Text("Сумма для реинвеста") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth(),
+                        supportingText = {
+                            if (!isReinvestAmountValid) {
+                                Text("Сумма не может быть пустой или нулевой", color = Color.Red, fontSize = 10.sp)
+                            } else {
+                                Text("По умолчанию 2000", fontSize = 10.sp, color = Color.Gray)
+                            }
+                        },
+                        isError = !isReinvestAmountValid,
+                        singleLine = true
+                    )
+                }
+
+                if (isFormValid) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Параметры прогноза:", fontSize = 12.sp)
+                    Text("Ежедневный %: ${String.format(Locale.US, "%.2f", dailyPercent)}%", fontSize = 14.sp)
+                    Text("В потоке: ${String.format(Locale.US, "%.2f", inFlow)}", fontSize = 14.sp)
+                    Text("Начисление: ${String.format(Locale.US, "%.2f", inFlow * dailyPercent / 100.0)}", fontSize = 14.sp)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (isFormValid) {
+                        val results = calculateNoviceFlowForecast(
+                            inFlow = inFlow,
+                            dailyPercent = dailyPercent,
+                            wallet = wallet,
+                            startDateMillis = System.currentTimeMillis(),
+                            targetDateMillis = targetDateMillis,
+                            isExistingFlow = true,
+                            compoundInterest = compoundInterest,
+                            reinvestAmount = if (compoundInterest) reinvestAmount else 2000.0
+                        )
+                        forecastResults = results
+                        showResults = true
+                    }
+                },
+                enabled = isFormValid
+            ) { Text("Рассчитать") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
+    )
+
+    if (showTargetDatePicker) {
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = targetDateMillis)
+        DatePickerDialog(
+            onDismissRequest = { showTargetDatePicker = false },
+            confirmButton = {
+                Button(onClick = {
+                    datePickerState.selectedDateMillis?.let { targetDateMillis = it }
+                    showTargetDatePicker = false
+                }) { Text("Выбрать") }
+            },
+            dismissButton = { TextButton(onClick = { showTargetDatePicker = false }) { Text("Отмена") } }
+        ) { DatePicker(state = datePickerState) }
+    }
+
+    if (showResults && forecastResults.isNotEmpty()) {
+        NoviceForecastResultsDialog(
+            title = "Прогноз действующего потока ПН",
+            forecastList = forecastResults,
+            onDismiss = { showResults = false },
+            onExportToExcel = { exportLauncher.launch("ПН_Действующий_${System.currentTimeMillis()}.xlsx") }
+        )
+    }
+}
+
+/**
+ * Экспорт прогноза действующего потока ПН в Excel с колонкой Шаг.
+ */
+private suspend fun exportExistingNoviceForecastToExcel(context: Context, uri: Uri, forecast: List<NoviceFlowEntity>) {
+    withContext(Dispatchers.IO) {
+        try {
+            context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                val workbook = org.dhatim.fastexcel.Workbook(outputStream, "Прогноз ПН", null)
+                val worksheet = workbook.newWorksheet("ПН")
+                worksheet.value(0, 0, "Шаг")
+                worksheet.value(0, 1, "Дата")
+                worksheet.value(0, 2, "В потоке")
+                worksheet.value(0, 3, "Начисление")
+                worksheet.value(0, 4, "Кошелек")
+                worksheet.value(0, 5, "Действие")
+                val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+                var currentStep = 0
+                forecast.forEachIndexed { index, entry ->
+                    val isActive = entry.actionType in listOf("PN_START", "PN_DAILY")
+                    if (isActive) currentStep++
+                    val stepDisplay = if (isActive) currentStep.toString() else "-"
+                    val date = dateFormat.format(Date(entry.date))
+                    val row = index + 1
+                    worksheet.value(row, 0, stepDisplay)
+                    worksheet.value(row, 1, date)
+                    worksheet.value(row, 2, entry.inFlowAmount)
+                    worksheet.value(row, 3, entry.dailyAccrual)
+                    worksheet.value(row, 4, entry.walletAmount)
+                    worksheet.value(row, 5, entry.actionType)
+                    val fillColor = when (entry.actionType) {
+                        "PN_START", "PN_DAILY" -> "C8FFC8"
+                        "SUNDAY" -> "E6C8FF"
+                        else -> null
+                    }
+                    if (fillColor != null) {
+                        (0..5).forEach { col ->
+                            worksheet.style(row, col).fillColor(fillColor).set()
+                        }
+                    }
+                }
+                workbook.finish()
+            }
+        } catch (e: Exception) { AppLogger.e("SettingsScreen", "Ошибка экспорта прогноза ПН", e) }
     }
 }
 

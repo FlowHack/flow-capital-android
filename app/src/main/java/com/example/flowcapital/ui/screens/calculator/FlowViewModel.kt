@@ -416,122 +416,153 @@ class FlowViewModel(
         }
     }
 
-    /**
-     * Генерация прогноза ПН до указанной даты.
-     * Учитывает воскресенья (SUNDAY записи).
-     * Останавливается когда поток достигает 0.
-     *
-     * Логика:
-     * - Используется фиксированный процент из БД настроек
-     * - Если кнопка нажата сегодня: прогноз начинается с текущих значений
-     * - Если кнопка НЕ нажата сегодня: прогноз начинается с расчётом начисления за сегодня
-     */
-    fun generateNoviceForecast(targetDateMillis: Long) {
-        viewModelScope.launch {
-            val lastEntry = noviceRepository.getLastEntry() ?: return@launch
-            val forecastList = mutableListOf<NoviceFlowEntity>()
-            val dailyPercent = settingsManager.pnDailyPercentFlow.first()
+     /**
+      * Генерация прогноза ПН до указанной даты.
+      * Учитывает воскресенья (SUNDAY записи).
+      * Останавливается когда поток достигает 0.
+      *
+      * Логика:
+      * - Используется фиксированный процент из БД настроек
+      * - Если кнопка нажата сегодня: прогноз начинается с текущих значений
+      * - Если кнопка НЕ нажата сегодня: прогноз начинается с расчётом начисления за сегодня
+      * - Если compoundInterest=true: при wallet >= reinvestAmount делается реинвест на всю сумму
+      *
+      * @param targetDateMillis Дата окончания прогноза
+      * @param compoundInterest Включить сложный процент (реинвест при накоплении)
+      * @param reinvestAmount Сумма для реинвеста (по умолчанию 2000)
+      */
+     fun generateNoviceForecast(
+         targetDateMillis: Long,
+         compoundInterest: Boolean = false,
+         reinvestAmount: Double = 2000.0
+     ) {
+         viewModelScope.launch {
+             val lastEntry = noviceRepository.getLastEntry() ?: return@launch
+             val forecastList = mutableListOf<NoviceFlowEntity>()
+             val dailyPercent = settingsManager.pnDailyPercentFlow.first()
 
-            val today = Calendar.getInstance()
-            val todayStart = today.apply {
-                set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-            }.timeInMillis
-            val lastEntryDay = Calendar.getInstance().apply { timeInMillis = lastEntry.date }.apply {
-                set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-            }.timeInMillis
-            val isLastEntryIsToday = lastEntryDay == todayStart
-            val isButtonPressed = lastEntry.isButtonPressed && lastEntry.actionType != "SUNDAY"
-            val isTodaySunday = today.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
+             val today = Calendar.getInstance()
+             val todayStart = today.apply {
+                 set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+             }.timeInMillis
+             val lastEntryDay = Calendar.getInstance().apply { timeInMillis = lastEntry.date }.apply {
+                 set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+             }.timeInMillis
+             val isLastEntryIsToday = lastEntryDay == todayStart
+             val isButtonPressed = lastEntry.isButtonPressed && lastEntry.actionType != "SUNDAY"
+             val isTodaySunday = today.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
 
-            var simInFlow: Double
-            var simWallet: Double
-            var simAccrual: Double
+             var simInFlow: Double
+             var simWallet: Double
+             var simAccrual: Double
+             var step = 1
 
-            if (isLastEntryIsToday && isButtonPressed && !isTodaySunday) {
-                simInFlow = lastEntry.inFlowAmount
-                simWallet = lastEntry.walletAmount
-                simAccrual = lastEntry.dailyAccrual
-            } else if (isLastEntryIsToday && !isButtonPressed && !isTodaySunday) {
-                val actualAccrual = minOf(lastEntry.inFlowAmount, lastEntry.dailyAccrual)
-                simInFlow = lastEntry.inFlowAmount - actualAccrual
-                if (simInFlow < 0) simInFlow = 0.0
-                simWallet = lastEntry.walletAmount + actualAccrual
-                simAccrual = if (simInFlow > 0) simInFlow * (dailyPercent / 100.0) else 0.0
-            } else if (isTodaySunday) {
-                simInFlow = lastEntry.inFlowAmount
-                simWallet = lastEntry.walletAmount
-                simAccrual = lastEntry.dailyAccrual
-            } else {
-                val actualAccrual = minOf(lastEntry.inFlowAmount, lastEntry.dailyAccrual)
-                simInFlow = lastEntry.inFlowAmount - actualAccrual
-                if (simInFlow < 0) simInFlow = 0.0
-                simWallet = lastEntry.walletAmount + actualAccrual
-                simAccrual = if (simInFlow > 0) simInFlow * (dailyPercent / 100.0) else 0.0
-            }
+             if (isLastEntryIsToday && isButtonPressed && !isTodaySunday) {
+                 simInFlow = lastEntry.inFlowAmount
+                 simWallet = lastEntry.walletAmount
+                 simAccrual = lastEntry.dailyAccrual
+             } else if (isLastEntryIsToday && !isButtonPressed && !isTodaySunday) {
+                 val actualAccrual = minOf(lastEntry.inFlowAmount, lastEntry.dailyAccrual)
+                 simInFlow = lastEntry.inFlowAmount - actualAccrual
+                 if (simInFlow < 0) simInFlow = 0.0
+                 simWallet = lastEntry.walletAmount + actualAccrual
+                 simAccrual = if (simInFlow > 0) simInFlow * (dailyPercent / 100.0) else 0.0
+             } else if (isTodaySunday) {
+                 simInFlow = lastEntry.inFlowAmount
+                 simWallet = lastEntry.walletAmount
+                 simAccrual = lastEntry.dailyAccrual
+             } else {
+                 val actualAccrual = minOf(lastEntry.inFlowAmount, lastEntry.dailyAccrual)
+                 simInFlow = lastEntry.inFlowAmount - actualAccrual
+                 if (simInFlow < 0) simInFlow = 0.0
+                 simWallet = lastEntry.walletAmount + actualAccrual
+                 simAccrual = if (simInFlow > 0) simInFlow * (dailyPercent / 100.0) else 0.0
+             }
 
-            val currentCal = Calendar.getInstance().apply {
-                timeInMillis = todayStart
-                set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-            }
-            val endCal = Calendar.getInstance().apply {
-                timeInMillis = targetDateMillis
-                set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-            }
+             val currentCal = Calendar.getInstance().apply {
+                 timeInMillis = todayStart
+                 set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+             }
+             val endCal = Calendar.getInstance().apply {
+                 timeInMillis = targetDateMillis
+                 set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+             }
 
-            if (isLastEntryIsToday && !isButtonPressed && !isTodaySunday && currentCal.get(Calendar.DAY_OF_WEEK) != Calendar.SUNDAY) {
-                forecastList.add(NoviceFlowEntity(
-                    date = currentCal.timeInMillis, percent = dailyPercent, inFlowAmount = simInFlow,
-                    dailyAccrual = simAccrual, walletAmount = simWallet, isButtonPressed = true, actionType = "PN_DAILY"
-                ))
-            } else {
-                forecastList.add(NoviceFlowEntity(
-                    date = currentCal.timeInMillis, percent = dailyPercent, inFlowAmount = simInFlow,
-                    dailyAccrual = simAccrual, walletAmount = simWallet, isButtonPressed = true, actionType = "PN_FORECAST"
-                ))
-            }
-            currentCal.add(Calendar.DAY_OF_YEAR, 1)
+             // Первая запись прогноза с учетом состояния кнопки
+             if (isLastEntryIsToday && !isButtonPressed && !isTodaySunday && currentCal.get(Calendar.DAY_OF_WEEK) != Calendar.SUNDAY) {
+                 // Кнопка не нажата сегодня - делаем начисление
+                 forecastList.add(NoviceFlowEntity(
+                     date = currentCal.timeInMillis, percent = dailyPercent, inFlowAmount = simInFlow,
+                     dailyAccrual = simAccrual, walletAmount = simWallet, isButtonPressed = true, actionType = "PN_DAILY"
+                 ))
+             } else {
+                 forecastList.add(NoviceFlowEntity(
+                     date = currentCal.timeInMillis, percent = dailyPercent, inFlowAmount = simInFlow,
+                     dailyAccrual = simAccrual, walletAmount = simWallet, isButtonPressed = true, actionType = "PN_FORECAST"
+                 ))
+             }
+             currentCal.add(Calendar.DAY_OF_YEAR, 1)
 
-            while (currentCal.timeInMillis <= endCal.timeInMillis && simInFlow > 0.0) {
-                val isSunday = currentCal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
+             // Основной цикл прогноза
+             while (currentCal.timeInMillis <= endCal.timeInMillis && simInFlow > 0.0) {
+                 val isSunday = currentCal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
 
-                if (isSunday) {
-                    forecastList.add(NoviceFlowEntity(
-                        date = currentCal.timeInMillis, percent = dailyPercent, inFlowAmount = simInFlow,
-                        dailyAccrual = simAccrual, walletAmount = simWallet, isButtonPressed = false, actionType = "SUNDAY"
-                    ))
-                } else {
-                    val actualAccrual = simInFlow * (dailyPercent / 100.0)
-                    val nextInFlow = simInFlow - actualAccrual
-                    val finalAccrual: Double
-                    val finalInFlow: Double
+                 if (isSunday) {
+                     forecastList.add(NoviceFlowEntity(
+                         date = currentCal.timeInMillis, percent = dailyPercent, inFlowAmount = simInFlow,
+                         dailyAccrual = simAccrual, walletAmount = simWallet, isButtonPressed = false, actionType = "SUNDAY"
+                     ))
+                 } else {
+                     // Нажатие кнопки (начисление)
+                     val actualAccrual = simInFlow * (dailyPercent / 100.0)
+                     val nextInFlow = simInFlow - actualAccrual
+                     val finalAccrual: Double
+                     val finalInFlow: Double
 
-                    if (nextInFlow < 0.005) {
-                        finalAccrual = simInFlow
-                        finalInFlow = 0.0
-                        simWallet += simInFlow
-                        forecastList.add(NoviceFlowEntity(
-                            date = currentCal.timeInMillis, percent = dailyPercent, inFlowAmount = 0.0,
-                            dailyAccrual = 0.0, walletAmount = simWallet, isButtonPressed = true, actionType = "PN_FORECAST"
-                        ))
-                        break
-                    } else {
-                        finalAccrual = actualAccrual
-                        finalInFlow = nextInFlow
-                        simWallet += actualAccrual
-                        simAccrual = finalInFlow * (dailyPercent / 100.0)
-                    }
-                    simInFlow = finalInFlow
+                     if (nextInFlow < 0.005) {
+                         finalAccrual = simInFlow
+                         finalInFlow = 0.0
+                         simWallet += simInFlow
+                         forecastList.add(NoviceFlowEntity(
+                             date = currentCal.timeInMillis, percent = dailyPercent, inFlowAmount = 0.0,
+                             dailyAccrual = 0.0, walletAmount = simWallet, isButtonPressed = true, actionType = "PN_FORECAST"
+                         ))
+                         break
+                     } else {
+                         finalAccrual = actualAccrual
+                         finalInFlow = nextInFlow
+                         simWallet += actualAccrual
+                         simAccrual = finalInFlow * (dailyPercent / 100.0)
+                     }
+                     simInFlow = finalInFlow
+                     step++
 
-                    forecastList.add(NoviceFlowEntity(
-                        date = currentCal.timeInMillis, percent = dailyPercent, inFlowAmount = simInFlow,
-                        dailyAccrual = simAccrual, walletAmount = simWallet, isButtonPressed = true, actionType = "PN_FORECAST"
-                    ))
-                }
-                currentCal.add(Calendar.DAY_OF_YEAR, 1)
-            }
-            _pnForecastResults.value = forecastList
-        }
-    }
+                     forecastList.add(NoviceFlowEntity(
+                         date = currentCal.timeInMillis, percent = dailyPercent, inFlowAmount = simInFlow,
+                         dailyAccrual = simAccrual, walletAmount = simWallet, isButtonPressed = true, actionType = "PN_FORECAST"
+                     ))
+
+                     // Сложный процент: проверяем, нужно ли делать реинвест
+                     if (compoundInterest && simWallet >= reinvestAmount) {
+                         val reinvestAmountActual = simWallet
+                         simInFlow += reinvestAmountActual
+                         simWallet = 0.0
+                         simAccrual = if (simInFlow > 0) simInFlow * (dailyPercent / 100.0) else 0.0
+                         step++
+
+                         forecastList.add(NoviceFlowEntity(
+                             date = currentCal.timeInMillis, // Та же дата, что и для DAILY
+                             percent = dailyPercent, inFlowAmount = simInFlow,
+                             dailyAccrual = simAccrual, walletAmount = simWallet, isButtonPressed = true,
+                             actionType = "PN_REINVEST"
+                         ))
+                     }
+                 }
+                 currentCal.add(Calendar.DAY_OF_YEAR, 1)
+             }
+             _pnForecastResults.value = forecastList
+         }
+     }
 
     /**
      * Генерация прогноза до конца цикла (поток = 0).
@@ -821,7 +852,9 @@ class FlowViewModel(
 
     /**
      * Экспорт прогноза ПН в Excel файл с использованием FastExcel.
-     * По ТЗ: колонка "Шаг" быть не должно.
+     * По ТЗ: первая колонка "Шаг", затем Дата, В потоке, Начисление, Кошелек.
+     * Шаг инкрементируется только для активных действий (START, DAILY, REINVEST).
+     * Для SUNDAY и MISSED ставится прочерк ("-").
      */
     fun exportNoviceForecastToCSV(context: Context, uri: Uri, forecastList: List<NoviceFlowEntity>) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -829,17 +862,26 @@ class FlowViewModel(
                 context.contentResolver.openOutputStream(uri)?.use { outputStream ->
                     val workbook = org.dhatim.fastexcel.Workbook(outputStream, "Прогноз ПН", null)
                     val worksheet = workbook.newWorksheet("ПН")
-                    worksheet.value(0, 0, "Дата")
-                    worksheet.value(0, 1, "В потоке")
-                    worksheet.value(0, 2, "Начисление")
-                    worksheet.value(0, 3, "Кошелек")
+                    worksheet.value(0, 0, "Шаг")
+                    worksheet.value(0, 1, "Дата")
+                    worksheet.value(0, 2, "В потоке")
+                    worksheet.value(0, 3, "Начисление")
+                    worksheet.value(0, 4, "Кошелек")
                     val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+                    var step = 0
                     forecastList.forEachIndexed { index, entry ->
                         val row = index + 1
-                        worksheet.value(row, 0, dateFormat.format(Date(entry.date)))
-                        worksheet.value(row, 1, entry.inFlowAmount)
-                        worksheet.value(row, 2, entry.dailyAccrual)
-                        worksheet.value(row, 3, entry.walletAmount)
+                        val isActiveAction = entry.actionType in listOf("PN_START", "PN_DAILY", "PN_FORECAST", "PN_REINVEST")
+                        if (isActiveAction) {
+                            step++
+                            worksheet.value(row, 0, step)
+                        } else {
+                            worksheet.value(row, 0, "-")
+                        }
+                        worksheet.value(row, 1, dateFormat.format(Date(entry.date)))
+                        worksheet.value(row, 2, entry.inFlowAmount)
+                        worksheet.value(row, 3, entry.dailyAccrual)
+                        worksheet.value(row, 4, entry.walletAmount)
                     }
                     workbook.finish()
                 }

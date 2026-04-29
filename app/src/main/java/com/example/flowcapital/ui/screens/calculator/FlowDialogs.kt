@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -380,7 +381,7 @@ fun GrowingForecastResultsDialog(
  * @param title Заголовок диалога
  * @param forecastList Список записей прогноза
  * @param onDismiss Закрытие диалога
- * @param onExportToExcel Экспорт в CSV
+ * @param onExportToExcel Экспорт в Excel
  */
 @Composable
 fun NoviceForecastResultsDialog(
@@ -396,9 +397,13 @@ fun NoviceForecastResultsDialog(
 
     val weightDate = if (isLandscape) 1.2f else 1.1f
     val weightInFlow = if (isLandscape) 2f else 1.4f
-    val weightAccrual = if (isLandscape) 1.8f else 1.2f
     val weightWallet = if (isLandscape) 2f else 1.4f
     val tableFontSize = if (isLandscape) 12.sp else 11.sp
+
+    // Цвета для подсветки строк
+    val greenBackground = Color(0xFF1B5E20).copy(alpha = 0.3f) // Зеленоватый для START/REINVEST
+    val purpleBackground = Color(0xFF4A148C).copy(alpha = 0.3f)   // Фиолетовый для SUNDAY
+    val redBackground = Color(0xFFB71C1C).copy(alpha = 0.3f)     // Красноватый для CORRECTION (если будет)
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -412,9 +417,9 @@ fun NoviceForecastResultsDialog(
             modifier = Modifier
                 .fillMaxWidth(
                     when {
-                        isLandscape -> 0.8f
-                        wideScreen -> 0.8f
-                        else -> 0.8f
+                        isLandscape -> 0.9f
+                        wideScreen -> 0.9f
+                        else -> 0.95f
                     }
                 )
                 .fillMaxHeight(0.9f)
@@ -434,23 +439,27 @@ fun NoviceForecastResultsDialog(
                 ) {
                     Text("Дата", modifier = Modifier.weight(weightDate), fontSize = tableFontSize, textAlign = TextAlign.Center)
                     Text("В потоке", modifier = Modifier.weight(weightInFlow), fontSize = tableFontSize, textAlign = TextAlign.Center)
-                    Text("Начисление", modifier = Modifier.weight(weightAccrual), fontSize = tableFontSize, textAlign = TextAlign.Center)
-                    if (wideScreen) Text("Кошелек", modifier = Modifier.weight(weightWallet), fontSize = tableFontSize, textAlign = TextAlign.Center)
+                    Text("Кошелек", modifier = Modifier.weight(weightWallet), fontSize = tableFontSize, textAlign = TextAlign.Center)
                 }
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
                 ) {
-                    items(forecastList) { entry ->
+                    items(forecastList.size) { index ->
+                        val entry = forecastList[index]
                         val isSunday = entry.actionType == "SUNDAY"
+                        val isStartOrReinvest = entry.actionType in listOf("PN_START", "PN_REINVEST")
+                        val rowBackground = when {
+                            isSunday -> purpleBackground
+                            isStartOrReinvest -> greenBackground
+                            else -> Color.Transparent
+                        }
+
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(
-                                    if (isSunday) Color(0xFF2C2C2C)
-                                    else Color.Transparent
-                                )
+                                .background(rowBackground)
                                 .padding(vertical = 6.dp),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -468,15 +477,7 @@ fun NoviceForecastResultsDialog(
                                     textAlign = TextAlign.Center
                                 )
                             }
-                            Box(modifier = Modifier.weight(weightAccrual), contentAlignment = Alignment.Center) {
-                                Text(
-                                    String.format(Locale.US, "+%.2f", entry.dailyAccrual),
-                                    color = if (isSunday) Color.Gray else Color(0xFF4CAF50),
-                                    fontSize = tableFontSize,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                            if (wideScreen) Box(modifier = Modifier.weight(weightWallet), contentAlignment = Alignment.Center) {
+                            Box(modifier = Modifier.weight(weightWallet), contentAlignment = Alignment.Center) {
                                 Text(
                                     String.format(Locale.US, "%.2f", entry.walletAmount),
                                     fontSize = tableFontSize,
@@ -652,6 +653,108 @@ fun ForecastDatePickerDialog(
         }
     ) {
         DatePicker(state = datePickerState)
+    }
+}
+
+/**
+ * Диалог конфигурации прогноза ПН.
+ * Содержит выбор даты, чекбокс "Включить сложный процент" и поле "Сумма для реинвеста".
+ *
+ * @param onDismiss Закрытие диалога
+ * @param onConfirm Подтверждение с датой, флагом сложного процента и суммой реинвеста
+ */
+@Composable
+fun NoviceForecastConfigDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (Long, Boolean, Double) -> Unit
+) {
+    var compoundInterest by remember { mutableStateOf(false) }
+    var reinvestAmountText by remember { mutableStateOf("2000") }
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = System.currentTimeMillis()
+    )
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+
+    // Валидация: сумма реинвеста не может быть пустой при включенном чекбоксе
+    val reinvestAmount = reinvestAmountText.replace(",", ".").toDoubleOrNull() ?: 0.0
+    val isReinvestAmountValid = !compoundInterest || (compoundInterest && reinvestAmount > 0)
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(if (isLandscape) 0.8f else 0.9f)
+                .wrapContentHeight()
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+                .padding(16.dp)
+        ) {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text("Прогноз ПН", fontSize = 18.sp, modifier = Modifier.padding(bottom = 16.dp))
+
+                // Выбор даты
+                DatePicker(state = datePickerState)
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Чекбокс сложного процента
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = compoundInterest,
+                        onCheckedChange = { compoundInterest = it }
+                    )
+                    Text("Включить сложный процент", fontSize = 14.sp)
+                }
+
+                // Поле суммы для реинвеста (видимо только при включенном чекбоксе)
+                if (compoundInterest) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = reinvestAmountText,
+                        onValueChange = { reinvestAmountText = it },
+                        label = { Text("Сумма для реинвеста") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth(),
+                        supportingText = {
+                            if (!isReinvestAmountValid) {
+                                Text("Сумма не может быть пустой или нулевой", color = Color.Red, fontSize = 10.sp)
+                            } else {
+                                Text("По умолчанию 2000", fontSize = 10.sp, color = Color.Gray)
+                            }
+                        },
+                        isError = !isReinvestAmountValid
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Кнопки
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) { Text("Отмена") }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            datePickerState.selectedDateMillis?.let { dateMillis ->
+                                onConfirm(dateMillis, compoundInterest, reinvestAmount)
+                            }
+                        },
+                        enabled = datePickerState.selectedDateMillis != null && isReinvestAmountValid
+                    ) { Text("Прогноз") }
+                }
+            }
+        }
     }
 }
 

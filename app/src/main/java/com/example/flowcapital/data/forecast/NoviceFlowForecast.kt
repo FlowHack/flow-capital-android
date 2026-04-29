@@ -10,17 +10,23 @@ import java.util.Calendar
  *
  * Логика по ТЗ:
  * - Старт: записывается с процентом, в потоке, начислением, кошельком
- * - Если не воскресенье: в день старта СРАЗУ делается начисление (кнопка нажата)
+ * - Если не воскресенье: в день старта СРАЗУ делается начисление (при isExistingFlow=false)
+ * - Если isExistingFlow=true: START в текущий день, первое DAILY только со следующего дня
  * - Каждый день (кроме воскресений): кнопка нажимается
  * - Воскресенье: SUNDAY запись без начисления
  * - Прогноз останавливается при inFlow <= 0
  * - Процент фиксированный (не растет как в РП)
+ * - Сложный процент: при compoundInterest=true, когда wallet >= reinvestAmount,
+ *   происходит реинвест (кошелек переходит в поток) в тот же день
  *
- * @param inFlow Начальная сумма в потоке с бонусом
+ * @param inFlow Начальная сумма в потоке
  * @param dailyPercent Фиксированный ежедневный процент
  * @param wallet Начальный кошелек
  * @param startDateMillis Дата старта (timestamp)
  * @param targetDateMillis Дата окончания прогноза (timestamp)
+ * @param isExistingFlow true если это расчет действующего потока
+ * @param compoundInterest true чтобы включить сложный процент (реинвест при накоплении)
+ * @param reinvestAmount Сумма в кошельке, при достижении которой происходит реинвест (по умолчанию 2000)
  * @return Список записей прогноза NoviceFlowEntity
  */
 fun calculateNoviceFlowForecast(
@@ -28,7 +34,10 @@ fun calculateNoviceFlowForecast(
     dailyPercent: Double,
     wallet: Double,
     startDateMillis: Long,
-    targetDateMillis: Long
+    targetDateMillis: Long,
+    isExistingFlow: Boolean = false,
+    compoundInterest: Boolean = false,
+    reinvestAmount: Double = 2000.0
 ): List<NoviceFlowEntity> {
     Timber.d("Начало прогноза ПН: inFlow=%.2f, percent=%.2f, wallet=%.2f", inFlow, dailyPercent, wallet)
     Timber.d("Период: ${formatDate(startDateMillis)} - ${formatDate(targetDateMillis)}")
@@ -61,8 +70,9 @@ fun calculateNoviceFlowForecast(
     Timber.v("START ПН: step=%d, percent=%.2f, inFlow=%.2f, accrual=%.2f, wallet=%.2f",
         step, dailyPercent, simInFlow, simAccrual, simWallet)
 
-    // Если не воскресенье - сразу делаем DAILY в день старта
-    if (calendar.get(Calendar.DAY_OF_WEEK) != Calendar.SUNDAY) {
+    // Для нового потока: если не воскресенье - сразу делаем DAILY в день старта
+    // Для действующего потока: DAILY начинается только со следующего дня
+    if (!isExistingFlow && calendar.get(Calendar.DAY_OF_WEEK) != Calendar.SUNDAY) {
         val actualAccrual = minOf(simInFlow, simAccrual)
         simInFlow -= actualAccrual
         if (simInFlow < 0) simInFlow = 0.0
@@ -105,6 +115,7 @@ fun calculateNoviceFlowForecast(
             ))
             Timber.v("SUNDAY ПН: ${formatDate(calendar.timeInMillis)}, step=$step")
         } else {
+            // Нажатие кнопки (DAILY)
             val actualAccrual = minOf(simInFlow, simAccrual)
             simInFlow -= actualAccrual
             if (simInFlow < 0) simInFlow = 0.0
@@ -126,6 +137,29 @@ fun calculateNoviceFlowForecast(
             ))
             Timber.v("DAILY ПН: step=%d, inFlow=%.2f, accrual=%.2f, wallet=%.2f",
                 step, simInFlow, simAccrual, simWallet)
+
+            // Сложный процент: проверяем, нужно ли делать реинвест
+            if (compoundInterest && simWallet >= reinvestAmount) {
+                // Реинвест на всю сумму в кошельке
+                val reinvestAmountActual = simWallet
+                simInFlow += reinvestAmountActual
+                simWallet = 0.0
+                simAccrual = if (simInFlow > 0) simInFlow * (dailyPercent / 100.0) else 0.0
+
+                step++
+
+                results.add(NoviceFlowEntity(
+                    date = calendar.timeInMillis, // Та же дата, что и для DAILY
+                    percent = dailyPercent,
+                    inFlowAmount = simInFlow,
+                    dailyAccrual = simAccrual,
+                    walletAmount = simWallet,
+                    isButtonPressed = true,
+                    actionType = "PN_REINVEST"
+                ))
+                Timber.v("REINVEST ПН (сложный процент): step=%d, reinvest=%.2f, newInFlow=%.2f, newAccrual=%.2f",
+                    step, reinvestAmountActual, simInFlow, simAccrual)
+            }
         }
         calendar.add(Calendar.DAY_OF_YEAR, 1)
     }
