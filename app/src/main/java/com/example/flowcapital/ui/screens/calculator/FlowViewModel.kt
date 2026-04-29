@@ -290,10 +290,77 @@ class FlowViewModel(
                 val dayEnd = checkDate.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
                 val entriesForDate = growingRepository.getEntriesForDateRange(dayStart, dayEnd)
                 
-                // Если проверяемый день содержит START - прерываем цикл (согласно алгоритму)
+                // Проверяем, есть ли START в этот день
                 val hasStart = entriesForDate.any { it.actionType == "START" }
+                
+                // Если это день со START - обрабатываем согласно алгоритму
                 if (hasStart) {
-                    AppLogger.d("FlowViewModel", "Найдена запись START в ${checkDate} - прерывание цикла")
+                    AppLogger.d("FlowViewModel", "Найден START день: ${checkDate}")
+                    
+                    // Для воскресений: если START и воскресенье - создаем SUNDAY (если нужно)
+                    if (needSundayCheck && checkDate.dayOfWeek == DayOfWeek.SUNDAY) {
+                        val hasSunday = entriesForDate.any { it.actionType == "SUNDAY" }
+                        if (!hasSunday) {
+                            // Создаем SUNDAY запись для START дня (воскресенье)
+                            val previousEntry = growingRepository.getLastEntryBeforeDate(dayStart) ?: firstStartEntry
+                            val sundayDate = if (entriesForDate.isNotEmpty()) {
+                                entriesForDate.maxOf { it.date } + 1
+                            } else {
+                                dayStart
+                            }
+                            val sundayEntry = GrowingFlowEntity(
+                                date = sundayDate,
+                                percent = previousEntry.percent,
+                                inFlowAmount = previousEntry.inFlowAmount,
+                                dailyAccrual = previousEntry.dailyAccrual,
+                                walletAmount = previousEntry.walletAmount,
+                                isButtonPressed = false,
+                                actionType = "SUNDAY"
+                            )
+                            growingRepository.insertEntry(sundayEntry)
+                            AppLogger.d("FlowViewModel", "Создана SUNDAY за START день (воскресенье) ${checkDate}")
+                        }
+                    }
+                    
+                    // При любом START останавливаем проверку воскресений
+                    if (needSundayCheck) {
+                        needSundayCheck = false
+                        AppLogger.d("FlowViewModel", "Найден START в ${checkDate} - проверка воскресений остановлена")
+                    }
+                    
+                    // Для пропусков: если START и НЕ воскресенье - создаем MISSED (если нет DAILY)
+                    if (needMissedCheck && checkDate.dayOfWeek != DayOfWeek.SUNDAY) {
+                        val hasDaily = entriesForDate.any { it.actionType == "DAILY" }
+                        val hasMissed = entriesForDate.any { it.actionType == "MISSED" }
+                        
+                        if (!hasDaily && !hasMissed) {
+                            // Нет DAILY и нет MISSED в день START - создаем MISSED
+                            val previousEntry = growingRepository.getLastEntryBeforeDate(dayStart) ?: firstStartEntry
+                            val missedDate = if (entriesForDate.isNotEmpty()) {
+                                entriesForDate.maxOf { it.date } + 1
+                            } else {
+                                dayStart
+                            }
+                            val missedEntry = GrowingFlowEntity(
+                                date = missedDate,
+                                percent = previousEntry.percent,
+                                inFlowAmount = previousEntry.inFlowAmount,
+                                dailyAccrual = previousEntry.dailyAccrual,
+                                walletAmount = previousEntry.walletAmount,
+                                isButtonPressed = false,
+                                actionType = "MISSED"
+                            )
+                            growingRepository.insertEntry(missedEntry)
+                            AppLogger.d("FlowViewModel", "Создана MISSED за день START ${checkDate}")
+                        }
+                    } else if (needMissedCheck && checkDate.dayOfWeek == DayOfWeek.SUNDAY) {
+                        // START день + воскресенье: MISSED не создаем (кнопка неактивна)
+                        AppLogger.d("FlowViewModel", "START день ${checkDate} - воскресенье, MISSED не создаем")
+                    }
+                    
+                    // После обработки START - останавливаем ОБЕ проверки (прерываем цикл)
+                    needMissedCheck = false
+                    AppLogger.d("FlowViewModel", "Найден START в ${checkDate} - прерывание цикла")
                     break
                 }
                 
