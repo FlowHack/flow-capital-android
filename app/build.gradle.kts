@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.flowcapital"
+    namespace = "com.flowhack.flowcapital"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -14,7 +14,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.flowcapital"
+        applicationId = "com.flowhack.flowcapital"
         minSdk = 28
         //noinspection OldTargetApi
         targetSdk = 36
