@@ -106,6 +106,9 @@ import com.example.flowcapital.data.proxy.ProxyStorage
 import com.example.flowcapital.data.proxy.ProxyType
 import com.example.flowcapital.data.proxy.ProxyValidator
 import com.example.flowcapital.data.settings.SettingsManager
+import androidx.compose.material3.Switch
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import com.example.flowcapital.notifications.ReminderWorker
 import com.example.flowcapital.ui.screens.calculator.GrowingForecastResultsDialog
 import com.example.flowcapital.ui.screens.calculator.NoviceForecastResultsDialog
@@ -193,6 +196,10 @@ fun SettingsScreen(onOpenBrowserUrl: (String) -> Unit = {}) {
         Text("ОБЩИЕ НАСТРОЙКИ", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.height(12.dp))
 
+        // Переключатель темы
+        ThemeSettings(settingsManager = settingsManager, scope = scope)
+        Spacer(modifier = Modifier.height(20.dp))
+
         // Вкладка при входе по умолчанию
         DefaultEntryTabSettings(settingsManager = settingsManager, scope = scope)
         Spacer(modifier = Modifier.height(20.dp))
@@ -274,6 +281,38 @@ fun SettingsFlowTabs(
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(top = 12.dp)
         )
+    }
+}
+
+/**
+ * Переключатель темы приложения.
+ * Светлая/Тёмная тема с сохранением в DataStore.
+ *
+ * @param settingsManager Менеджер настроек
+ * @param scope Корутинный скоуп
+ */
+@Composable
+fun ThemeSettings(settingsManager: SettingsManager, scope: kotlinx.coroutines.CoroutineScope) {
+    val darkTheme by settingsManager.darkThemeFlow.collectAsState(initial = true)
+
+    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Тёмная тема", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("По умолчанию включена тёмная тема", fontSize = 11.sp, color = Color.Gray)
+            }
+            Switch(
+                checked = darkTheme,
+                onCheckedChange = { newVal ->
+                    scope.launch { settingsManager.setDarkTheme(newVal) }
+                }
+            )
+        }
     }
 }
 

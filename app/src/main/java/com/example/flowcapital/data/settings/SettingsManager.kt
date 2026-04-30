@@ -59,8 +59,11 @@ class SettingsManager(context: Context) {
         val SKIP_AUTO_UPDATE = booleanPreferencesKey("skip_auto_update")
         /** Ключ для пропущенной версии (чтобы не показывать повторно) */
         val SKIPPED_VERSION = stringPreferencesKey("skipped_version")
-        /** Ключ для проверки обновлений при входе */
-        val CHECK_UPDATE_ON_START = booleanPreferencesKey("check_update_on_start")
+/** Ключ для проверки обновлений при входе */
+val CHECK_UPDATE_ON_START = booleanPreferencesKey("check_update_on_start")
+
+/** Ключ для темной темы (true = тёмная, false = светлая) */
+val DARK_THEME = booleanPreferencesKey("dark_theme")
 
         private val DEFAULT_PSP_COEFFICIENTS = mapOf(
             1 to 30.0, 2 to 55.8, 3 to 78.0, 4 to 97.07,
@@ -387,20 +390,36 @@ class SettingsManager(context: Context) {
         }
     }
 
-    /**
-     * Поток для проверки обновлений при входе.
-     */
-    val checkUpdateOnStartFlow: Flow<Boolean> = dataStore.data.map { it[CHECK_UPDATE_ON_START] ?: true }
+/**
+ * Поток для проверки обновлений при входе.
+ */
+val checkUpdateOnStartFlow: Flow<Boolean> = dataStore.data.map { it[CHECK_UPDATE_ON_START] ?: true }
 
-    /**
-     * Установить флаг проверки обновлений при входе.
-     * @param check true - проверять при входе
-     */
-    suspend fun setCheckUpdateOnStart(check: Boolean) {
-        dataStore.edit { prefs ->
-            prefs[CHECK_UPDATE_ON_START] = check
-        }
+/**
+ * Поток для состояния темной темы.
+ * По умолчанию true (тёмная тема).
+ */
+val darkThemeFlow: Flow<Boolean> = dataStore.data.map { it[DARK_THEME] ?: true }
+
+/**
+ * Установить флаг проверки обновлений при входе.
+ * @param check true - проверять при входе
+ */
+suspend fun setCheckUpdateOnStart(check: Boolean) {
+    dataStore.edit { prefs ->
+        prefs[CHECK_UPDATE_ON_START] = check
     }
+}
+
+/**
+ * Установить состояние темной темы.
+ * @param dark true - тёмная тема, false - светлая
+ */
+suspend fun setDarkTheme(dark: Boolean) {
+    dataStore.edit { prefs ->
+        prefs[DARK_THEME] = dark
+    }
+}
 
     /**
      * Инициализировать настройки значениями по умолчанию при первом запуске.
@@ -429,15 +448,18 @@ class SettingsManager(context: Context) {
                 val entries = DEFAULT_E_CURRENCY_COEFFICIENTS.entries.joinToString(";") { "${it.key}=${it.value}" }
                 prefs[E_CURRENCY_COEFFICIENTS] = entries
             }
-            if (!prefs.contains(CHECK_UPDATE_ON_START)) {
-                prefs[CHECK_UPDATE_ON_START] = true
-            }
-            if (!prefs.contains(DEFAULT_ENTRY_TAB)) {
-                prefs[DEFAULT_ENTRY_TAB] = 1
-            }
-            if (!prefs.contains(DEFAULT_CALC_TAB)) {
-                prefs[DEFAULT_CALC_TAB] = 3
-            }
+if (!prefs.contains(CHECK_UPDATE_ON_START)) {
+    prefs[CHECK_UPDATE_ON_START] = true
+}
+if (!prefs.contains(DARK_THEME)) {
+    prefs[DARK_THEME] = true
+}
+if (!prefs.contains(DEFAULT_ENTRY_TAB)) {
+    prefs[DEFAULT_ENTRY_TAB] = 1
+}
+if (!prefs.contains(DEFAULT_CALC_TAB)) {
+    prefs[DEFAULT_CALC_TAB] = 3
+}
         }
         initialized = true
     }

@@ -66,7 +66,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var settingsManager: SettingsManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        val splashScreen = installSplashScreen()
+        installSplashScreen()
         super.onCreate(savedInstanceState)
 
         AppLogger.init(this)
@@ -82,7 +82,8 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            FlowCapitalTheme {
+            val darkTheme by settingsManager.darkThemeFlow.collectAsState(initial = true)
+            FlowCapitalTheme(darkTheme = darkTheme) {
                 val defaultEntryTab by settingsManager.defaultEntryTabFlow.collectAsState(initial = 1)
                 var showSplash by remember { mutableStateOf(true) }
                 LaunchedEffect(Unit) {
