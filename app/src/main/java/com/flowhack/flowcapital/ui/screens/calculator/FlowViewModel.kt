@@ -162,11 +162,12 @@ class FlowViewModel(
             val today = Calendar.getInstance()
             val isSunday = today.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
 
+            // Проверяем, была ли запись создана сегодня (для определения isSameDay)
             val entryDate = Calendar.getInstance().apply { timeInMillis = lastEntry.date }
             val isSameDay = today.get(Calendar.YEAR) == entryDate.get(Calendar.YEAR) &&
                     today.get(Calendar.DAY_OF_YEAR) == entryDate.get(Calendar.DAY_OF_YEAR)
 
-            // Воскресенье - создаём SUNDAY запись (значения не меняются)
+            // Воскресенье - выходной, создаём SUNDAY запись с текущими значениями
             if (isSunday) {
                 val newEntry = GrowingFlowEntity(
                     date = System.currentTimeMillis(),
@@ -181,41 +182,37 @@ class FlowViewModel(
                 return@launch
             }
 
-            // Уже нажато сегодня - выходим
+            // Защита от двойного нажатия в один день
             if (isSameDay && lastEntry.isButtonPressed) return@launch
 
-            // Расчёт новых значений
+            // Расчёт начисления и нового остатка в потоке
             var currentAccrual = lastEntry.dailyAccrual
             var newInFlow = lastEntry.inFlowAmount - currentAccrual
 
-            // Защита от отрицательного потока
+            // Крайний случай: начисление больше, чем остаток в потоке
             if (newInFlow <= 0) {
                 currentAccrual = lastEntry.inFlowAmount
                 newInFlow = 0.0
             }
 
-            // Увеличиваем кошелёк на сумму начисления
+            // Обновление состояния: кошелёк растёт, процент увеличивается на dailyAddition
             val newWallet = lastEntry.walletAmount + currentAccrual
-            // Увеличиваем процент на ежедневный прирост
             val newPercent = lastEntry.percent + dailyAddition.value
-            // Пересчитываем начисление для нового потока
             val newDailyAccrual = if (newInFlow > 0) newInFlow * (newPercent / 100.0) else 0.0
 
-            // Проверяем, есть ли MISSED на сегодня (созданный generateMissedDaysForGrowingFlow)
+            // Проверяем, был ли пропущен сегодняшний день (создана запись MISSED)
             val todayStart = Calendar.getInstance().apply {
                 timeInMillis = System.currentTimeMillis()
-                set(Calendar.HOUR_OF_DAY, 0)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
+                set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
             }.timeInMillis
-            val todayEnd = todayStart + (24 * 60 * 60 * 1000)
+            val todayEnd = todayStart + (24 * 60 * 60 * 1000) // Конец дня (23:59:59)
 
             val todayEntries = growingRepository.getEntriesForDateRange(todayStart, todayEnd)
             val missedEntry = todayEntries.find { it.actionType == "MISSED" }
 
             if (missedEntry != null) {
-                // Обновляем MISSED в DAILY (не создаём новую запись!)
+                // Сценарий "Догоняем": обновляем MISSED в DAILY (используем UPDATE, а не INSERT)
                 val updatedEntry = missedEntry.copy(
                     date = System.currentTimeMillis(),
                     percent = newPercent,
@@ -227,7 +224,7 @@ class FlowViewModel(
                 )
                 growingRepository.updateEntry(updatedEntry)
             } else {
-                // Нет MISSED - создаём новую DAILY запись
+                // Обычное нажатие кнопки - создаём новую запись DAILY
                 val newEntry = GrowingFlowEntity(
                     date = System.currentTimeMillis(),
                     percent = newPercent,
@@ -256,25 +253,29 @@ class FlowViewModel(
             val zoneId = ZoneId.systemDefault()
             val today = LocalDate.now(zoneId)
 
+            // Находим дату самого первого старта потока (START), от неё пойдёт отсчёт
             val firstStartEntry = growingRepository.getFirstStartEntry() ?: return@launch
             val startDate = Instant.ofEpochMilli(firstStartEntry.date).atZone(zoneId).toLocalDate()
 
+            // Флаги контроля: если нашли DAILY или достигли начала - прекращаем проверку
             var needSundayCheck = true
             var needMissedCheck = true
 
             var checkDate = today
-            var isFirstIteration = true
+            var isFirstIteration = true // Флаг для обработки текущего дня (today) отдельно
 
             while ((needSundayCheck || needMissedCheck) && !checkDate.isBefore(startDate)) {
                 val dayStart = checkDate.atStartOfDay(zoneId).toInstant().toEpochMilli()
                 val dayEnd = checkDate.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
                 val entriesForDate = growingRepository.getEntriesForDateRange(dayStart, dayEnd)
 
+                // Определяем, какие типы записей есть в этот день
                 val hasStartInDay = entriesForDate.any { it.actionType == "START" }
                 val hasSundayRecord = entriesForDate.any { it.actionType == "SUNDAY" }
                 val hasDailyRecord = entriesForDate.any { it.actionType == "DAILY" }
                 val hasMissedRecord = entriesForDate.any { it.actionType == "MISSED" }
 
+                // Делегируем логику принятия решения MissedDaysCalculator (чистая функция)
                 val result = MissedDaysCalculator.checkDayForGrowingFlow(
                     hasSundayRecord = hasSundayRecord,
                     hasDailyRecord = hasDailyRecord,
@@ -286,8 +287,10 @@ class FlowViewModel(
                     needMissedCheck = needMissedCheck
                 )
 
+                // Создание записи SUNDAY, если нужно (и нет дубликатов)
                 if (result.shouldCreateSunday) {
                     val previousEntry = growingRepository.getLastEntryBeforeDate(dayStart) ?: firstStartEntry
+                    // Ставим время записи чуть позже последней в этот день (или на 00:00)
                     val sundayDate = if (entriesForDate.isNotEmpty()) {
                         entriesForDate.maxOf { it.date } + 1
                     } else {
@@ -306,6 +309,7 @@ class FlowViewModel(
                     AppLogger.d("FlowViewModel", "Создана SUNDAY за $checkDate")
                 }
 
+                // Создание записи MISSED, если день пропущен
                 if (result.shouldCreateMissed) {
                     val previousEntry = growingRepository.getLastEntryBeforeDate(dayStart) ?: firstStartEntry
                     val missedDate = if (entriesForDate.isNotEmpty()) {
@@ -326,20 +330,18 @@ class FlowViewModel(
                     AppLogger.d("FlowViewModel", "Создана MISSED за $checkDate")
                 }
 
-                if (result.shouldStopSundayCheck) {
-                    needSundayCheck = false
-                }
-                if (result.shouldStopMissedCheck) {
-                    needMissedCheck = false
-                }
+                // Обновляем флаги остановки на основе результата калькулятора
+                if (result.shouldStopSundayCheck) needSundayCheck = false
+                if (result.shouldStopMissedCheck) needMissedCheck = false
 
+                // Прерывание цикла (найден START или критическая точка)
                 if (result.shouldBreak) {
                     AppLogger.d("FlowViewModel", "Прерывание цикла в $checkDate")
                     break
                 }
 
                 isFirstIteration = false
-                checkDate = checkDate.minusDays(1)
+                checkDate = checkDate.minusDays(1) // Переходим к предыдущему дню
             }
         }
     }
@@ -447,7 +449,7 @@ class FlowViewModel(
             val isSameDay = today.get(Calendar.YEAR) == entryDate.get(Calendar.YEAR) &&
                     today.get(Calendar.DAY_OF_YEAR) == entryDate.get(Calendar.DAY_OF_YEAR)
 
-            // Воскресенье - SUNDAY запись (значения не меняются)
+            // Воскресенье - выходной, SUNDAY запись с текущими значениями
             if (isSunday) {
                 val newEntry = NoviceFlowEntity(
                     date = System.currentTimeMillis(),
@@ -462,14 +464,15 @@ class FlowViewModel(
                 return@launch
             }
 
-            // Уже нажато сегодня - выходим
+            // Защита от двойного нажатия в один день
             if (isSameDay && lastEntry.isButtonPressed) return@launch
 
-            // ПН использует фиксированный процент
+            // ПН использует фиксированный процент (не растёт как в РП)
             val dailyPercent = lastEntry.percent
             var currentAccrual = lastEntry.dailyAccrual
             var newInFlow = lastEntry.inFlowAmount - currentAccrual
 
+            // Крайний случай: начисление больше остатка
             if (newInFlow <= 0) {
                 currentAccrual = lastEntry.inFlowAmount
                 newInFlow = 0.0
@@ -478,13 +481,11 @@ class FlowViewModel(
             val newWallet = lastEntry.walletAmount + currentAccrual
             val newDailyAccrual = if (newInFlow > 0) newInFlow * (dailyPercent / 100.0) else 0.0
 
-            // Проверяем, есть ли MISSED на сегодня (созданный generateMissedDaysForNoviceFlow)
+            // Проверяем, есть ли пропуск (MISSED) на сегодня
             val todayStart = Calendar.getInstance().apply {
                 timeInMillis = System.currentTimeMillis()
-                set(Calendar.HOUR_OF_DAY, 0)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
+                set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
             }.timeInMillis
             val todayEnd = todayStart + (24 * 60 * 60 * 1000)
 
@@ -492,7 +493,7 @@ class FlowViewModel(
             val missedEntry = todayEntries.find { it.actionType == "MISSED" }
 
             if (missedEntry != null) {
-                // Обновляем MISSED в PN_DAILY (не создаём новую запись!)
+                // Сценарий "догоняем": обновляем MISSED в PN_DAILY
                 val updatedEntry = missedEntry.copy(
                     date = System.currentTimeMillis(),
                     percent = dailyPercent,
@@ -504,7 +505,7 @@ class FlowViewModel(
                 )
                 noviceRepository.updateEntry(updatedEntry)
             } else {
-                // Нет MISSED - создаём новую PN_DAILY запись
+                // Обычное нажатие кнопки - создаём новую PN_DAILY запись
                 val newEntry = NoviceFlowEntity(
                     date = System.currentTimeMillis(),
                     percent = dailyPercent,
@@ -642,21 +643,21 @@ class FlowViewModel(
 
     /**
      * Генерация прогноза ПН до указанной даты.
-      * Учитывает воскресенья (SUNDAY записи).
-      * Останавливается когда поток достигает 0.
-      *
-      * Логика:
-      * - Используется фиксированный процент из БД настроек
-      * - Если кнопка нажата сегодня: прогноз начинается с текущих значений
-      * - Если кнопка НЕ нажата сегодня: прогноз начинается с расчётом начисления за сегодня
-      * - Если compoundInterest=true: при wallet >= reinvestAmount делается реинвест на всю сумму
-      *
-      * @param targetDateMillis Дата окончания прогноза
-      * @param compoundInterest Включить сложный процент (реинвест при накоплении)
-      * @param reinvestAmount Сумма для реинвеста (по умолчанию 2000)
-      * @param bonusPercent Процент бонуса за взнос (из настроек)
-      */
-     fun generateNoviceForecast(
+     * Учитывает воскресенья (SUNDAY записи) и неизменный процент.
+     * Останавливается когда поток достигает 0.
+     *
+     * Логика:
+     * - Используется фиксированный процент из БД настроек (по умолчанию 2%)
+     * - Если кнопка нажата сегодня: прогноз начинается с текущих значений
+     * - Если кнопка НЕ нажата сегодня: прогноз начинается с расчётом начисления за сегодня
+     * - Если compoundInterest=true: при wallet >= reinvestAmount делается реинвест на всю сумму
+     *
+     * @param targetDateMillis Дата окончания прогноза (timestamp)
+     * @param compoundInterest Включить сложный процент (реинвест при накоплении)
+     * @param reinvestAmount Сумма для реинвеста (по умолчанию 2000)
+     * @param bonusPercent Процент бонуса за взнос (из настроек, по умолчанию 50%)
+     */
+    fun generateNoviceForecast(
          targetDateMillis: Long,
          compoundInterest: Boolean = false,
          reinvestAmount: Double = 2000.0,
@@ -787,8 +788,14 @@ class FlowViewModel(
      }
 
     /**
-     * Генерация прогноза до конца цикла (поток = 0).
+     * Генерация прогноза до конца цикла ПН (поток = 0).
      * Симулирует дни до полного исчерпания потока.
+     * Учитывает достижение нуля (с точностью до 0.005).
+     *
+     * Особенности:
+     * - Использует текущие значения как точку старта
+     * - Симуляция идёт максимум 730 дней (2 года) для защиты от бесконечного цикла
+     * - В воскресенья создаются SUNDAY записи (без начислений)
      */
     fun generateNoviceCycleEndForecast() {
         viewModelScope.launch {
@@ -853,6 +860,9 @@ class FlowViewModel(
      * Логика:
      * - Если кнопка нажата сегодня: прогноз начинается с текущих значений (без начисления сегодня)
      * - Если кнопка НЕ нажата сегодня: прогноз начинается с расчётом начисления за сегодня
+     * - Процент растёт на dailyAddition (0.003) каждый рабочий день
+     *
+     * @param targetDateMillis Дата окончания прогноза (timestamp)
      */
     fun generateForecast(targetDateMillis: Long) {
         viewModelScope.launch {
@@ -957,8 +967,15 @@ class FlowViewModel(
     }
 
     /**
-     * Поиск лучшей даты для реинвеста.
+     * Поиск лучшей даты для реинвеста РП.
      * Находит дату, когда начисление начинает уменьшаться (после точки максимума).
+     * Алгоритм ищет момент, когда dailyAccrual начинает падать из-за уменьшения потока.
+     *
+     * Механизм:
+     * - Симуляция продолжается до падения начисления (foundDrop = true)
+     * - После падения добавляется ещё один день для наглядности (showOneMoreAfterDrop)
+     * - Стоп-фактор: 730 дней (защита от бесконечного цикла)
+     * - Тип DROP_DAY помечает день, когда начисление стало меньше предыдущего
      */
     fun findBestReinvestDate() {
         viewModelScope.launch {

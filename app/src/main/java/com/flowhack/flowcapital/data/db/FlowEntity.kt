@@ -6,14 +6,21 @@ import androidx.room.PrimaryKey
 /**
  * Сущность записи истории Растущего Потока (РП).
  *
- * @property id Уникальный идентификатор записи
- * @property date Дата и время действия (timestamp)
- * @property percent Текущий процент начисления
- * @property inFlowAmount Сумма денег в потоке
- * @property dailyAccrual Ежедневное начисление
- * @property walletAmount Сумма в кошельке
- * @property isButtonPressed Была ли нажата кнопка начисления
- * @property actionType Тип действия: START, DAILY, REINVEST, CORRECTION, SUNDAY, MISSED
+ * @property id Уникальный идентификатор записи (автогенерация)
+ * @property date Дата и время действия в миллисекундах (timestamp)
+ * @property step Порядковый номер шага в истории потока (для экспорта в Excel)
+ * @property percent Текущий процент начисления (растет на 0.003 каждый день)
+ * @property inFlowAmount Сумма денег в потоке (уменьшается при начислении)
+ * @property dailyAccrual Ежедневное начисление (inFlow * percent / 100)
+ * @property walletAmount Сумма в кошельке (увеличивается при начислении)
+ * @property isButtonPressed Была ли нажата кнопка начисления в этот день
+ * @property actionType Тип действия:
+ *     - START: старт потока
+ *     - DAILY: ежедневное начисление
+ *     - REINVEST: реинвест (взнос с бонусом)
+ *     - CORRECTION: ручная корректировка значений
+ *     - SUNDAY: воскресенье (нет начислений)
+ *     - MISSED: пропущенный день (не нажали кнопку)
  */
 @Entity(tableName = "growing_flow_history")
 data class GrowingFlowEntity(
@@ -31,14 +38,23 @@ data class GrowingFlowEntity(
 /**
  * Сущность записи истории Потока Новичка (ПН).
  *
- * @property id Уникальный идентификатор записи
- * @property date Дата и время действия (timestamp)
- * @property percent Процент начисления (фиксированный 2%)
- * @property inFlowAmount Сумма денег в потоке
- * @property dailyAccrual Ежедневное начисление
- * @property walletAmount Сумма в кошельке
- * @property isButtonPressed Была ли нажата кнопка начисления
- * @property actionType Тип действия: START, DAILY, REINVEST, CORRECTION, SUNDAY, MISSED
+ * @property id Уникальный идентификатор записи (автогенерация)
+ * @property date Дата и время действия в миллисекундах (timestamp)
+ * @property step Порядковый номер шага в истории потока (для экспорта в Excel)
+ * @property percent Процент начисления (фиксированный, по умолчанию 2%)
+ * @property inFlowAmount Сумма денег в потоке (уменьшается при начислении)
+ * @property dailyAccrual Ежедневное начисление (inFlow * percent / 100)
+ * @property walletAmount Сумма в кошельке (увеличивается при начислении)
+ * @property isButtonPressed Была ли нажата кнопка начисления в этот день
+ * @property actionType Тип действия:
+ *     - PN_START: старт потока ПН
+ *     - PN_DAILY: ежедневное начисление ПН
+ *     - PN_REINVEST: реинвест ПН (взнос с бонусом 50%)
+ *     - PN_CORRECTION: ручная корректировка значений ПН
+ *     - PN_FORECAST: запись прогноза ПН
+ *     - PN_CYCLE_END: запись прогноза до конца цикла ПН
+ *     - SUNDAY: воскресенье (нет начислений)
+ *     - MISSED: пропущенный день (не нажали кнопку)
  */
 @Entity(tableName = "novice_flow_history")
 data class NoviceFlowEntity(
@@ -54,16 +70,16 @@ data class NoviceFlowEntity(
 )
 
 /**
- * Сущность Потока Новичка (ПН) - агрегированные данные.
- * Хранит текущее состояние одного экземпляра ПН.
+ * Сущность Потока Новичка (ПН) версии 2 - агрегированные данные.
+ * Хранит текущее состояние одного экземпляра ПН (не используется активно, история в NoviceFlowEntity).
  *
- * @property id Уникальный идентификатор
- * @property startDate Дата старта потока
- * @property nominalAmount Номинал потока
- * @property currentPercent Текущий процент (фиксированный 2%)
- * @property totalInFlow Общая сумма в потоке
+ * @property id Уникальный идентификатор (автогенерация)
+ * @property startDate Дата старта потока (timestamp)
+ * @property nominalAmount Номинал потока (сумма взноса)
+ * @property currentPercent Текущий процент начисления (фиксированный, из настроек)
+ * @property totalInFlow Общая сумма в потоке (inFlow всех записей)
  * @property totalWallet Общая сумма в кошельке
- * @property totalAccrued Всего начислено за все время
+ * @property totalAccrued Всего начислено за все время (сумма всех dailyAccrual)
  */
 @Entity(tableName = "novice_flows")
 data class NoviceFlowEntityV2(
@@ -79,13 +95,14 @@ data class NoviceFlowEntityV2(
 /**
  * Сущность Премиум Стартового Потока (ПСП).
  * Каждый экземпляр ПСП создаётся отдельно и имеет свой номинал.
+ * ПСП длится 20 периодов по 14 дней каждый.
  *
- * @property id Уникальный идентификатор
- * @property nominalAmount Номинал потока
- * @property startDate Дата создания потока
+ * @property id Уникальный идентификатор (автогенерация)
+ * @property nominalAmount Номинал потока (сумма взноса за период)
+ * @property startDate Дата создания потока (старт первого периода, timestamp)
  * @property totalAccrued Всего накапало по всем периодам
- * @property isActive Активен ли поток
- * @property currentPeriod Текущий период (1-20)
+ * @property isActive Активен ли поток (true - можно делать взносы)
+ * @property currentPeriod Текущий период (1-20, инкрементируется после взноса)
  */
 @Entity(tableName = "premium_start_flows")
 data class PremiumStartFlowEntity(
@@ -98,19 +115,20 @@ data class PremiumStartFlowEntity(
 )
 
 /**
- * Сущность периода ПСП.
- * Хранит информацию о каждом периоде отдельно.
+ * Сущность периода Премиум Стартового Потока (ПСП).
+ * Хранит информацию о каждом из 20 периодов отдельно.
+ * Период длится 14 дней, после чего нужно сделать взнос для перехода к следующему.
  *
- * @property id Уникальный идентификатор
- * @property flowId ID родительского потока
- * @property periodNumber Номер периода (1-20)
- * @property percent Процент начисления от номинала
- * @property startDate Дата начала периода
- * @property endDate Дата окончания периода (через 2 недели)
+ * @property id Уникальный идентификатор (автогенерация)
+ * @property flowId ID родительского потока (PremiumStartFlowEntity)
+ * @property periodNumber Номер периода (1-20, коэффициенты из настроек)
+ * @property percent Процент начисления от номинала за этот период
+ * @property startDate Дата начала периода (timestamp)
+ * @property endDate Дата окончания периода (startDate + 14 дней, timestamp)
  * @property accrualAmount Сумма начисления (номинал * процент / 100)
- * @property isContributionMade Был ли сделан взнос номинала
- * @property contributionDate Дата взноса
- * @property isCompleted Завершён ли период
+ * @property isContributionMade Был ли сделан взнос номинала в этот период
+ * @property contributionDate Дата взноса (timestamp, null если не сделан)
+ * @property isCompleted Завершён ли период (после 14 дней или взноса)
  */
 @Entity(tableName = "premium_start_periods")
 data class PremiumStartPeriodEntity(

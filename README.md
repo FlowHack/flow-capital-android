@@ -5,7 +5,7 @@
 ![Android](https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)
 ![Compose](https://img.shields.io/badge/Compose-02569B?style=for-the-badge&logo=jetpackcompose&logoColor=white)
-![License](https://img.shields.io/badge/License-BSD--3--Clause-blue?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
 
 **Android-приложение для учёта финансовых потоков**
 
@@ -23,11 +23,9 @@
 
 | Поток | Описание | Статус |
 |-------|---------|--------|
-| **Растущий Поток (РП)** | Прогрессивный рост начислений | ✅ |
-| **Поток Новичка (ПН)** | Стабильные 2% в день | ✅ |
-| **Быстрый Поток (БП)** | Ускоренные начисления | 🚧 В разработке |
-| **Премиум Стартовый Поток (ПСП)** | 20 периодов с растущими коэффициентами | ✅ |
-| **Накопительный Поток (НП)** | Долгосрочные накопления | 🚧 В разработке |
+| **Растущий Поток (РП)** | Прогрессивный рост начислений (+0.003/клик) | ✅ |
+| **Поток Новичка (ПН)** | Стабильные 2% в день + 50% бонус | ✅ |
+| **Премиум Стартовый Поток (ПСП)** | 20 периодов × 14 дней с растущими коэффициентами | ✅ |
 
 ---
 
@@ -42,10 +40,10 @@
 
 ### 📅 Планирование
 
-- **Напоминания** — push-уведомления о необходимости действий (до 5 напоминаний)
+- **Напоминания** — push-уведомления о необходимости действий
 - **Календарь** — визуализация периодов и сроков
 - **История** — полная история всех операций
-- **Расчёт потоков** — прогнозирование будущих начислений для РП, ПН и ПСП
+- **Расчёт потоков** — прогнозирование будущих начислений
 
 ### 💾 Экспорт данных
 
@@ -54,14 +52,18 @@
 
 ### 🌐 Встроенный браузер
 
-- Быстрый доступ к связанным сервисам (potok.cash, sberkassa, e-id)
+- Быстрый доступ к связанным сервисам (potok.cash, sberkossa, e-id)
 - Поддержка прокси (SOCKS5, MTProto)
 - Сохранение сессий и cookies между переключениями
+
+### 📸 Сканер QR-кодов
+
+- Встроенный сканер для быстрого доступа к ресурсам
 
 ### 🔄 Автообновления
 
 - Проверка новых версий через GitHub API
-- Уведомление о доступных обновлениях
+- Уведомление и загрузка обновлений
 
 ---
 
@@ -69,13 +71,13 @@
 
 ### Ядро
 
-| Технология | Версия | Назначе��ие |
+| Технология | Версия | Назначение |
 |------------|--------|------------|
-| **Kotlin** | 1.9.x | Основной язык разработки |
-| **Jetpack Compose** | BOM 2024.x | UI-фреймворк |
+| **Kotlin** | 2.3.20 | Основной язык разработки |
+| **Jetpack Compose** | BOM 2026.03.01 | UI-фреймворк |
 | **Material 3** | - | Дизайн-система |
-| **Room** | 2.6.x | Локальная база данных |
-| **DataStore** | - | Хранение настроек |
+| **Room** | 2.8.4 | Локальная база данных |
+| **DataStore** | 1.2.1 | Хранение настроек |
 
 ### Архитектура
 
@@ -88,9 +90,14 @@
 
 ### Дополнительные библиотеки
 
-- **WorkManager** — фоновые задачи и напоминания
-- **FastExcel** — экспорт в Excel формат
-- **Navigation Compose** — навигация между экранами
+- **WorkManager** (2.11.2) — фоновые задачи и напоминания
+- **FastExcel** (0.15.4) — экспорт в Excel формат
+- **Navigation Compose** (2.9.7) — навигация между экранами
+- **Retrofit** (2.12.0) + **Moshi** — сетевые запросы и сериализация
+- **Coil** (2.7.0) — загрузка изображений
+- **CameraX** (1.6.0) — работа с камерой и QR-кодами
+- **Timber** (5.0.1) — логирование
+- **Kotlinx Serialization** (1.7.3) — сериализация данных
 
 ---
 
@@ -101,13 +108,14 @@
 - Android Studio Hedgehog (2023.1.1) или новее
 - JDK 17+
 - Android SDK 28+ (Android 9)
+- AGP 9.2.0
 
 ### Debug-сборка
 
 ```bash
 # Клонирование репозитория
-git clone https://github.com/FlowHack/FlowCapitalAndroidApp.git
-cd FlowCapitalAndroidApp
+git clone https://github.com/FlowHack/flow-capital-android.git
+cd flow-capital-android
 
 # Debug-сборка
 ./gradlew assembleDebug
@@ -126,65 +134,50 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 ## Структура проекта
 
 ```
-app/src/main/java/com/example/flowcapital/
+app/src/main/java/com/flowhack/flowcapital/
 ├── data/
-│   ├── db/                    # Room база данных
-│   │   ├── AppDatabase.kt     # Главная БД
-│   │   ├── FlowEntity.kt      # Сущности потоков
-│   │   ├── FlowDao.kt         # DAO интерфейсы
-│   │   └── FlowRepository.kt  # Репозитории
+│   ├── db/                          # Room база данных
+│   │   ├── AppDatabase.kt            # Главная БД
+│   │   ├── FlowEntity.kt             # Сущности потоков
+│   │   ├── FlowDao.kt                # DAO интерфейсы
+│   │   └── FlowRepository.kt         # Репозитории
+│   ├── forecast/                     # Расчёты и прогнозы
+│   │   ├── GrowingFlowForecast.kt    # Прогноз РП
+│   │   ├── NoviceFlowForecast.kt     # Прогноз ПН
+│   │   ├── PspFlowForecast.kt        # Прогноз ПСП
+│   │   └── MissedDaysCalculator.kt   # Расчёт пропущенных дней
 │   ├── settings/
-│   │   └── SettingsManager.kt  # Управление настройками
+│   │   └── SettingsManager.kt        # Управление настройками
 │   ├── update/
-│   │   └── UpdateChecker.kt    # Проверка обновлений
+│   │   ├── UpdateChecker.kt          # Проверка обновлений
+│   │   └── ApkDownloader.kt          # Загрузка APK
 │   ├── proxy/
-│   │   └── ProxyStorage.kt     # Хранение прокси
+│   │   ├── ProxyModels.kt            # Модели прокси
+│   │   └── ProxyStorage.kt           # Хранение прокси
 │   └── logging/
-���       └── AppLogger.kt       # Логирование
+│       └── AppLogger.kt              # Логирование
 ├── notifications/
-│   └── ReminderWorker.kt       # WorkManager для напоминаний
+│   └── ReminderWorker.kt             # WorkManager для напоминаний
 ├── ui/
 │   ├── screens/
-│   │   ├── browser/           # Встроенный браузер
+│   │   ├── browser/                  # Встроенный браузер
 │   │   │   └── BrowserScreen.kt
-│   │   ├── calculator/        # Экраны расчётов (РП, ПН, ПСП)
-│   │   │   ├── CalculatorScreen.kt    # Главный экран расчётов
-│   │   │   ├── FlowViewModel.kt        # ViewModel для потоков
-│   │   │   ├── FlowDialogs.kt          # Диалоги (старт, реинвест, прогноз)
-│   │   │   ├── FlowComponents.kt       # UI компоненты (карточки, таблицы)
-│   │   │   └── ScreenUtils.kt          # Утилиты экрана (isNarrowScreen, isWideScreen)
+│   │   ├── calculator/               # Экраны расчётов
+│   │   │   ├── CalculatorScreen.kt    # Главный экран (РП, ПН)
+│   │   │   ├── PremiumStartScreen.kt # Экран ПСП
+│   │   │   ├── FlowViewModel.kt       # ViewModel для РП и ПН
+│   │   │   ├── PremiumStartViewModel.kt # ViewModel для ПСП
+│   │   │   ├── FlowDialogs.kt        # Диалоги (старт, реинвест, прогноз)
+│   │   │   ├── FlowComponents.kt     # UI компоненты (карточки, таблицы)
+│   │   │   └── ScreenUtils.kt        # Утилиты экрана
 │   │   └── settings/
-│   │       ├── SettingsScreen.kt       # Экран настроек
-│   │       └── BackupScreen.kt         # Импорт/экспорт
+│   │       └── SettingsScreen.kt     # Экран настроек
 │   └── theme/
-│       └── FlowColors.kt       # Цветовая палитра
-└── MainActivity.kt             # Точка входа
-```
-app/src/main/java/com/example/flowcapital/
-├── data/
-│   ├── db/                    # Room база данных
-│   │   ├── AppDatabase.kt     # Главная БД
-│   │   ├── FlowEntity.kt      # Сущности потоков
-│   │   ├── FlowDao.kt         # DAO интерфейсы
-│   │   └── FlowRepository.kt  # Репозитории
-│   ├── settings/
-│   │   └── SettingsManager.kt  # Управление настройками
-│   ├── update/
-│   │   └── UpdateChecker.kt    # Проверка обновлений
-│   ├── proxy/
-│   │   └── ProxyStorage.kt     # Хранение прокси
-│   └── logging/
-│       └── AppLogger.kt       # Логирование
-├── notifications/
-│   └── ReminderWorker.kt       # WorkManager для напоминаний
-├── ui/
-│   ├── screens/
-│   │   ├── browser/           # Встроенный браузер
-│   │   ├── calculator/        # Экраны расчётов (РП, ПН, ПСП)
-│   │   └── settings/          # Экран настроек
-│   └── theme/
-│       └── FlowColors.kt       # Цветовая палитра
-└── MainActivity.kt             # Точка входа
+│       ├── Color.kt                  # Основные цвета
+│       ├── FlowColors.kt             # Цветовая палитра потоков
+│       ├── Theme.kt                  # Тема приложения
+│       └── Type.kt                   # Типографика
+└── MainActivity.kt                    # Точка входа
 ```
 
 ---

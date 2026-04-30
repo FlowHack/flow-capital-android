@@ -239,7 +239,7 @@ class GrowingFlowIntegrationTest : BaseIntegrationTest() {
         val allRecords = growingFlowDao.getAllHistory().first()
         val reinvestRecord = allRecords.find { it.actionType == "REINVEST" }
         assertTrue("Должна быть запись REINVEST", reinvestRecord != null)
-        assertEquals("В потоке должно быть 24000", 24000.0, reinvestRecord!!.inFlowAmount, 0.01)
+        assertEquals("В потоке должно быть 29000 (19000 + 5000 + 5000*100/100)", 29000.0, reinvestRecord!!.inFlowAmount, 0.01)
         assertEquals("Шаг должен увеличиться", 6, reinvestRecord.step)
     }
 
@@ -263,9 +263,10 @@ class GrowingFlowIntegrationTest : BaseIntegrationTest() {
         )
         growingFlowDao.insert(original)
 
-        // Act - коррекция кошелька
+        // Act - коррекция кошелька (создаем новую запись с новым ID)
         val lastEntry = growingFlowDao.getLastEntry()!!
         val corrected = lastEntry.copy(
+            id = 0, // Сбрасываем ID для автогенерации новой записи
             walletAmount = 0.0, // Пользователь указал 0 в кошельке
             actionType = "CORRECTION"
         )
@@ -315,66 +316,44 @@ class GrowingFlowIntegrationTest : BaseIntegrationTest() {
             )
         )
 
-        // Act - зашли в пятницу (16.01), должны создаться MISSED за вт, ср, чт, пт
+        // Act - зашли в пятницу (16.01), должны создаться MISSED за вт, ср, чт
         val tuesday = createDateMillis(2026, Calendar.JANUARY, 13)
         val wednesday = createDateMillis(2026, Calendar.JANUARY, 14)
         val thursday = createDateMillis(2026, Calendar.JANUARY, 15)
         val friday = createDateMillis(2026, Calendar.JANUARY, 16)
 
-        val lastEntry = growingFlowDao.getLastEntry()!!
+        var lastEntry = growingFlowDao.getLastEntry()!!
         var currentStep = lastEntry.step
 
-        // Вторник - MISSED
-        growingFlowDao.insert(
-            GrowingFlowEntity(
-                date = tuesday,
-                step = currentStep,
-                percent = lastEntry.percent,
-                inFlowAmount = lastEntry.inFlowAmount,
-                dailyAccrual = lastEntry.dailyAccrual,
-                walletAmount = lastEntry.walletAmount,
-                isButtonPressed = false,
-                actionType = "MISSED"
+        // Генерируем MISSED для пропущенных дней
+        val missedDates = listOf(tuesday, wednesday, thursday)
+        for (date in missedDates) {
+            growingFlowDao.insert(
+                GrowingFlowEntity(
+                    date = date,
+                    step = currentStep,
+                    percent = lastEntry.percent,
+                    inFlowAmount = lastEntry.inFlowAmount,
+                    dailyAccrual = lastEntry.dailyAccrual,
+                    walletAmount = lastEntry.walletAmount,
+                    isButtonPressed = false,
+                    actionType = "MISSED"
+                )
             )
-        )
-
-        // Среда - MISSED
-        growingFlowDao.insert(
-            GrowingFlowEntity(
-                date = wednesday,
-                step = currentStep,
-                percent = lastEntry.percent,
-                inFlowAmount = lastEntry.inFlowAmount,
-                dailyAccrual = lastEntry.dailyAccrual,
-                walletAmount = lastEntry.walletAmount,
-                isButtonPressed = false,
-                actionType = "MISSED"
-            )
-        )
-
-        // Четверг - MISSED
-        growingFlowDao.insert(
-            GrowingFlowEntity(
-                date = thursday,
-                step = currentStep,
-                percent = lastEntry.percent,
-                inFlowAmount = lastEntry.inFlowAmount,
-                dailyAccrual = lastEntry.dailyAccrual,
-                walletAmount = lastEntry.walletAmount,
-                isButtonPressed = false,
-                actionType = "MISSED"
-            )
-        )
+        }
 
         // Пятница - DAILY (нажал кнопку)
         currentStep++
+        lastEntry = growingFlowDao.getLastEntry()!! // Обновляем lastEntry
+        val newPercent = lastEntry.percent + 0.003
+        val newInFlow = lastEntry.inFlowAmount - lastEntry.dailyAccrual
         growingFlowDao.insert(
             GrowingFlowEntity(
                 date = friday,
                 step = currentStep,
-                percent = lastEntry.percent + 0.003,
-                inFlowAmount = lastEntry.inFlowAmount - lastEntry.dailyAccrual,
-                dailyAccrual = (lastEntry.inFlowAmount - lastEntry.dailyAccrual) * (lastEntry.percent + 0.003) / 100,
+                percent = newPercent,
+                inFlowAmount = newInFlow,
+                dailyAccrual = newInFlow * newPercent / 100,
                 walletAmount = lastEntry.walletAmount + lastEntry.dailyAccrual,
                 isButtonPressed = true,
                 actionType = "DAILY"
@@ -385,7 +364,7 @@ class GrowingFlowIntegrationTest : BaseIntegrationTest() {
         val allRecords = growingFlowDao.getAllHistory().first()
         val missedRecords = allRecords.filter { it.actionType == "MISSED" }
         assertEquals("Должно быть 3 записи MISSED (вт, ср, чт)", 3, missedRecords.size)
-        assertEquals("Должно быть 5 записей всего (START, DAILY, 3xMISSED, DAILY)", 5, allRecords.size)
+        assertEquals("Должно быть 6 записей всего (START, DAILY, 3xMISSED, DAILY)", 6, allRecords.size)
     }
 
     /**

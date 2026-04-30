@@ -76,7 +76,17 @@ fun calculatePspForecast(
 }
 
 /**
- * Результат прогноза ПСП.
+ * Результат прогноза одного периода Премиум Стартового Потока (ПСП).
+ * Используется для отображения прогноза и экспорта в Excel.
+ *
+ * @property periodNumber Номер периода (1-20, согласно ТЗ)
+ * @property startDate Дата начала периода (timestamp, начало 14-дневного цикла)
+ * @property endDate Дата окончания периода (startDate + 14 дней)
+ * @property nominal Номинал потока (сумма взноса за период)
+ * @property percent Процент начисления для этого периода (из настроек коэффициентов)
+ * @property accrualAmount Сумма начисления за период (nominal * percent / 100)
+ * @property totalAccrued Общая сумма начислений за все периоды включая текущий
+ * @property isCompleted true если это 20-й период (последний)
  */
 data class PspForecastResult(
     val periodNumber: Int,
@@ -90,7 +100,11 @@ data class PspForecastResult(
 )
 
 /**
- * Форматирует дату для логов.
+ * Форматирует timestamp в читаемую строку даты (ДД.ММ.ГГГГ) для логирования.
+ * Использует системный календарь для преобразования.
+ *
+ * @param millis Время в миллисекундах
+ * @return Отформатированная строка даты
  */
 private fun formatDate(millis: Long): String {
     val cal = Calendar.getInstance().apply { timeInMillis = millis }

@@ -156,7 +156,7 @@ object AppLogger {
 
                 Result.success(Unit)
             } catch (e: Exception) {
-                e.printStackTrace()
+                Timber.tag("AppLogger").e(e, "Ошибка экспорта логов")
                 Result.failure(e)
             }
         }

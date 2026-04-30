@@ -4,7 +4,13 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 
 /**
- * Результат проверки дня на необходимость создания записей.
+ * Результат проверки конкретного дня на необходимость создания записей пропусков или воскресений.
+ *
+ * @property shouldCreateSunday Нужно ли создать запись SUNDAY за этот день
+ * @property shouldCreateMissed Нужно ли создать запись MISSED за этот день
+ * @property shouldStopSundayCheck Остановить ли проверку воскресений для последующих дней (найдена запись или START)
+ * @property shouldStopMissedCheck Остановить ли проверку пропусков для последующих дней (найдена DAILY/MISSED/START)
+ * @property shouldBreak Прервать ли цикл обхода дней полностью (найден START)
  */
 data class DayCheckResult(
     val shouldCreateSunday: Boolean = false,
@@ -17,11 +23,28 @@ data class DayCheckResult(
 /**
  * Калькулятор для определения необходимости создания записей пропущенных дней.
  * Содержит чистую логику (без зависимостей от БД или Android), пригодную для тестирования.
+ *
+ * Алгоритм работы:
+ * 1. Если в день есть START — создаем SUNDAY (если воскресенье) или MISSED (если нет DAILY),
+ *    и прерываем цикл (break).
+ * 2. Если это первый день (today) — проверяем только воскресенья.
+ * 3. Для обычных дней: если воскресенье и нет SUNDAY — создаем SUNDAY.
+ * 4. Для пропусков: если нет DAILY и MISSED — создаем MISSED.
  */
 object MissedDaysCalculator {
 
     /**
      * Проверяет, какие действия нужно выполнить для конкретного дня (для РП).
+     *
+     * @param hasSundayRecord Есть ли в этот день запись SUNDAY
+     * @param hasDailyRecord Есть ли в этот день запись DAILY
+     * @param hasMissedRecord Есть ли в этот день запись MISSED
+     * @param hasStartInDay Есть ли в этот день запись START
+     * @param dayOfWeek День недели (java.time.DayOfWeek)
+     * @param isFirstIteration true, если это текущий день (today), а не история
+     * @param needSundayCheck Флаг, указывающий, что еще нужно проверять воскресенья
+     * @param needMissedCheck Флаг, указывающий, что еще нужно проверять пропуски
+     * @return [DayCheckResult] с решениями по текущему дню
      */
     fun checkDayForGrowingFlow(
         hasSundayRecord: Boolean,
@@ -111,6 +134,17 @@ object MissedDaysCalculator {
 
     /**
      * Проверяет, какие действия нужно выполнить для конкретного дня (для ПН).
+     * Логика идентична РП, но используются другие типы действий (PN_START, PN_DAILY и т.д.).
+     *
+     * @param hasSundayRecord Есть ли в этот день запись SUNDAY
+     * @param hasDailyRecord Есть ли в этот день запись PN_DAILY
+     * @param hasMissedRecord Есть ли в этот день запись MISSED
+     * @param hasStartInDay Есть ли в этот день запись PN_START
+     * @param dayOfWeek День недели
+     * @param isFirstIteration true, если это текущий день
+     * @param needSundayCheck Флаг проверки воскресений
+     * @param needMissedCheck Флаг проверки пропусков
+     * @return [DayCheckResult] с решениями по текущему дню
      */
     fun checkDayForNoviceFlow(
         hasSundayRecord: Boolean,

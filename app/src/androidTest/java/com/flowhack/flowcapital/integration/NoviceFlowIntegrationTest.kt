@@ -138,9 +138,10 @@ class NoviceFlowIntegrationTest : BaseIntegrationTest() {
 
         // Act - пропуск вторника, зашли в среду
         val tuesday = createDateMillis(2026, Calendar.JANUARY, 13)
-        val lastEntry = noviceFlowDao.getLastEntry()!!
+        val lastEntry = noviceFlowDao.getAllHistory().first().lastOrNull() ?: throw AssertionError("Нет записей")
         noviceFlowDao.insert(
             NoviceFlowEntity(
+                id = 0, // Сбрасываем ID для автогенерации
                 date = tuesday,
                 step = lastEntry.step, // Шаг не увеличивается
                 percent = lastEntry.percent,
@@ -151,10 +152,9 @@ class NoviceFlowIntegrationTest : BaseIntegrationTest() {
                 actionType = "PN_MISSED"
             )
         )
-
+        
         // Assert
-        val allRecords = noviceFlowDao.getAllHistory().first()
-        val missedRecord = allRecords.find { it.actionType == "PN_MISSED" }
+        val missedRecord = noviceFlowDao.getAllHistory().first().find { it.actionType == "PN_MISSED" }
         assertTrue("Должна быть запись PN_MISSED", missedRecord != null)
         assertEquals("PN_MISSED должна быть во вторник", tuesday, missedRecord!!.date)
         assertEquals("Шаг не должен увеличиться", 2, missedRecord.step)
@@ -274,10 +274,11 @@ class NoviceFlowIntegrationTest : BaseIntegrationTest() {
             )
         )
 
-        // Act - коррекция кошелька
+        // Act - коррекция кошелька (создаем новую запись с новым ID)
         val lastEntry = noviceFlowDao.getLastEntry()!!
         noviceFlowDao.insert(
             NoviceFlowEntity(
+                id = 0, // Сбрасываем ID для автогенерации
                 date = date,
                 step = lastEntry.step,
                 percent = lastEntry.percent,
