@@ -17,12 +17,6 @@ val RedAccentLight = Color(0xFFFF6659)
 /** Основной цвет текста */
 val TextPrimary = Color(0xFFE0E0E0)
 
-/** Вторичный цвет текста */
-val TextSecondary = Color(0xFFAAAAAA)
-
-/** Зелёный цвет для начислений */
-val GreenAccrual = Color(0xFF4CAF50)
-
 /** Светлый фон приложения */
 val LightBackground = Color(0xFFF5F5F5)
 
@@ -31,6 +25,3 @@ val LightSurface = Color(0xFFFFFFFF)
 
 /** Основной цвет текста для светлой темы */
 val LightTextPrimary = Color(0xFF212121)
-
-/** Вторичный цвет текста для светлой темы */
-val LightTextSecondary = Color(0xFF757575)

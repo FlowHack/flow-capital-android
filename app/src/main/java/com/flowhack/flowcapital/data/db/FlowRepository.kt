@@ -53,25 +53,6 @@ class NoviceFlowRepository(private val dao: NoviceFlowDao) {
 }
 
 /**
- * Репозиторий для управления экземплярами Потока Новичка (v2).
- */
-class NoviceFlowsRepository(private val dao: NoviceFlowsDao) {
-    val allFlows: Flow<List<NoviceFlowEntityV2>> = dao.getAllFlows()
-
-    suspend fun getFlowById(id: Int): NoviceFlowEntityV2? = dao.getFlowById(id)
-
-    suspend fun insertFlow(flow: NoviceFlowEntityV2): Long = dao.insert(flow)
-
-    suspend fun updateFlow(flow: NoviceFlowEntityV2) = dao.update(flow)
-
-    suspend fun deleteFlow(id: Int) = dao.deleteById(id)
-
-    suspend fun clearAll() = dao.clearAll()
-
-    suspend fun getFlowsCount(): Int = dao.getFlowsCount()
-}
-
-/**
  * Репозиторий для управления ПСП.
  */
 class PremiumStartFlowRepository(

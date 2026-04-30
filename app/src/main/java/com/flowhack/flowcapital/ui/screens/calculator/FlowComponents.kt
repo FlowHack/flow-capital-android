@@ -135,7 +135,7 @@ fun HistoryTable(history: List<GrowingFlowEntity>) {
                 Text("Кошелек", modifier = Modifier.weight(1.2f), fontSize = 10.sp, textAlign = TextAlign.Center)
             }
         }
-        historyWithStep.forEach { (entry, step) ->
+        historyWithStep.forEach { (entry, _) ->
             val backgroundColor = when (entry.actionType) {
                 "SUNDAY" -> Color(0x33E040FB)
                 "CORRECTION" -> Color(0x33FF5252)
@@ -485,7 +485,7 @@ fun NoviceHistoryTable(history: List<NoviceFlowEntity>) {
                 Text("Кошелек", modifier = Modifier.weight(1.2f), fontSize = 10.sp, textAlign = TextAlign.Center)
             }
         }
-        historyWithStep.forEach { (entry, step) ->
+        historyWithStep.forEach { (entry, _) ->
             val backgroundColor = when (entry.actionType) {
                 "SUNDAY" -> Color(0x33E040FB)
                 "CORRECTION", "PN_CORRECTION" -> Color(0x33FF5252)

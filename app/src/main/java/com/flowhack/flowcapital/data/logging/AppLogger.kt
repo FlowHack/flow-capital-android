@@ -24,7 +24,6 @@ import java.util.concurrent.ConcurrentLinkedDeque
  */
 object AppLogger {
 
-    private const val LOG_FILE_NAME = "flowcapital_log.txt"
     private const val MAX_LOG_ENTRIES = 1000
 
     private val logEntries = ConcurrentLinkedDeque<LogEntry>()
@@ -84,20 +83,12 @@ object AppLogger {
         }
     }
 
-    fun v(tag: String, message: String) {
-        Timber.tag(tag).v(message)
-    }
-
     fun d(tag: String, message: String) {
         Timber.tag(tag).d(message)
     }
 
     fun i(tag: String, message: String) {
         Timber.tag(tag).i(message)
-    }
-
-    fun w(tag: String, message: String) {
-        Timber.tag(tag).w(message)
     }
 
     fun e(tag: String, message: String, throwable: Throwable? = null) {
@@ -112,22 +103,10 @@ object AppLogger {
         Timber.tag(tag).i(message)
     }
 
-    fun logError(tag: String, message: String, throwable: Throwable? = null) {
-        val fullMessage = if (throwable != null) {
-            val sw = StringWriter()
-            throwable.printStackTrace(PrintWriter(sw))
-            "$message\n${sw}"
-        } else {
-            message
-        }
-        Timber.tag(tag).e(fullMessage)
-    }
-
     suspend fun exportLogToFile(context: Context, uri: android.net.Uri): Result<Unit> {
         return withContext(Dispatchers.IO) {
             try {
                 val dateFormat = SimpleDateFormat("dd.MM.yyyy HH:mm:ss", Locale.getDefault())
-                val fileNameFormat = SimpleDateFormat("dd.MM.yyyy_HH-mm-ss", Locale.getDefault())
 
                 val outputStream = context.contentResolver.openOutputStream(uri)
                     ?: return@withContext Result.failure(Exception("Не удалось создать файл"))
@@ -181,11 +160,6 @@ object AppLogger {
                 Result.failure(e)
             }
         }
-    }
-
-    fun clearLogs() {
-        logEntries.clear()
-        log("AppLogger", "Логи очищены")
     }
 
     fun getLogCount(): Int = logEntries.size

@@ -92,8 +92,7 @@ fun ReinvestDialog(
     val isPercentValid = !isExistingFlow || percentText.isNotEmpty()
     val isAmountValid = amountText.isNotEmpty()
 
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+    val isLandscape = isWideScreen()
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -402,7 +401,6 @@ fun NoviceForecastResultsDialog(
     // Цвета для подсветки строк
     val greenBackground = Color(0xFF1B5E20).copy(alpha = 0.3f) // Зеленоватый для START/REINVEST
     val purpleBackground = Color(0xFF4A148C).copy(alpha = 0.3f)   // Фиолетовый для SUNDAY
-    val redBackground = Color(0xFFB71C1C).copy(alpha = 0.3f)     // Красноватый для CORRECTION (если будет)
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -546,12 +544,7 @@ fun CorrectionDialog(
 
     val isEnabled = hasAnyChange && hasSomeInput
 
-    val newFlow = parseDouble(flowText) ?: currentInFlow
-    val newAccrual = parseDouble(accrualText) ?: currentAccrual
-    val newWallet = parseDouble(walletText) ?: currentWallet
-
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+    val isLandscape = isWideScreen()
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -944,8 +937,7 @@ fun NoviceCorrectionDialog(
     val newFlowValue = parseDouble(flowText) ?: currentInFlow
     val newAccrual = newFlowValue * currentDailyPercent / 100.0
 
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+    val isLandscape = isWideScreen()
 
     Dialog(
         onDismissRequest = onDismiss,

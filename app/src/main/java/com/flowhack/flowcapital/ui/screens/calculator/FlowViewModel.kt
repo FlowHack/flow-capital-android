@@ -55,11 +55,6 @@ class FlowViewModel(
     /** Ежедневное увеличение процента для РП */
     private val dailyAddition = settingsManager.dailyAdditionFlow.stateIn(viewModelScope, SharingStarted.Eagerly, 0.003)
 
-    /** Бонус за взнос для ПН - получаем актуальное значение из settingsManager */
-    val pnBonusPercent get() = settingsManager.pnBonusPercentFlow.stateIn(viewModelScope, SharingStarted.Eagerly, 50.0)
-    /** Ежедневный процент для ПН - получаем актуальное значение из settingsManager */
-    val pnDailyPercent get() = settingsManager.pnDailyPercentFlow.stateIn(viewModelScope, SharingStarted.Eagerly, 2.0)
-
     /** E-currency коэффициенты из настроек */
     private val eCurrencyCoefficients: Flow<Map<Double, Double>>
         get() = settingsManager.eCurrencyCoefficientsFlow
@@ -99,19 +94,6 @@ class FlowViewModel(
             }
         }
         return amount
-    }
-
-    /**
-     * Получить процент бонуса для суммы (из настроек).
-     */
-    private suspend fun getECurrencyBonusPercent(amount: Double): Double {
-        val coefficients = eCurrencyCoefficients.first().entries.sortedByDescending { it.key }
-        for ((threshold, bonus) in coefficients) {
-            if (amount >= threshold) {
-                return bonus
-            }
-        }
-        return 0.0
     }
 
     /**
@@ -157,7 +139,7 @@ class FlowViewModel(
                 inFlowAmount = newInFlowAmount,
                 dailyAccrual = newDailyAccrual,
                 walletAmount = newWallet,
-                isButtonPressed = false,
+                isButtonPressed = lastEntry?.isButtonPressed ?: false,
                 actionType = if (lastEntry == null) "START" else "REINVEST"
             )
             growingRepository.insertEntry(newEntry)
@@ -295,7 +277,7 @@ class FlowViewModel(
                 
                 // Если это день со START - обрабатываем согласно алгоритму
                 if (hasStart) {
-                    AppLogger.d("FlowViewModel", "Найден START день: ${checkDate}")
+                    AppLogger.d("FlowViewModel", "Найден START день: $checkDate")
                     
                     // Для воскресений: если START и воскресенье - создаем SUNDAY (если нужно)
                     if (needSundayCheck && checkDate.dayOfWeek == DayOfWeek.SUNDAY) {
@@ -318,14 +300,14 @@ class FlowViewModel(
                                 actionType = "SUNDAY"
                             )
                             growingRepository.insertEntry(sundayEntry)
-                            AppLogger.d("FlowViewModel", "Создана SUNDAY за START день (воскресенье) ${checkDate}")
+                            AppLogger.d("FlowViewModel", "Создана SUNDAY за START день (воскресенье) $checkDate")
                         }
                     }
                     
                     // При любом START останавливаем проверку воскресений
                     if (needSundayCheck) {
                         needSundayCheck = false
-                        AppLogger.d("FlowViewModel", "Найден START в ${checkDate} - проверка воскресений остановлена")
+                        AppLogger.d("FlowViewModel", "Найден START в $checkDate - проверка воскресений остановлена")
                     }
                     
                     // Для пропусков: если START и НЕ воскресенье - создаем MISSED (если нет DAILY)
@@ -351,16 +333,16 @@ class FlowViewModel(
                                 actionType = "MISSED"
                             )
                             growingRepository.insertEntry(missedEntry)
-                            AppLogger.d("FlowViewModel", "Создана MISSED за день START ${checkDate}")
+                            AppLogger.d("FlowViewModel", "Создана MISSED за день START $checkDate")
                         }
                     } else if (needMissedCheck && checkDate.dayOfWeek == DayOfWeek.SUNDAY) {
                         // START день + воскресенье: MISSED не создаем (кнопка неактивна)
-                        AppLogger.d("FlowViewModel", "START день ${checkDate} - воскресенье, MISSED не создаем")
+                        AppLogger.d("FlowViewModel", "START день $checkDate - воскресенье, MISSED не создаем")
                     }
                     
                     // После обработки START - останавливаем ОБЕ проверки (прерываем цикл)
                     needMissedCheck = false
-                    AppLogger.d("FlowViewModel", "Найден START в ${checkDate} - прерывание цикла")
+                    AppLogger.d("FlowViewModel", "Найден START в $checkDate - прерывание цикла")
                     break
                 }
                 
@@ -391,7 +373,7 @@ class FlowViewModel(
                                 actionType = "SUNDAY"
                             )
                             growingRepository.insertEntry(sundayEntry)
-                            AppLogger.d("FlowViewModel", "Создана запись SUNDAY за сегодня (${checkDate})")
+                            AppLogger.d("FlowViewModel", "Создана запись SUNDAY за сегодня ($checkDate)")
                         } else {
                             // Есть запись SUNDAY - больше не проверяем воскресенья
                             needSundayCheck = false
@@ -429,11 +411,11 @@ class FlowViewModel(
                             actionType = "SUNDAY"
                         )
                         growingRepository.insertEntry(sundayEntry)
-                        AppLogger.d("FlowViewModel", "Создана запись SUNDAY за ${checkDate}")
+                        AppLogger.d("FlowViewModel", "Создана запись SUNDAY за $checkDate")
                     } else {
                         // Есть запись SUNDAY - больше не проверяем воскресенья
                         needSundayCheck = false
-                        AppLogger.d("FlowViewModel", "Найдена SUNDAY за ${checkDate} - проверка воскресений остановлена")
+                        AppLogger.d("FlowViewModel", "Найдена SUNDAY за $checkDate - проверка воскресений остановлена")
                     }
                     
                     checkDate = checkDate.minusDays(1)
@@ -471,18 +453,18 @@ class FlowViewModel(
                             actionType = "MISSED"
                         )
                         growingRepository.insertEntry(missedEntry)
-                        AppLogger.d("FlowViewModel", "Создана запись MISSED за ${checkDate}")
+                        AppLogger.d("FlowViewModel", "Создана запись MISSED за $checkDate")
                         
                         checkDate = checkDate.minusDays(1)
                     } else if (!hasDaily && hasMissed) {
                         // Нет DAILY, но есть MISSED - останавливаем проверку пропусков
                         needMissedCheck = false
-                        AppLogger.d("FlowViewModel", "Найдена MISSED за ${checkDate} - проверка пропусков остановлена")
+                        AppLogger.d("FlowViewModel", "Найдена MISSED за $checkDate - проверка пропусков остановлена")
                         checkDate = checkDate.minusDays(1)
                     } else if (hasDaily) {
                         // Есть DAILY - останавливаем проверку пропусков
                         needMissedCheck = false
-                        AppLogger.d("FlowViewModel", "Найдена DAILY за ${checkDate} - проверка пропусков остановлена")
+                        AppLogger.d("FlowViewModel", "Найдена DAILY за $checkDate - проверка пропусков остановлена")
                         checkDate = checkDate.minusDays(1)
                     } else {
                         // Другие случаи (например, START без DAILY)
@@ -507,12 +489,12 @@ class FlowViewModel(
                                 actionType = "MISSED"
                             )
                             growingRepository.insertEntry(missedEntry)
-                            AppLogger.d("FlowViewModel", "Создана MISSED за день START ${checkDate}")
+                            AppLogger.d("FlowViewModel", "Создана MISSED за день START $checkDate")
                             needMissedCheck = false
                         } else if (hasStartEntry && hasDaily) {
                             // День с START и есть DAILY - останавливаем
                             needMissedCheck = false
-                            AppLogger.d("FlowViewModel", "Найдена START+DAILY за ${checkDate} - проверка пропусков остановлена")
+                            AppLogger.d("FlowViewModel", "Найдена START+DAILY за $checkDate - проверка пропусков остановлена")
                         }
                         
                         checkDate = checkDate.minusDays(1)
@@ -602,7 +584,7 @@ class FlowViewModel(
                 inFlowAmount = newInFlowAmount,
                 dailyAccrual = dailyAccrual,
                 walletAmount = newWallet,
-                isButtonPressed = false,
+                isButtonPressed = lastEntry?.isButtonPressed ?: false,
                 actionType = if (lastEntry == null || isFirstEntry) "PN_START" else "PN_REINVEST"
             )
             noviceRepository.insertEntry(newEntry)
@@ -755,7 +737,7 @@ class FlowViewModel(
                 
                 // Если это день со START - обрабатываем согласно алгоритму
                 if (hasStart) {
-                    AppLogger.d("FlowViewModel", "ПН: Найден PN_START день: ${checkDate}")
+                    AppLogger.d("FlowViewModel", "ПН: Найден PN_START день: $checkDate")
                     
                     // Для воскресений: если START и воскресенье - создаем SUNDAY (если нужно)
                     if (needSundayCheck && checkDate.dayOfWeek == DayOfWeek.SUNDAY) {
@@ -777,14 +759,14 @@ class FlowViewModel(
                                 actionType = "SUNDAY"
                             )
                             noviceRepository.insertEntry(sundayEntry)
-                            AppLogger.d("FlowViewModel", "ПН: Создана SUNDAY за PN_START день (воскресенье) ${checkDate}")
+                            AppLogger.d("FlowViewModel", "ПН: Создана SUNDAY за PN_START день (воскресенье) $checkDate")
                         }
                     }
                     
                     // При любом PN_START останавливаем проверку воскресений
                     if (needSundayCheck) {
                         needSundayCheck = false
-                        AppLogger.d("FlowViewModel", "ПН: Найден PN_START в ${checkDate} - проверка воскресений остановлена")
+                        AppLogger.d("FlowViewModel", "ПН: Найден PN_START в $checkDate - проверка воскресений остановлена")
                     }
                     
                     // Для пропусков: если PN_START и НЕ воскресенье - создаем MISSED (если нет PN_DAILY)
@@ -809,15 +791,15 @@ class FlowViewModel(
                                 actionType = "MISSED"
                             )
                             noviceRepository.insertEntry(missedEntry)
-                            AppLogger.d("FlowViewModel", "ПН: Создана MISSED за день PN_START ${checkDate}")
+                            AppLogger.d("FlowViewModel", "ПН: Создана MISSED за день PN_START $checkDate")
                         }
                     } else if (needMissedCheck && checkDate.dayOfWeek == DayOfWeek.SUNDAY) {
-                        AppLogger.d("FlowViewModel", "ПН: PN_START день ${checkDate} - воскресенье, MISSED не создаем")
+                        AppLogger.d("FlowViewModel", "ПН: PN_START день $checkDate - воскресенье, MISSED не создаем")
                     }
                     
                     // После обработки PN_START - останавливаем ОБЕ проверки (прерываем цикл)
                     needMissedCheck = false
-                    AppLogger.d("FlowViewModel", "ПН: Найден PN_START в ${checkDate} - прерывание цикла")
+                    AppLogger.d("FlowViewModel", "ПН: Найден PN_START в $checkDate - прерывание цикла")
                     break
                 }
                 
@@ -847,7 +829,7 @@ class FlowViewModel(
                                 actionType = "SUNDAY"
                             )
                             noviceRepository.insertEntry(sundayEntry)
-                            AppLogger.d("FlowViewModel", "ПН: Создана запись SUNDAY за сегодня (${checkDate})")
+                            AppLogger.d("FlowViewModel", "ПН: Создана запись SUNDAY за сегодня ($checkDate)")
                         } else {
                             needSundayCheck = false
                             AppLogger.d("FlowViewModel", "ПН: Найдена SUNDAY за сегодня - проверка воскресений остановлена")
@@ -883,10 +865,10 @@ class FlowViewModel(
                             actionType = "SUNDAY"
                         )
                         noviceRepository.insertEntry(sundayEntry)
-                        AppLogger.d("FlowViewModel", "ПН: Создана запись SUNDAY за ${checkDate}")
+                        AppLogger.d("FlowViewModel", "ПН: Создана запись SUNDAY за $checkDate")
                     } else {
                         needSundayCheck = false
-                        AppLogger.d("FlowViewModel", "ПН: Найдена SUNDAY за ${checkDate} - проверка воскресений остановлена")
+                        AppLogger.d("FlowViewModel", "ПН: Найдена SUNDAY за $checkDate - проверка воскресений остановлена")
                     }
                     
                     checkDate = checkDate.minusDays(1)
@@ -923,16 +905,16 @@ class FlowViewModel(
                             actionType = "MISSED"
                         )
                         noviceRepository.insertEntry(missedEntry)
-                        AppLogger.d("FlowViewModel", "ПН: Создана запись MISSED за ${checkDate}")
+                        AppLogger.d("FlowViewModel", "ПН: Создана запись MISSED за $checkDate")
                         
                         checkDate = checkDate.minusDays(1)
                     } else if (!hasDaily && hasMissed) {
                         needMissedCheck = false
-                        AppLogger.d("FlowViewModel", "ПН: Найдена MISSED за ${checkDate} - проверка пропусков остановлена")
+                        AppLogger.d("FlowViewModel", "ПН: Найдена MISSED за $checkDate - проверка пропусков остановлена")
                         checkDate = checkDate.minusDays(1)
                     } else if (hasDaily) {
                         needMissedCheck = false
-                        AppLogger.d("FlowViewModel", "ПН: Найдена PN_DAILY за ${checkDate} - проверка пропусков остановлена")
+                        AppLogger.d("FlowViewModel", "ПН: Найдена PN_DAILY за $checkDate - проверка пропусков остановлена")
                         checkDate = checkDate.minusDays(1)
                     } else {
                         val hasStartEntry = entriesForDate.any { it.actionType == "PN_START" }
@@ -955,11 +937,11 @@ class FlowViewModel(
                                 actionType = "MISSED"
                             )
                             noviceRepository.insertEntry(missedEntry)
-                            AppLogger.d("FlowViewModel", "ПН: Создана MISSED за день PN_START ${checkDate}")
+                            AppLogger.d("FlowViewModel", "ПН: Создана MISSED за день PN_START $checkDate")
                             needMissedCheck = false
                         } else if (hasStartEntry && hasDaily) {
                             needMissedCheck = false
-                            AppLogger.d("FlowViewModel", "ПН: Найдена PN_START+PN_DAILY за ${checkDate} - проверка пропусков остановлена")
+                            AppLogger.d("FlowViewModel", "ПН: Найдена PN_START+PN_DAILY за $checkDate - проверка пропусков остановлена")
                         }
                         
                         checkDate = checkDate.minusDays(1)
@@ -1069,29 +1051,23 @@ class FlowViewModel(
                          date = currentCal.timeInMillis, percent = dailyPercent, inFlowAmount = simInFlow,
                          dailyAccrual = simAccrual, walletAmount = simWallet, isButtonPressed = false, actionType = "SUNDAY"
                      ))
-                 } else {
-                     // Нажатие кнопки (начисление)
-                     val actualAccrual = simInFlow * (dailyPercent / 100.0)
-                     val nextInFlow = simInFlow - actualAccrual
-                     val finalAccrual: Double
-                     val finalInFlow: Double
+                    } else {
+                        // Нажатие кнопки (начисление)
+                        val actualAccrual = simInFlow * (dailyPercent / 100.0)
+                        val nextInFlow = simInFlow - actualAccrual
 
-                     if (nextInFlow < 0.005) {
-                         finalAccrual = simInFlow
-                         finalInFlow = 0.0
-                         simWallet += simInFlow
-                         forecastList.add(NoviceFlowEntity(
-                             date = currentCal.timeInMillis, percent = dailyPercent, inFlowAmount = 0.0,
-                             dailyAccrual = 0.0, walletAmount = simWallet, isButtonPressed = true, actionType = "PN_FORECAST"
-                         ))
-                         break
-                     } else {
-                         finalAccrual = actualAccrual
-                         finalInFlow = nextInFlow
-                         simWallet += actualAccrual
-                         simAccrual = finalInFlow * (dailyPercent / 100.0)
-                     }
-                     simInFlow = finalInFlow
+                        if (nextInFlow < 0.005) {
+                            simWallet += simInFlow
+                            forecastList.add(NoviceFlowEntity(
+                                date = currentCal.timeInMillis, percent = dailyPercent, inFlowAmount = 0.0,
+                                dailyAccrual = 0.0, walletAmount = simWallet, isButtonPressed = true, actionType = "PN_FORECAST"
+                            ))
+                            break
+                        } else {
+                            simWallet += actualAccrual
+                            simInFlow = nextInFlow
+                            simAccrual = simInFlow * (dailyPercent / 100.0)
+                        }
                      step++
 
                      forecastList.add(NoviceFlowEntity(

@@ -109,12 +109,6 @@ val DARK_THEME = booleanPreferencesKey("dark_theme")
     val pnDailyPercentFlow: Flow<Double> = dataStore.data.map { it[PN_DAILY_PERCENT] ?: 2.0 }
 
     /**
-     * Поток с индексом вкладки по умолчанию.
-     * По умолчанию 3 (РП).
-     */
-    val defaultTabFlow: Flow<Int> = dataStore.data.map { it[DEFAULT_TAB] ?: 3 }
-
-    /**
      * Поток с индексом вкладки расчётов по умолчанию.
      * По умолчанию 3 (РП).
      */
@@ -138,11 +132,6 @@ val DARK_THEME = booleanPreferencesKey("dark_theme")
      * Отдельный от напоминаний РП/ПН.
      */
     val pspRemindersFlow: Flow<Set<String>> = dataStore.data.map { it[PSP_REMINDERS_KEY] ?: emptySet() }
-
-    /**
-     * Поток для пропуска автопроверки обновлений.
-     */
-    val skipAutoUpdateFlow: Flow<Boolean> = dataStore.data.map { it[SKIP_AUTO_UPDATE] ?: false }
 
     /**
      * Поток для запомненной пропущенной версии.
@@ -170,16 +159,6 @@ val DARK_THEME = booleanPreferencesKey("dark_theme")
         dataStore.edit { prefs ->
             prefs[PN_BONUS_PERCENT] = bonus
             prefs[PN_DAILY_PERCENT] = daily
-        }
-    }
-
-    /**
-     * Установить вкладку по умолчанию.
-     * @param index Индекс вкладки (0-4)
-     */
-    suspend fun setDefaultTab(index: Int) {
-        dataStore.edit { prefs ->
-            prefs[DEFAULT_TAB] = index
         }
     }
 
@@ -308,15 +287,6 @@ val DARK_THEME = booleanPreferencesKey("dark_theme")
                 }
             }
         }
-    }
-
-    /**
-     * Получить коэффициенты периодов ПСП.
-     * Если сохранённых коэффициентов нет, возвращает значения по умолчанию.
-     * @return Карта номеров периодов к процентам
-     */
-    fun getPspCoefficients(): Map<Int, Double> {
-        return cachedPspCoefficients
     }
 
     /**
@@ -467,13 +437,6 @@ if (!prefs.contains(DEFAULT_CALC_TAB)) {
     private var cachedECurrencyCoefficients: Map<Double, Double> = DEFAULT_E_CURRENCY_COEFFICIENTS
 
     /**
-     * Получить коэффициенты E-currency для РП.
-     */
-    fun getECurrencyCoefficients(): Map<Double, Double> {
-        return cachedECurrencyCoefficients
-    }
-
-/**
      * MutableStateFlow для коэффициентов E-currency - обновляется сразу после сохранения.
      */
     private val _eCurrencyCoefficientsFlow = MutableStateFlow(DEFAULT_E_CURRENCY_COEFFICIENTS)
@@ -545,48 +508,6 @@ if (!prefs.contains(DEFAULT_CALC_TAB)) {
                 }
             }
         }
-    }
-
-    /**
-     * Принудительно обновить кэш E-currency коэффициентов из DataStore.
-     * Вызывать из корутины!
-     */
-    suspend fun refreshECurrencyCacheSync() {
-        dataStore.data.first().let { preferences ->
-            val serialized = preferences[E_CURRENCY_COEFFICIENTS]
-            if (!serialized.isNullOrEmpty()) {
-                val parsed = mutableMapOf<Double, Double>()
-                serialized.split(";").forEach { entry ->
-                    val parts = entry.split("=")
-                    if (parts.size == 2) {
-                        val key = parts[0].toDoubleOrNull()
-                        val value = parts[1].toDoubleOrNull()
-                        if (key != null && value != null) {
-                            parsed[key] = value
-                        }
-                    }
-                }
-                if (parsed.isNotEmpty()) {
-                    cachedECurrencyCoefficients = parsed
-                    _eCurrencyCoefficientsFlow.value = parsed
-                }
-            }
-        }
-    }
-
-    /**
-     * Рассчитать E-currency бонус для суммы.
-     * Использует .first() для получения актуальных данных из DataStore.
-     * Важно: вызывать из корутины!
-     */
-    suspend fun calculateECurrencyBonus(amount: Double): Double {
-        val coefficients = eCurrencyCoefficientsFlow.first().entries.sortedByDescending { it.key }
-        for ((threshold, bonus) in coefficients) {
-            if (amount >= threshold) {
-                return amount * (1 + bonus / 100.0)
-            }
-        }
-        return amount
     }
 
     /**

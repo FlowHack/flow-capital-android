@@ -259,14 +259,6 @@ class PremiumStartViewModel(
         }
     }
 
-    /** Корректировка периода (сохранение) */
-    fun updatePeriod(period: PremiumStartPeriodEntity) {
-        viewModelScope.launch {
-            flowRepository.updatePeriod(period)
-            loadFlowData(_currentFlow.value?.id ?: return@launch)
-        }
-    }
-
     /** Корректировка "Всего получено" */
     fun correctTotalAccrued(newTotalAccrued: Double) {
         viewModelScope.launch {
@@ -286,15 +278,6 @@ class PremiumStartViewModel(
             val updatedPeriod = period.copy(endDate = newEndDate)
             flowRepository.updatePeriod(updatedPeriod)
             _currentPeriod.value = updatedPeriod
-        }
-    }
-
-    /** Обновление потока */
-    fun updateFlow(flow: PremiumStartFlowEntity) {
-        viewModelScope.launch {
-            flowRepository.updateFlow(flow)
-            _currentFlow.value = flow
-            loadFlowData(flow.id)
         }
     }
 
