@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.flowcapital"
+    namespace = "com.flowhack.flowcapital"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -14,13 +14,13 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.flowcapital"
+        applicationId = "com.flowhack.flowcapital"
         minSdk = 28
         //noinspection OldTargetApi
         targetSdk = 36
-versionCode = 41
+versionCode = 42
 
-        versionName = "0.5.1"
+        versionName = "0.7.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -97,6 +97,7 @@ dependencies {
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.runner)
+    androidTestImplementation(libs.androidx.room.testing)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     implementation(libs.work.runtime.ktx)
