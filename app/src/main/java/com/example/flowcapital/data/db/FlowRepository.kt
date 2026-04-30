@@ -39,6 +39,17 @@ class NoviceFlowRepository(private val dao: NoviceFlowDao) {
     suspend fun getAllEntries(): List<NoviceFlowEntity> = dao.getAllEntries()
 
     suspend fun clearHistory() = dao.clearAll()
+
+    suspend fun getEntriesForDateRange(startDate: Long, endDate: Long): List<NoviceFlowEntity> =
+        dao.getEntriesForDateRange(startDate, endDate)
+
+    suspend fun getLastEntryBeforeDate(date: Long): NoviceFlowEntity? =
+        dao.getLastEntryBeforeDate(date)
+
+    suspend fun getFirstStartEntry(): NoviceFlowEntity? =
+        dao.getFirstStartEntry()
+
+    suspend fun updateEntry(entry: NoviceFlowEntity) = dao.update(entry)
 }
 
 /**

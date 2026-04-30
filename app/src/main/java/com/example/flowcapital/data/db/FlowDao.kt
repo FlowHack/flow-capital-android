@@ -58,6 +58,18 @@ interface NoviceFlowDao {
 
     @Query("SELECT * FROM novice_flow_history")
     suspend fun getAllEntries(): List<NoviceFlowEntity>
+
+    @Query("SELECT * FROM novice_flow_history WHERE date >= :startDate AND date < :endDate ORDER BY date ASC")
+    suspend fun getEntriesForDateRange(startDate: Long, endDate: Long): List<NoviceFlowEntity>
+
+    @Query("SELECT * FROM novice_flow_history WHERE date < :date ORDER BY date DESC LIMIT 1")
+    suspend fun getLastEntryBeforeDate(date: Long): NoviceFlowEntity?
+
+    @Query("SELECT * FROM novice_flow_history WHERE actionType = 'PN_START' ORDER BY date ASC LIMIT 1")
+    suspend fun getFirstStartEntry(): NoviceFlowEntity?
+
+    @Update
+    suspend fun update(flowEntity: NoviceFlowEntity)
 }
 
 /**

@@ -73,10 +73,11 @@ fun CalculatorScreen() {
         factory = FlowViewModelFactory(growingRepository, noviceRepository, settingsManager)
     )
 
-    // Генерация пропущенных дней для РП при открытии вкладки или возобновлении приложения
+    // Генерация пропущенных дней для РП и ПН при открытии вкладки или возобновлении приложения
     LaunchedEffect(selectedTabIndex) {
-        if (selectedTabIndex == 3) { // РП вкладка
-            viewModel.generateMissedDaysForGrowingFlow()
+        when (selectedTabIndex) {
+            0 -> viewModel.generateMissedDaysForNoviceFlow() // ПН вкладка
+            3 -> viewModel.generateMissedDaysForGrowingFlow() // РП вкладка
         }
     }
     
@@ -85,8 +86,9 @@ fun CalculatorScreen() {
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                if (selectedTabIndex == 3) { // РП вкладка
-                    viewModel.generateMissedDaysForGrowingFlow()
+                when (selectedTabIndex) {
+                    0 -> viewModel.generateMissedDaysForNoviceFlow() // ПН вкладка
+                    3 -> viewModel.generateMissedDaysForGrowingFlow() // РП вкладка
                 }
             }
         }
