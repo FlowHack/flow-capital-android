@@ -1403,6 +1403,8 @@ class FlowViewModel(
                         worksheet.value(row, 3, entry.dailyAccrual)
                         worksheet.value(row, 4, entry.walletAmount)
                     }
+                    val lastRow = forecastList.size
+                    worksheet.range(0, 0, lastRow, 4).style().horizontalAlignment("center").set()
                     workbook.finish()
                 }
             } catch (e: Exception) { AppLogger.e("FlowViewModel", "Ошибка экспорта GrowingFlow прогноза", e) }
@@ -1442,6 +1444,8 @@ class FlowViewModel(
                     worksheet.value(row, 3, entry.dailyAccrual)
                     worksheet.value(row, 4, entry.walletAmount)
                 }
+                    val lastRow = forecastList.size
+                    worksheet.range(0, 0, lastRow, 4).style().horizontalAlignment("center").set()
                     workbook.finish()
                 }
             } catch (e: Exception) { AppLogger.e("FlowViewModel", "Ошибка экспорта NoviceFlow прогноза", e) }

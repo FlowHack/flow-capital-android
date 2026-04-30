@@ -535,6 +535,8 @@ private suspend fun exportGrowingFlowToExcel(context: Context, uri: Uri, history
                         }
                     }
                 }
+                val lastRow = history.size
+                worksheet.range(0, 0, lastRow, 6).style().horizontalAlignment("center").set()
                 workbook.finish()
             }
         } catch (e: Exception) { AppLogger.e("Export", "Ошибка экспорта GrowingFlow", e) }
@@ -730,6 +732,8 @@ private suspend fun exportNoviceFlowToExcel(context: Context, uri: Uri, history:
                         }
                     }
                 }
+                val lastRow = history.size
+                worksheet.range(0, 0, lastRow, 5).style().horizontalAlignment("center").set()
                 workbook.finish()
             }
         } catch (e: Exception) { AppLogger.e("Export", "Ошибка экспорта NoviceFlow", e) }
@@ -1101,6 +1105,10 @@ private suspend fun exportPspToExcel(
                     val totalAll = flows.sumOf { it.totalAccrued }
                     worksheet.value(currentRow, 0, "ИТОГО ВО ВСЕХ ПСП")
                     worksheet.value(currentRow, 1, totalAll)
+                    // Центрирование для текущего листа
+                    val lastDataRow = currentRow
+                    val lastDataCol = 6 // максимальная колонка на листе ПСП
+                    worksheet.range(0, 0, lastDataRow, lastDataCol).style().horizontalAlignment("center").set()
                 }
                 workbook.finish()
             }
@@ -2957,6 +2965,8 @@ private suspend fun exportExistingForecastToExcel(context: Context, uri: Uri, fo
                         }
                     }
                 }
+                val lastRow = forecast.size
+                worksheet.range(0, 0, lastRow, 6).style().horizontalAlignment("center").set()
                 workbook.finish()
             }
         } catch (e: Exception) { AppLogger.e("SettingsScreen", "Ошибка экспорта прогноза РП", e) }
@@ -3005,6 +3015,8 @@ private suspend fun exportForecastToExcel(context: Context, uri: Uri, forecast: 
                         }
                     }
                 }
+                val lastRow = forecast.size
+                worksheet.range(0, 0, lastRow, 6).style().horizontalAlignment("center").set()
                 workbook.finish()
             }
         } catch (e: Exception) { AppLogger.e("SettingsScreen", "Ошибка экспорта прогноза РП", e) }
@@ -3411,6 +3423,8 @@ private suspend fun exportExistingNoviceForecastToExcel(context: Context, uri: U
                         }
                     }
                 }
+                val lastRow = forecast.size
+                worksheet.range(0, 0, lastRow, 4).style().horizontalAlignment("center").set()
                 workbook.finish()
             }
         } catch (e: Exception) { AppLogger.e("SettingsScreen", "Ошибка экспорта прогноза ПН", e) }
@@ -3455,6 +3469,8 @@ private suspend fun exportNoviceForecastToExcel(context: Context, uri: Uri, fore
                         }
                     }
                 }
+                val lastRow = forecast.size
+                worksheet.range(0, 0, lastRow, 4).style().horizontalAlignment("center").set()
                 workbook.finish()
             }
         } catch (e: Exception) { AppLogger.e("SettingsScreen", "Ошибка экспорта прогноза ПН", e) }
@@ -3598,6 +3614,8 @@ private suspend fun exportPspForecastToExcel(context: Context, uri: Uri, forecas
                         }
                     }
                 }
+                val lastRow = forecast.size
+                worksheet.range(0, 0, lastRow, 5).style().horizontalAlignment("center").set()
                 workbook.finish()
             }
         } catch (e: Exception) { AppLogger.e("SettingsScreen", "Ошибка экспорта прогноза ПСП", e) }

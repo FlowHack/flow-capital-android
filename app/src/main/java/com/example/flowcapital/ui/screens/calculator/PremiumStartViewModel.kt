@@ -376,6 +376,8 @@ class PremiumStartViewModel(
                     worksheet.value(totalRow, 0, "Итого")
                     worksheet.value(totalRow, 2, total)
 
+                    val lastRow = forecastList.size + 1 // +1 для строки с итогом
+                    worksheet.range(0, 0, lastRow, 4).style().horizontalAlignment("center").set()
                     workbook.finish()
                 }
                 AppLogger.i("PremiumStartViewModel", "Прогноз экспортирован: ${forecastList.size} периодов")
