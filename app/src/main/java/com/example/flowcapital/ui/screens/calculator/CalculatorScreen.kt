@@ -252,7 +252,7 @@ fun CalculatorScreen() {
             title = "Прогноз начислений",
             forecastList = forecastData,
             onDismiss = { viewModel.clearForecast() },
-            onExportToExcel = { exportLauncher.launch("Potok_Forecast_${System.currentTimeMillis()}.xlsx") }
+            onExportToExcel = { exportLauncher.launch("РП_Прогноз_${System.currentTimeMillis()}.xlsx") }
         )
     }
     if (bestDateData.isNotEmpty()) {
@@ -264,7 +264,7 @@ fun CalculatorScreen() {
             title = "Лучшая дата: $bestDateStr",
             forecastList = bestDateData,
             onDismiss = { viewModel.clearBestDateForecast() },
-            onExportToExcel = { exportLauncher.launch("Potok_BestDate_${System.currentTimeMillis()}.xlsx") },
+            onExportToExcel = { exportLauncher.launch("РП_Лучшая_дата_${System.currentTimeMillis()}.xlsx") },
             isBestDateDialog = true
         )
     }
@@ -317,7 +317,7 @@ fun CalculatorScreen() {
             title = "Прогноз Потока Новичка",
             forecastList = pnForecastData,
             onDismiss = { viewModel.clearPnForecast() },
-            onExportToExcel = { exportLauncher.launch("NoviceFlow_Forecast_${System.currentTimeMillis()}.xlsx") }
+            onExportToExcel = { exportLauncher.launch("ПН_Прогноз_${System.currentTimeMillis()}.xlsx") }
         )
     }
     if (pnCycleEndData.isNotEmpty()) {
@@ -330,7 +330,7 @@ fun CalculatorScreen() {
             title = "Конец цикла: $endDateStr ($daysCount дней)",
             forecastList = pnCycleEndData,
             onDismiss = { viewModel.clearPnCycleEndForecast() },
-            onExportToExcel = { exportLauncher.launch("NoviceFlow_CycleEnd_${System.currentTimeMillis()}.xlsx") }
+            onExportToExcel = { exportLauncher.launch("ПН_Конец_цикла_${System.currentTimeMillis()}.xlsx") }
         )
     }
 }

@@ -413,7 +413,7 @@ fun GrowingFlowSettings(
             Text("Данные", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(12.dp))
 
-            GrowingExportButton(hasData = hasHistory, onExport = { exportLauncher.launch("GrowingFlow_History_${System.currentTimeMillis()}.xlsx") })
+            GrowingExportButton(hasData = hasHistory, onExport = { exportLauncher.launch("РП_История_${System.currentTimeMillis()}.xlsx") })
             Spacer(modifier = Modifier.height(8.dp))
 
             Button(
@@ -633,7 +633,7 @@ fun NoviceFlowSettings(
             Spacer(modifier = Modifier.height(12.dp))
 
             OutlinedButton(
-                onClick = { exportLauncher.launch("NoviceFlow_History_${System.currentTimeMillis()}.xlsx") },
+                onClick = { exportLauncher.launch("ПН_История_${System.currentTimeMillis()}.xlsx") },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = hasNoviceHistory
             ) { Text("Выгрузить в Excel") }
@@ -840,7 +840,7 @@ fun PremiumStartSettings(settingsManager: SettingsManager, scope: kotlinx.corout
             Spacer(modifier = Modifier.height(12.dp))
 
             OutlinedButton(
-                onClick = { exportLauncher.launch("PSP_All_${System.currentTimeMillis()}.xlsx") },
+                onClick = { exportLauncher.launch("ПСП_Все_${System.currentTimeMillis()}.xlsx") },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = hasPspFlows
             ) { Text("Выгрузить всё в Excel") }
@@ -2763,7 +2763,7 @@ private fun CalculateGrowingFlowDialog(
             title = "Прогноз потока РП",
             forecastList = forecastResults,
             onDismiss = { showResults = false },
-            onExportToExcel = { exportLauncher.launch("RP_Прогноз_${System.currentTimeMillis()}.xlsx") }
+            onExportToExcel = { exportLauncher.launch("РП_Рассчет_${System.currentTimeMillis()}.xlsx") }
         )
     }
 }
@@ -2918,7 +2918,7 @@ private fun CalculateExistingGrowingFlowDialog(
             title = "Прогноз действующего потока РП",
             forecastList = forecastResults,
             onDismiss = { showResults = false },
-            onExportToExcel = { exportLauncher.launch("RP_Existing_${System.currentTimeMillis()}.xlsx") }
+            onExportToExcel = { exportLauncher.launch("РП_Действующий_${System.currentTimeMillis()}.xlsx") }
         )
     }
 }
@@ -3201,7 +3201,7 @@ private fun CalculateNoviceFlowDialog(
             title = "Прогноз потока ПН",
             forecastList = forecastResults,
             onDismiss = { showResults = false },
-            onExportToExcel = { exportLauncher.launch("ПН_Прогноз_${System.currentTimeMillis()}.xlsx") }
+            onExportToExcel = { exportLauncher.launch("ПН_Рассчет_${System.currentTimeMillis()}.xlsx") }
         )
     }
 }
@@ -3579,7 +3579,7 @@ private fun CalculatePspDialog(
             title = "Прогноз ПСП",
             forecastList = forecastResults,
             onDismiss = { showResults = false },
-            onExportToExcel = { exportLauncher.launch("ПСП_Прогноз_${System.currentTimeMillis()}.xlsx") }
+            onExportToExcel = { exportLauncher.launch("ПСП_Рассчет_${System.currentTimeMillis()}.xlsx") }
         )
     }
 }

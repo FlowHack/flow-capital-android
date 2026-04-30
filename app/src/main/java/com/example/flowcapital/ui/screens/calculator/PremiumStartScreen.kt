@@ -1140,7 +1140,7 @@ fun ForecastPSPDialog(
                     TextButton(onClick = onDismiss) { Text("Закрыть") }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
-                        onClick = { exportLauncher.launch("PSP_Forecast_${System.currentTimeMillis()}.xlsx") },
+                        onClick = { exportLauncher.launch("ПСП_Прогноз_${System.currentTimeMillis()}.xlsx") },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))
                     ) {
                         Text("Excel", fontSize = 12.sp)
