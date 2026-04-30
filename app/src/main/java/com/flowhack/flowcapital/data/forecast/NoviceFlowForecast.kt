@@ -73,11 +73,29 @@ fun calculateNoviceFlowForecast(
 
     // Для нового потока: если не воскресенье - сразу делаем DAILY в день старта
     // Для действующего потока: DAILY начинается только со следующего дня
-    if (!isExistingFlow && calendar.get(Calendar.DAY_OF_WEEK) != Calendar.SUNDAY) {
+    // Если воскресенье - создаем SUNDAY запись
+    if (calendar.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY) {
+        // Воскресенье: создаем SUNDAY запись без начисления
+        results.add(NoviceFlowEntity(
+            date = calendar.timeInMillis,
+            percent = dailyPercent,
+            inFlowAmount = simInFlow,
+            dailyAccrual = simAccrual,
+            walletAmount = simWallet,
+            isButtonPressed = false,
+            actionType = "SUNDAY"
+        ))
+        Timber.v("SUNDAY ПН (start day): ${formatDate(calendar.timeInMillis)}")
+    } else if (!isExistingFlow) {
+        // Не воскресенье и новый поток: делаем DAILY
         val actualAccrual = minOf(simInFlow, simAccrual)
+        val accrualForRecord = actualAccrual
+
         simInFlow -= actualAccrual
         if (simInFlow < 0) simInFlow = 0.0
         simWallet += actualAccrual
+
+        // Пересчет для следующего дня
         if (simInFlow > 0) {
             simAccrual = simInFlow * (dailyPercent / 100.0)
         }
@@ -88,13 +106,13 @@ fun calculateNoviceFlowForecast(
             date = calendar.timeInMillis,
             percent = dailyPercent,
             inFlowAmount = simInFlow,
-            dailyAccrual = simAccrual,
+            dailyAccrual = accrualForRecord, // Начисление за текущий день
             walletAmount = simWallet,
             isButtonPressed = true,
             actionType = "PN_DAILY"
         ))
         Timber.v("DAILY ПН (start day): step=%d, inFlow=%.2f, accrual=%.2f, wallet=%.2f",
-            step, simInFlow, simAccrual, simWallet)
+            step, simInFlow, accrualForRecord, simWallet)
     }
 
     calendar.add(Calendar.DAY_OF_YEAR, 1)
@@ -116,11 +134,15 @@ fun calculateNoviceFlowForecast(
             ))
             Timber.v("SUNDAY ПН: ${formatDate(calendar.timeInMillis)}, step=$step")
         } else {
-            // Нажатие кнопки (DAILY)
+            // Нажатие кнопки (DAILY) - начисление за текущий день
             val actualAccrual = minOf(simInFlow, simAccrual)
+            val accrualForRecord = actualAccrual
+
             simInFlow -= actualAccrual
             if (simInFlow < 0) simInFlow = 0.0
             simWallet += actualAccrual
+
+            // Пересчет для следующего дня
             if (simInFlow > 0) {
                 simAccrual = simInFlow * (dailyPercent / 100.0)
             }
@@ -131,7 +153,7 @@ fun calculateNoviceFlowForecast(
                 date = calendar.timeInMillis,
                 percent = dailyPercent,
                 inFlowAmount = simInFlow,
-                dailyAccrual = simAccrual,
+                dailyAccrual = accrualForRecord, // Начисление за текущий день
                 walletAmount = simWallet,
                 isButtonPressed = true,
                 actionType = "PN_DAILY"
