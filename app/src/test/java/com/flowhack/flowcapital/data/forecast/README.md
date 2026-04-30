@@ -46,17 +46,3 @@ export ANDROID_HOME=~/Android/Sdk
 cd /mnt/p/AndroidStudioProjects/flow-capital-android-app/flow-capital-android
 ./gradlew :app:testDebugUnitTest --no-daemon
 ```
-
-## Исправления в коде (сделано в рамках Т1)
-1. **GrowingFlowForecast.kt**: Исправлена логика начислений - поле `dailyAccrual` теперь содержит начисление за текущий день, а не следующий
-2. **GrowingFlowForecast.kt**: Добавлена обработка воскресений при старте (создание SUNDAY записи)
-3. **NoviceFlowForecast.kt**: Аналогично исправлена логика начислений
-4. **NoviceFlowForecast.kt**: Добавлена обработка воскресений при старте
-
-## Исправления в коде (сделано в рамках Т1)
-1. **GrowingFlowForecast.kt**: Исправлена логика начислений - поле `dailyAccrual` теперь содержит начисление за текущий день, а не следующий
-2. **GrowingFlowForecast.kt**: Добавлена обработка воскресений при старте (создание SUNDAY записи)
-3. **NoviceFlowForecast.kt**: Аналогично исправлена логика начислений
-4. **NoviceFlowForecast.kt**: Добавлена обработка воскресений при старте
-5. **MissedDaysCalculator.kt**: Создан чистый класс с бизнес-логикой генерации пропущенных дней (без зависимостей от БД)
-6. **FlowViewModel.kt**: Использует MissedDaysCalculator для упрощения сложных функций generateMissedDays*

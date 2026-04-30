@@ -19,6 +19,7 @@ import androidx.room.PrimaryKey
 data class GrowingFlowEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val date: Long,
+    val step: Int = 1,
     val percent: Double,
     val inFlowAmount: Double,
     val dailyAccrual: Double,
@@ -43,6 +44,7 @@ data class GrowingFlowEntity(
 data class NoviceFlowEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val date: Long,
+    val step: Int = 1,
     val percent: Double,
     val inFlowAmount: Double,
     val dailyAccrual: Double,
