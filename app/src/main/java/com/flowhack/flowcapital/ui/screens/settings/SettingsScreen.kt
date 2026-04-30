@@ -4,6 +4,8 @@ package com.flowhack.flowcapital.ui.screens.settings
 
 import android.annotation.SuppressLint
 import android.app.TimePickerDialog
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -187,6 +189,10 @@ fun SettingsScreen(onOpenBrowserUrl: (String) -> Unit = {}) {
 
         Spacer(modifier = Modifier.height(20.dp))
 
+        // Блок донатов
+        DonateSection(onOpenBrowserUrl = onOpenBrowserUrl)
+        Spacer(modifier = Modifier.height(20.dp))
+
         // Общие настройки
         Text("ОБЩИЕ НАСТРОЙКИ", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.height(12.dp))
@@ -211,8 +217,6 @@ fun SettingsScreen(onOpenBrowserUrl: (String) -> Unit = {}) {
         ImportExportSettingsCard(scope = scope)
 
         Spacer(modifier = Modifier.height(32.dp))
-        DonateSection(onOpenBrowserUrl = onOpenBrowserUrl)
-        Spacer(modifier = Modifier.height(16.dp))
         UpdateCheckerCard()
         Spacer(modifier = Modifier.height(12.dp))
         SupportSection()
@@ -1906,12 +1910,14 @@ private fun ProxyAddEditDialog(
  */
 @Composable
 fun DonateSection(onOpenBrowserUrl: (String) -> Unit = {}) {
+    val context = LocalContext.current
+    val email = "dmitriy@flow-hack.ru"
     Column(modifier = Modifier.fillMaxWidth()) {
         Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
             Column(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Поддержать проект", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.primary)
+                Text("Отблагодарить", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("Отправьте донат с произвольной суммой", fontSize = 12.sp, color = Color.Gray, textAlign = TextAlign.Center)
+                Text("Вы можете отблагодарить создателя приложения", fontSize = 12.sp, color = Color.Gray, textAlign = TextAlign.Center)
                 Spacer(modifier = Modifier.height(12.dp))
                 Button(
                     onClick = { onOpenBrowserUrl("https://sberkassa.site/transfer") },
@@ -1920,9 +1926,16 @@ fun DonateSection(onOpenBrowserUrl: (String) -> Unit = {}) {
                     shape = RoundedCornerShape(8.dp)
                 ) { Text("Перейти в СберКассу", fontSize = 14.sp, fontWeight = FontWeight.Bold) }
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    Text("Пользователь: ", fontSize = 11.sp, color = Color.Gray)
-                    Text("dmitriy@flow-hack.ru", fontSize = 11.sp, color = Color(0xFFE53935), fontWeight = FontWeight.Bold)
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("Email", email))
+                        Toast.makeText(context, "E-mail скопирован", Toast.LENGTH_SHORT).show()
+                    },
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text("Пользователь СберКассы: ", fontSize = 11.sp, color = Color.Gray)
+                    Text(email, fontSize = 11.sp, color = Color(0xFFE53935), fontWeight = FontWeight.Bold)
                 }
             }
         }
