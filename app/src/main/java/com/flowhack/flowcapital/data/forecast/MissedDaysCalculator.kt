@@ -24,12 +24,13 @@ data class DayCheckResult(
  * Калькулятор для определения необходимости создания записей пропущенных дней.
  * Содержит чистую логику (без зависимостей от БД или Android), пригодную для тестирования.
  *
- * Алгоритм работы:
- * 1. Если в день есть START — создаем SUNDAY (если воскресенье) или MISSED (если нет DAILY),
+ * Алгоритм работы (согласно ТЗ):
+ * 1. Воскресенья проверяются с ТЕКУЩЕГО дня (today)
+ * 2. Пропуски дней проверяются со ВЧЕРАШНЕГО дня (D-1) — текущий день НЕ проверяется
+ * 3. Если в день есть START — создаем SUNDAY (если воскресенье) или MISSED (если нет DAILY),
  *    и прерываем цикл (break).
- * 2. Если это первый день (today) — проверяем только воскресенья.
- * 3. Для обычных дней: если воскресенье и нет SUNDAY — создаем SUNDAY.
- * 4. Для пропусков: если нет DAILY и MISSED — создаем MISSED.
+ * 4. Для обычных дней: если воскресенье и нет SUNDAY — создаем SUNDAY.
+ * 5. Для пропусков: если нет DAILY и MISSED — создаем MISSED.
  */
 object MissedDaysCalculator {
 
@@ -41,7 +42,7 @@ object MissedDaysCalculator {
      * @param hasMissedRecord Есть ли в этот день запись MISSED
      * @param hasStartInDay Есть ли в этот день запись START
      * @param dayOfWeek День недели (java.time.DayOfWeek)
-     * @param isFirstIteration true, если это текущий день (today), а не история
+     * @param isFirstIteration true, если это текущий день (today) — только воскресенья, без пропусков
      * @param needSundayCheck Флаг, указывающий, что еще нужно проверять воскресенья
      * @param needMissedCheck Флаг, указывающий, что еще нужно проверять пропуски
      * @return [DayCheckResult] с решениями по текущему дню
@@ -59,7 +60,6 @@ object MissedDaysCalculator {
         // Если это день со START
         if (hasStartInDay) {
             var shouldStopSundayCheck = needSundayCheck
-            var shouldStopMissedCheck = needMissedCheck
             var shouldCreateSunday = false
             var shouldCreateMissed = false
 
@@ -77,8 +77,8 @@ object MissedDaysCalculator {
                 shouldStopSundayCheck = true
             }
 
-            // Для пропусков: если START и НЕ воскресенье
-            if (needMissedCheck && dayOfWeek != DayOfWeek.SUNDAY) {
+            // Для пропусков: если START и НЕ воскресенье и это НЕ текущий день (today)
+            if (needMissedCheck && dayOfWeek != DayOfWeek.SUNDAY && !isFirstIteration) {
                 if (!hasDailyRecord && !hasMissedRecord) {
                     shouldCreateMissed = true
                 }
@@ -93,7 +93,7 @@ object MissedDaysCalculator {
             )
         }
 
-        // Проверка текущего дня
+        // Проверка текущего дня (today) — только воскресенья, пропуски НЕ проверяем
         if (isFirstIteration) {
             if (needSundayCheck && dayOfWeek == DayOfWeek.SUNDAY) {
                 if (!hasSundayRecord) {
@@ -105,7 +105,7 @@ object MissedDaysCalculator {
             return DayCheckResult()
         }
 
-        // Проверка на воскресенье (не первый день)
+        // Для не-current дней (D-1 и ранее): воскресенья + пропуски
         if (needSundayCheck && dayOfWeek == DayOfWeek.SUNDAY) {
             if (!hasSundayRecord) {
                 return DayCheckResult(shouldCreateSunday = true)
@@ -114,7 +114,7 @@ object MissedDaysCalculator {
             }
         }
 
-        // Проверка на пропуск дней
+        // Проверка на пропуск дней (только для не-current)
         if (needMissedCheck) {
             if (dayOfWeek == DayOfWeek.SUNDAY) {
                 return DayCheckResult() // Просто идем дальше
@@ -156,7 +156,6 @@ object MissedDaysCalculator {
         needSundayCheck: Boolean,
         needMissedCheck: Boolean
     ): DayCheckResult {
-        // Логика идентична РП, но типы действий другие
         return checkDayForGrowingFlow(
             hasSundayRecord = hasSundayRecord,
             hasDailyRecord = hasDailyRecord,

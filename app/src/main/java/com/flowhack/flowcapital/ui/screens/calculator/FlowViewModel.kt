@@ -76,6 +76,14 @@ class FlowViewModel(
     private val _pnCycleEndForecast = MutableStateFlow<List<NoviceFlowEntity>>(emptyList())
     val pnCycleEndForecast: StateFlow<List<NoviceFlowEntity>> = _pnCycleEndForecast
 
+    /** Ошибка реинвеста ПН (превышение лимита 300000) */
+    private val _pnReinvestError = MutableStateFlow<String?>(null)
+    val pnReinvestError: StateFlow<String?> = _pnReinvestError
+
+    fun clearPnReinvestError() {
+        _pnReinvestError.value = null
+    }
+
     /**
      * Расчёт E-currency бонуса в зависимости от суммы взноса.
      * Таблица коэффициентов из настроек:
@@ -414,6 +422,15 @@ class FlowViewModel(
             val lastEntry = noviceRepository.getLastEntry()
             val previousInFlow = lastEntry?.inFlowAmount ?: 0.0
             val newInFlowAmount = previousInFlow + inFlow
+
+            // Проверка лимита 300000 для "В потоке"
+            if (newInFlowAmount > 300_000.0) {
+                _pnReinvestError.value = "Сумма потока не может быть более 300000"
+                Timber.d("addToNoviceFlow: превышен лимит 300000. Текущий=%.2f, добавляем=%.2f, итого=%.2f",
+                    previousInFlow, inFlow, newInFlowAmount)
+                return@launch
+            }
+
             val newWallet = wallet
             val dailyPercent = lastEntry?.percent ?: settingsManager.pnDailyPercentFlow.first()
 
@@ -768,7 +785,17 @@ class FlowViewModel(
                          val reinvestAmountActual = simWallet
                          // Реинвест с учётом бонуса (как при обычном взносе)
                          val withBonus = reinvestAmountActual + reinvestAmountActual * (bonusPercent / 100.0)
-                         simInFlow += withBonus
+                         val potentialInFlow = simInFlow + withBonus
+
+                         if (potentialInFlow > 300_000.0) {
+                             // Добиваем "В потоке" до 300000, остальное считается выведенным
+                             val withdrawn = potentialInFlow - 300_000.0
+                             simInFlow = 300_000.0
+                             Timber.d("REINVEST ПН: лимит 300000. Потенциально %.2f, выведено на карту %.2f",
+                                 potentialInFlow, withdrawn)
+                         } else {
+                             simInFlow += withBonus
+                         }
                          simWallet = 0.0
                          simAccrual = if (simInFlow > 0) simInFlow * (dailyPercent / 100.0) else 0.0
                          step++
