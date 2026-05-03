@@ -222,7 +222,11 @@ fun MainScreen(defaultEntryTab: Int = 1) {
                                         },
                                         text = { Text(site.name, fontSize = 14.sp, fontWeight = FontWeight.Medium) },
                                         onClick = {
+                                            currentWebUrl = site.url
                                             showBrowserMenu = false
+                                            navController.navigate(BottomNavItem.Browser.route) {
+                                                launchSingleTop = true
+                                            }
                                         }
                                     )
                                 }
