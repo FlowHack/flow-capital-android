@@ -14,6 +14,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -129,6 +131,17 @@ fun CalculatorScreen() {
     val pnForecastData by viewModel.pnForecastResults.collectAsState()
     val pnCycleEndData by viewModel.pnCycleEndForecast.collectAsState()
 
+    // Snackbar для ошибок ПН
+    val snackbarHostState = remember { SnackbarHostState() }
+    val pnReinvestError by viewModel.pnReinvestError.collectAsState()
+
+    LaunchedEffect(pnReinvestError) {
+        pnReinvestError?.let { error ->
+            snackbarHostState.showSnackbar(error)
+            viewModel.clearPnReinvestError()
+        }
+    }
+
     // Лончер для экспорта Excel файлов
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/octet-stream")
@@ -159,9 +172,13 @@ fun CalculatorScreen() {
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .verticalScroll(rememberScrollState())
-            .padding(bottom = 8.dp)
     ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 8.dp)
+        ) {
         FlowTabs(
             selectedTabIndex = selectedTabIndex,
             tabs = tabs,
@@ -278,7 +295,8 @@ fun CalculatorScreen() {
             },
             bonusPercent = pnBonusPercent,
             dailyPercent = pnDailyPercent,
-            isNewFlow = noviceHistory.isEmpty()
+            isNewFlow = noviceHistory.isEmpty(),
+            currentInFlow = noviceHistory.firstOrNull()?.inFlowAmount ?: 0.0
         )
     }
     if (showNoviceCorrectionDialog) {
@@ -331,5 +349,6 @@ fun CalculatorScreen() {
             onDismiss = { viewModel.clearPnCycleEndForecast() },
             onExportToExcel = { exportLauncher.launch("ПН_Конец_цикла_${System.currentTimeMillis()}.xlsx") }
         )
+    }
     }
 }

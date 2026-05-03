@@ -762,6 +762,7 @@ fun NoviceForecastConfigDialog(
  * @param bonusPercent Бонус за взнос в процентах (из БД Настроек)
  * @param dailyPercent Ежедневный процент начислений (из БД Настроек)
  * @param isNewFlow true если это создание нового потока
+ * @param currentInFlow Текущая сумма "В потоке" (0.0 для нового потока)
  */
 @Composable
 fun NoviceReinvestDialog(
@@ -769,7 +770,8 @@ fun NoviceReinvestDialog(
     onConfirm: (Double, Double, Double) -> Unit,
     bonusPercent: Double = 50.0,
     dailyPercent: Double = 2.0,
-    isNewFlow: Boolean = false
+    isNewFlow: Boolean = false,
+    currentInFlow: Double = 0.0
 ) {
     var isExistingFlow by remember { mutableStateOf(false) }
     var amountText by remember { mutableStateOf("") }
@@ -781,6 +783,9 @@ fun NoviceReinvestDialog(
     val amount = parseDouble(amountText)
     val inFlow = if (isExistingFlow) amount else amount + amount * bonusPercent / 100.0
     val dailyAccrual = inFlow * dailyPercent / 100.0
+
+    val newTotalInFlow = currentInFlow + inFlow
+    val exceedsLimit = newTotalInFlow > 300_000.0
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
@@ -812,6 +817,21 @@ fun NoviceReinvestDialog(
                         fontSize = 12.sp,
                         color = Color.Gray
                     )
+                    if (amount > 0 && currentInFlow > 0) {
+                        Text(
+                            "Итого в потоке: ${String.format(Locale.US, "%.2f", newTotalInFlow)}",
+                            fontSize = 11.sp,
+                            color = if (exceedsLimit) MaterialTheme.colorScheme.error else Color(0xFF4CAF50)
+                        )
+                    }
+                    if (exceedsLimit) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "Сумма потока не может быть более 300000",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                 } else {
                     Text("Бонус ко взносу: ${String.format(Locale.US, "%.0f", bonusPercent)}%", fontSize = 12.sp, color = Color.Gray)
                     Text("Ежедневный процент: ${String.format(Locale.US, "%.0f", dailyPercent)}%", fontSize = 12.sp, color = Color.Gray)
@@ -822,6 +842,21 @@ fun NoviceReinvestDialog(
                             fontSize = 11.sp,
                             color = Color(0xFF4CAF50)
                         )
+                        if (currentInFlow > 0) {
+                            Text(
+                                "Итого в потоке: ${String.format(Locale.US, "%.2f", newTotalInFlow)}",
+                                fontSize = 11.sp,
+                                color = if (exceedsLimit) MaterialTheme.colorScheme.error else Color(0xFF4CAF50)
+                            )
+                        }
+                        if (exceedsLimit) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                "Сумма потока не может быть более 300000",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
                         Text(
                             "Начисление: ${String.format(Locale.US, "%.2f", dailyAccrual)} руб.",
                             fontSize = 11.sp,
@@ -882,11 +917,11 @@ fun NoviceReinvestDialog(
                     val wallet = if (walletExplicitlySet) parseDouble(walletText) else 0.0
                     Button(
                         onClick = {
-                            if (amount > 0) {
+                            if (amount > 0 && !exceedsLimit) {
                                 onConfirm(inFlow, dailyAccrual, wallet)
                             }
                         },
-                        enabled = amount > 0,
+                        enabled = amount > 0 && !exceedsLimit,
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336))
                     ) { Text("Внести") }
                 }
