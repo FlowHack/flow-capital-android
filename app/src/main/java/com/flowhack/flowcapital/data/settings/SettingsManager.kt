@@ -453,6 +453,12 @@ if (!prefs.contains(CHECK_UPDATE_ON_START)) {
 if (!prefs.contains(DARK_THEME)) {
     prefs[DARK_THEME] = true
 }
+if (!prefs.contains(BROWSER_FAB_OFFSET_X)) {
+    prefs[BROWSER_FAB_OFFSET_X] = 0
+}
+if (!prefs.contains(BROWSER_FAB_OFFSET_Y)) {
+    prefs[BROWSER_FAB_OFFSET_Y] = 0
+}
 if (!prefs.contains(DEFAULT_ENTRY_TAB)) {
     prefs[DEFAULT_ENTRY_TAB] = 1
 }
