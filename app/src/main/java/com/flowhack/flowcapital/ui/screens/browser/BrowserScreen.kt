@@ -6,9 +6,15 @@ import android.webkit.CookieManager
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -17,28 +23,40 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.webkit.ProxyController
 import androidx.webkit.WebViewFeature
 import com.flowhack.flowcapital.data.proxy.ProxyConfig
+import com.flowhack.flowcapital.data.proxy.ProxyStatus
 import com.flowhack.flowcapital.data.proxy.ProxyStorage
+import com.flowhack.flowcapital.data.settings.SettingsManager
+import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.util.concurrent.Executors
 import androidx.webkit.ProxyConfig as WebKitProxyConfig
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
 
 @SuppressLint("SetJavaScriptEnabled", "DEPRECATION")
 @Composable
 fun BrowserScreen(url: String) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val settingsManager = remember { SettingsManager(context) }
     val proxyStorage = remember { ProxyStorage(context) }
     val proxies by proxyStorage.proxiesFlow.collectAsState(initial = emptyList())
+
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
+    var isDragging by remember { mutableFloatStateOf(0f) }
 
     val siteName = when {
         url.contains("potok.cash") -> "ПОТОКCASH"
@@ -50,7 +68,7 @@ fun BrowserScreen(url: String) {
     val enabledProxies = remember(proxies, siteName) {
         if (siteName == null) emptyList()
         else proxies.filter {
-            it.status == com.flowhack.flowcapital.data.proxy.ProxyStatus.CONNECTED && siteName in it.enabledForSites
+            it.status == ProxyStatus.CONNECTED && siteName in it.enabledForSites
         }.sortedBy { it.pingMs ?: Int.MAX_VALUE }
     }
 
@@ -106,17 +124,46 @@ fun BrowserScreen(url: String) {
             }
         )
 
-        FloatingActionButton(
-            onClick = { webView.reload() },
+        Box(
             modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp),
-            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragStart = { isDragging = 1f },
+                        onDragEnd = {
+                            isDragging = 0f
+                            scope.launch {
+                                settingsManager.saveBrowserFabOffset(offsetX.toInt(), offsetY.toInt())
+                            }
+                        },
+                        onDragCancel = { isDragging = 0f },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            offsetX += dragAmount.x
+                            offsetY += dragAmount.y
+                        }
+                    )
+                }
         ) {
-            Icon(
-                imageVector = Icons.Default.Refresh,
-                contentDescription = "Обновить страницу"
-            )
+            FloatingActionButton(
+                onClick = { webView.reload() },
+                containerColor = if (isDragging > 0) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                } else {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+                },
+                shape = CircleShape,
+                modifier = Modifier
+                    .size(56.dp)
+                    .offset {
+                        IntOffset(offsetX.toInt(), offsetY.toInt())
+                    }
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Обновить страницу"
+                )
+            }
         }
     }
 }

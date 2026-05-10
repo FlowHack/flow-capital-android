@@ -65,6 +65,11 @@ val CHECK_UPDATE_ON_START = booleanPreferencesKey("check_update_on_start")
 /** Ключ для темной темы (true = тёмная, false = светлая) */
 val DARK_THEME = booleanPreferencesKey("dark_theme")
 
+/** Ключ для смещения кнопки обновления браузера по X (dp) */
+val BROWSER_FAB_OFFSET_X = intPreferencesKey("browser_fab_offset_x")
+/** Ключ для смещения кнопки обновления браузера по Y (dp) */
+val BROWSER_FAB_OFFSET_Y = intPreferencesKey("browser_fab_offset_y")
+
         private val DEFAULT_PSP_COEFFICIENTS = mapOf(
             1 to 30.0, 2 to 55.8, 3 to 78.0, 4 to 97.07,
             5 to 113.48, 6 to 127.59, 7 to 139.73, 8 to 150.17,
@@ -372,6 +377,18 @@ val checkUpdateOnStartFlow: Flow<Boolean> = dataStore.data.map { it[CHECK_UPDATE
 val darkThemeFlow: Flow<Boolean> = dataStore.data.map { it[DARK_THEME] ?: true }
 
 /**
+ * Поток со смещением X кнопки обновления браузера (dp).
+ * По умолчанию 400 (слева).
+ */
+val browserFabOffsetXFlow: Flow<Int> = dataStore.data.map { it[BROWSER_FAB_OFFSET_X] ?: 400 }
+
+/**
+ * Поток со смещением Y кнопки обновления браузера (dp).
+ * По умолчанию 16.
+ */
+val browserFabOffsetYFlow: Flow<Int> = dataStore.data.map { it[BROWSER_FAB_OFFSET_Y] ?: 16 }
+
+/**
  * Установить флаг проверки обновлений при входе.
  * @param check true - проверять при входе
  */
@@ -388,6 +405,18 @@ suspend fun setCheckUpdateOnStart(check: Boolean) {
 suspend fun setDarkTheme(dark: Boolean) {
     dataStore.edit { prefs ->
         prefs[DARK_THEME] = dark
+    }
+}
+
+/**
+ * Сохранить позицию кнопки обновления браузера.
+ * @param offsetX Смещение по X в dp
+ * @param offsetY Смещение по Y в dp
+ */
+suspend fun saveBrowserFabOffset(offsetX: Int, offsetY: Int) {
+    dataStore.edit { prefs ->
+        prefs[BROWSER_FAB_OFFSET_X] = offsetX
+        prefs[BROWSER_FAB_OFFSET_Y] = offsetY
     }
 }
 

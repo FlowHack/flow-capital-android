@@ -177,7 +177,7 @@ fun SettingsScreen(onOpenBrowserUrl: (String) -> Unit = {}) {
             onTabSelected = { selectedFlowTab = it }
         )
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         // Настройки конкретного потока
         when (selectedFlowTab) {

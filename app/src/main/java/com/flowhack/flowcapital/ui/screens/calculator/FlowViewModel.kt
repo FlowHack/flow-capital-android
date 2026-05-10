@@ -177,6 +177,16 @@ class FlowViewModel(
 
             // Воскресенье - выходной, создаём SUNDAY запись с текущими значениями
             if (isSunday) {
+                // Проверяем, есть ли уже SUNDAY запись за сегодня
+                val todayStart = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
+                val todayEnd = todayStart + (24 * 60 * 60 * 1000)
+                val todayEntries = growingRepository.getEntriesForDateRange(todayStart, todayEnd)
+                if (todayEntries.any { it.actionType == "SUNDAY" }) {
+                    return@launch // SUNDAY уже создана, ничего не делаем
+                }
                 val newEntry = GrowingFlowEntity(
                     date = System.currentTimeMillis(),
                     percent = lastEntry.percent,
@@ -468,6 +478,16 @@ class FlowViewModel(
 
             // Воскресенье - выходной, SUNDAY запись с текущими значениями
             if (isSunday) {
+                // Проверяем, есть ли уже SUNDAY запись за сегодня
+                val todayStart = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
+                val todayEnd = todayStart + (24 * 60 * 60 * 1000)
+                val todayEntries = noviceRepository.getEntriesForDateRange(todayStart, todayEnd)
+                if (todayEntries.any { it.actionType == "SUNDAY" }) {
+                    return@launch // SUNDAY уже создана, ничего не делаем
+                }
                 val newEntry = NoviceFlowEntity(
                     date = System.currentTimeMillis(),
                     percent = lastEntry.percent,

@@ -186,7 +186,7 @@ fun CalculatorScreen() {
             onTabSelected = { index -> selectedTabIndex = index }
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
         // Контент в зависимости от выбранной вкладки
         when (selectedTabIndex) {
