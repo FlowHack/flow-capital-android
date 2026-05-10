@@ -6,7 +6,6 @@ import android.webkit.CookieManager
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -55,9 +54,17 @@ fun BrowserScreen(url: String) {
     val proxyStorage = remember { ProxyStorage(context) }
     val proxies by proxyStorage.proxiesFlow.collectAsState(initial = emptyList())
 
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    var offsetY by remember { mutableFloatStateOf(0f) }
+    val savedOffsetX by settingsManager.browserFabOffsetXFlow.collectAsState(initial = 400)
+    val savedOffsetY by settingsManager.browserFabOffsetYFlow.collectAsState(initial = 16)
+
+    var offsetX by remember { mutableFloatStateOf(savedOffsetX.toFloat()) }
+    var offsetY by remember { mutableFloatStateOf(savedOffsetY.toFloat()) }
     var isDragging by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(savedOffsetX, savedOffsetY) {
+        offsetX = savedOffsetX.toFloat()
+        offsetY = savedOffsetY.toFloat()
+    }
 
     val siteName = when {
         url.contains("potok.cash") -> "ПОТОКCASH"
@@ -126,27 +133,16 @@ fun BrowserScreen(url: String) {
         )
 
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(Unit) {
-                    detectDragGestures(
-                        onDragStart = { isDragging = 1f },
-                        onDragEnd = {
-                            isDragging = 0f
-                            scope.launch {
-                                settingsManager.saveBrowserFabOffset(offsetX.toInt(), offsetY.toInt())
-                            }
-                        },
-                        onDragCancel = { isDragging = 0f },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            offsetX += dragAmount.x
-                            offsetY += dragAmount.y
-                        }
-                    )
-                }
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.BottomStart
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .padding(start = 16.dp, bottom = 16.dp)
+                    .offset {
+                        IntOffset(offsetX.toInt(), offsetY.toInt())
+                    }
+            ) {
                 FloatingActionButton(
                     onClick = { webView.reload() },
                     containerColor = if (isDragging > 0) {
@@ -157,10 +153,22 @@ fun BrowserScreen(url: String) {
                     shape = CircleShape,
                     modifier = Modifier
                         .size(56.dp)
-                        .align(Alignment.BottomStart)
-                        .padding(start = 16.dp, bottom = 16.dp)
-                        .offset {
-                            IntOffset(offsetX.toInt(), offsetY.toInt())
+                        .pointerInput(Unit) {
+                            detectDragGestures(
+                                onDragStart = { isDragging = 1f },
+                                onDragEnd = {
+                                    isDragging = 0f
+                                    scope.launch {
+                                        settingsManager.saveBrowserFabOffset(offsetX.toInt(), offsetY.toInt())
+                                    }
+                                },
+                                onDragCancel = { isDragging = 0f },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    offsetX += dragAmount.x
+                                    offsetY += dragAmount.y
+                                }
+                            )
                         }
                 ) {
                     Icon(
