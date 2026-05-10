@@ -11,6 +11,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -145,24 +146,28 @@ fun BrowserScreen(url: String) {
                     )
                 }
         ) {
-            FloatingActionButton(
-                onClick = { webView.reload() },
-                containerColor = if (isDragging > 0) {
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
-                } else {
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
-                },
-                shape = CircleShape,
-                modifier = Modifier
-                    .size(56.dp)
-                    .offset {
-                        IntOffset(offsetX.toInt(), offsetY.toInt())
-                    }
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = "Обновить страницу"
-                )
+            Box(modifier = Modifier.fillMaxSize()) {
+                FloatingActionButton(
+                    onClick = { webView.reload() },
+                    containerColor = if (isDragging > 0) {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                    } else {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+                    },
+                    shape = CircleShape,
+                    modifier = Modifier
+                        .size(56.dp)
+                        .align(Alignment.BottomStart)
+                        .padding(start = 16.dp, bottom = 16.dp)
+                        .offset {
+                            IntOffset(offsetX.toInt(), offsetY.toInt())
+                        }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Обновить страницу"
+                    )
+                }
             }
         }
     }
