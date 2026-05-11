@@ -7,20 +7,12 @@ plugins {
 
 android {
     namespace = "com.flowhack.flowcapital"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.flowhack.flowcapital"
-        minSdk = 28
-        //noinspection OldTargetApi
-        targetSdk = 36
-versionCode = 76
-
-        versionName = "0.7.6"
+        versionCode = 37
+        versionName = "0.7.7"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

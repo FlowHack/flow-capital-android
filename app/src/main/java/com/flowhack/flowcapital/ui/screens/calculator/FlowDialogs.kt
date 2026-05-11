@@ -785,7 +785,7 @@ fun NoviceReinvestDialog(
     val dailyAccrual = inFlow * dailyPercent / 100.0
 
     val newTotalInFlow = currentInFlow + inFlow
-    val exceedsLimit = newTotalInFlow > 300_000.0
+    val exceedsLimit = newTotalInFlow > 750_000.0
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
@@ -827,7 +827,7 @@ fun NoviceReinvestDialog(
                     if (exceedsLimit) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            "Сумма потока не может быть более 300000",
+                            "Сумма потока не может быть более 750000",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.error
                         )
@@ -852,7 +852,7 @@ fun NoviceReinvestDialog(
                         if (exceedsLimit) {
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                "Сумма потока не может быть более 300000",
+                                "Сумма потока не может быть более 750000",
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.error
                             )

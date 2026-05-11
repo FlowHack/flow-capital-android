@@ -5,7 +5,7 @@ import timber.log.Timber
 import java.util.Calendar
 
 /** Максимальная сумма "В потоке" для ПН */
-const val PN_MAX_IN_FLOW = 300_000.0
+const val PN_MAX_IN_FLOW = 750_000.0
 
 /**
  * Рассчитывает прогноз ПН (Поток Новичка).
@@ -171,10 +171,10 @@ fun calculateNoviceFlowForecast(
                 val potentialInFlow = simInFlow + withBonus
 
                 if (potentialInFlow > PN_MAX_IN_FLOW) {
-                    // Добиваем "В потоке" до 300000, остальное считается выведенным
+                    // Добиваем "В потоке" до 750000, остальное считается выведенным
                     val allowedAdd = PN_MAX_IN_FLOW - simInFlow
                     simInFlow = PN_MAX_IN_FLOW
-                    Timber.d("REINVEST ПН: лимит 300000. Добавлено %.2f, выведено на карту %.2f",
+                    Timber.d("REINVEST ПН: лимит 750000. Добавлено %.2f, выведено на карту %.2f",
                         allowedAdd, withBonus - allowedAdd)
                 } else {
                     simInFlow += withBonus

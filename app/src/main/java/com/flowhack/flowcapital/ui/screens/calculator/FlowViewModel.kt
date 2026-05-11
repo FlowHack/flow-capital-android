@@ -76,7 +76,7 @@ class FlowViewModel(
     private val _pnCycleEndForecast = MutableStateFlow<List<NoviceFlowEntity>>(emptyList())
     val pnCycleEndForecast: StateFlow<List<NoviceFlowEntity>> = _pnCycleEndForecast
 
-    /** Ошибка реинвеста ПН (превышение лимита 300000) */
+    /** Ошибка реинвеста ПН (превышение лимита 750000) */
     private val _pnReinvestError = MutableStateFlow<String?>(null)
     val pnReinvestError: StateFlow<String?> = _pnReinvestError
 
@@ -433,10 +433,10 @@ class FlowViewModel(
             val previousInFlow = lastEntry?.inFlowAmount ?: 0.0
             val newInFlowAmount = previousInFlow + inFlow
 
-            // Проверка лимита 300000 для "В потоке"
-            if (newInFlowAmount > 300_000.0) {
-                _pnReinvestError.value = "Сумма потока не может быть более 300000"
-                Timber.d("addToNoviceFlow: превышен лимит 300000. Текущий=%.2f, добавляем=%.2f, итого=%.2f",
+            // Проверка лимита 750000 для "В потоке"
+            if (newInFlowAmount > 750_000.0) {
+                _pnReinvestError.value = "Сумма потока не может быть более 750000"
+                Timber.d("addToNoviceFlow: превышен лимит 750000. Текущий=%.2f, добавляем=%.2f, итого=%.2f",
                     previousInFlow, inFlow, newInFlowAmount)
                 return@launch
             }
@@ -807,11 +807,11 @@ class FlowViewModel(
                          val withBonus = reinvestAmountActual + reinvestAmountActual * (bonusPercent / 100.0)
                          val potentialInFlow = simInFlow + withBonus
 
-                         if (potentialInFlow > 300_000.0) {
-                             // Добиваем "В потоке" до 300000, остальное считается выведенным
-                             val withdrawn = potentialInFlow - 300_000.0
-                             simInFlow = 300_000.0
-                             Timber.d("REINVEST ПН: лимит 300000. Потенциально %.2f, выведено на карту %.2f",
+                         if (potentialInFlow > 750_000.0) {
+                             // Добиваем "В потоке" до 750000, остальное считается выведенным
+                             val withdrawn = potentialInFlow - 750_000.0
+                             simInFlow = 750_000.0
+                             Timber.d("REINVEST ПН: лимит 750000. Потенциально %.2f, выведено на карту %.2f",
                                  potentialInFlow, withdrawn)
                          } else {
                              simInFlow += withBonus
