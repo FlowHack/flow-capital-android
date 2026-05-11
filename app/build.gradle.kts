@@ -13,6 +13,7 @@ android {
         applicationId = "com.flowhack.flowcapital"
         versionCode = 77
         versionName = "0.7.7"
+        minSdk = 28
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
