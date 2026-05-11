@@ -3114,6 +3114,8 @@ private fun CalculateNoviceFlowDialog(
     val inFlow = if (contribution > 0) contribution + contribution * bonusPercent / 100.0 else contribution
     val dailyAccrual = if (inFlow > 0) inFlow * (savedDailyPercent / 100.0) else 0.0
 
+    val exceedsLimit = inFlow > 750_000.0
+
     var compoundInterest by remember { mutableStateOf(false) }
     var reinvestAmountText by remember { mutableStateOf("2000") }
     val reinvestAmount = reinvestAmountText.replace(",", ".").toDoubleOrNull() ?: 0.0
@@ -3190,7 +3192,16 @@ private fun CalculateNoviceFlowDialog(
 
                 if (contribution > 0) {
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("После старта: В потоке=${String.format(Locale.US, "%.2f", inFlow)}, Начисление=${String.format(Locale.US, "%.2f", dailyAccrual)}", fontSize = 12.sp)
+                    val textColor = if (exceedsLimit) MaterialTheme.colorScheme.error else Color(0xFF4CAF50)
+                    Text(
+                        "После старта: В потоке=${String.format(Locale.US, "%.2f", inFlow)}, Начисление=${String.format(Locale.US, "%.2f", dailyAccrual)}",
+                        fontSize = 12.sp,
+                        color = textColor
+                    )
+                    if (exceedsLimit) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("Сумма потока не может быть более 750000", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
+                    }
                 }
             }
         },
@@ -3210,7 +3221,7 @@ private fun CalculateNoviceFlowDialog(
                     forecastResults = results
                     showResults = true
                 }
-            }, enabled = contribution > 0 && isReinvestAmountValid) { Text("Рассчитать") }
+            }, enabled = contribution > 0 && isReinvestAmountValid && !exceedsLimit) { Text("Рассчитать") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
     )
@@ -3294,12 +3305,14 @@ private fun CalculateExistingNoviceFlowDialog(
     val wallet = if (walletText.isBlank()) 0.0 else parseDouble(walletText)
     val dailyPercent = savedDailyPercent
 
+    val exceedsLimit = inFlow > 750_000.0
+
     var compoundInterest by remember { mutableStateOf(false) }
     var reinvestAmountText by remember { mutableStateOf("2000") }
     val reinvestAmount = reinvestAmountText.replace(",", ".").toDoubleOrNull() ?: 0.0
     val isReinvestAmountValid = !compoundInterest || (compoundInterest && reinvestAmount > 0)
 
-    val isFormValid = inFlow > 0 && dailyPercent > 0 && isReinvestAmountValid
+    val isFormValid = inFlow > 0 && dailyPercent > 0 && isReinvestAmountValid && !exceedsLimit
 
     AlertDialog(
         onDismissRequest = onDismiss,
