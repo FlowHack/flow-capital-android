@@ -782,7 +782,8 @@ fun NoviceReinvestDialog(
 
     val amount = parseDouble(amountText)
     val inFlow = if (isExistingFlow) amount else amount + amount * bonusPercent / 100.0
-    val dailyAccrual = inFlow * dailyPercent / 100.0
+    val totalInFlowWithLimit = minOf(750_000.0, currentInFlow + inFlow)
+    val dailyAccrual = totalInFlowWithLimit * dailyPercent / 100.0
 
     val newTotalInFlow = currentInFlow + inFlow
     val exceedsLimit = newTotalInFlow > 750_000.0
