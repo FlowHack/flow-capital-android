@@ -4,10 +4,74 @@ import timber.log.Timber
 import java.util.Calendar
 
 /**
+ * Вычисляет дату закрытия периода ПСП по алгоритму "якорных дней".
+ * В месяце всегда 2 периода. Разница между датами закрытия составляет 14 дней + остаток месяца.
+ *
+ * @param startDateMillis Дата старта потока
+ * @param periodNum Номер периода (1-20)
+ * @return Timestamp даты закрытия периода
+ */
+fun calculatePspPeriodEndDate(startDateMillis: Long, periodNum: Int): Long {
+    val startCal = Calendar.getInstance().apply {
+        timeInMillis = startDateMillis
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }
+    val startDay = startCal.get(Calendar.DAY_OF_MONTH)
+
+    val day1: Int
+    val day2: Int
+    if (startDay <= 14) {
+        day1 = startDay
+        day2 = startDay + 14
+    } else {
+        day1 = startDay - 14
+        day2 = startDay
+    }
+
+    val targetDay: Int
+    val monthsToAdd: Int
+    if (startDay <= 14) {
+        if (periodNum % 2 == 1) {
+            monthsToAdd = periodNum / 2
+            targetDay = day2
+        } else {
+            monthsToAdd = periodNum / 2
+            targetDay = day1
+        }
+    } else {
+        if (periodNum % 2 == 1) {
+            monthsToAdd = (periodNum + 1) / 2
+            targetDay = day1
+        } else {
+            monthsToAdd = periodNum / 2
+            targetDay = day2
+        }
+    }
+
+    var adjustedDay = targetDay
+    if (adjustedDay > 28) adjustedDay = 28
+
+    val resultCal = Calendar.getInstance().apply {
+        timeInMillis = startDateMillis
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+        set(Calendar.DAY_OF_MONTH, 1)
+        add(Calendar.MONTH, monthsToAdd)
+        set(Calendar.DAY_OF_MONTH, adjustedDay)
+    }
+    return resultCal.timeInMillis
+}
+
+/**
  * Рассчитывает прогноз ПСП (Премиум Стартовый Поток).
  *
  * Логика по ТЗ:
- * - 20 периодов по 14 дней
+ * - 20 периодов по алгоритму "якорных дней" (в месяце 2 периода)
  * - Коэффициенты из БД Настроек
  * - Считается, что взнос делается идеально день в день
  *
@@ -25,35 +89,22 @@ fun calculatePspForecast(
     Timber.d("Старт: ${formatDate(startDateMillis)}")
 
     val results = mutableListOf<PspForecastResult>()
-    val calendar = Calendar.getInstance().apply {
-        timeInMillis = startDateMillis
-        set(Calendar.HOUR_OF_DAY, 0)
-        set(Calendar.MINUTE, 0)
-        set(Calendar.SECOND, 0)
-        set(Calendar.MILLISECOND, 0)
-    }
 
     var totalAccrued = 0.0
     var currentNominal = nominal
+    var previousEndDate = startDateMillis
 
     for (periodNum in 1..20) {
         val percent = coefficients[periodNum] ?: 0.0
         val accrual = currentNominal * (percent / 100.0)
         totalAccrued += accrual
 
-        // Дата окончания периода = startDate + (periodNum * 14 дней)
-        val periodEndDate = Calendar.getInstance().apply {
-            timeInMillis = startDateMillis
-            add(Calendar.DAY_OF_YEAR, (periodNum * 14))
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
+        val periodEndDate = calculatePspPeriodEndDate(startDateMillis, periodNum)
+        val periodStartDate = if (periodNum == 1) startDateMillis else previousEndDate
 
         results.add(PspForecastResult(
             periodNumber = periodNum,
-            startDate = calendar.timeInMillis,
+            startDate = periodStartDate,
             endDate = periodEndDate,
             nominal = currentNominal,
             percent = percent,
@@ -62,13 +113,10 @@ fun calculatePspForecast(
             isCompleted = periodNum == 20
         ))
 
-        Timber.v("ПСП Период $periodNum: nominal=%.2f, percent=%.2f, accrual=%.2f, total=%.2f",
+        Timber.v("ПСП Период $periodNum: nominal=%.2f, percent=%.2f, accrual=%.2f, total=%.2f, endDate=${formatDate(periodEndDate)}",
             currentNominal, percent, accrual, totalAccrued)
 
-        // Переход к следующему периоду (номинал остается тот же, но в реальности добавляется)
-        // Для прогноза считаем что номинал тот же (или можно предположить реинвест)
-        // По ТЗ "идеально день в день" - значит номинал тот же
-        calendar.add(Calendar.DAY_OF_YEAR, 14)
+        previousEndDate = periodEndDate
     }
 
     Timber.d("Прогноз ПСП завершен: периодов=${results.size}, всего начислено=%.2f", totalAccrued)

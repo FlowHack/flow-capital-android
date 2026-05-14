@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.flowhack.flowcapital.data.db.PremiumStartFlowEntity
 import com.flowhack.flowcapital.data.db.PremiumStartFlowRepository
 import com.flowhack.flowcapital.data.db.PremiumStartPeriodEntity
+import com.flowhack.flowcapital.data.forecast.calculatePspPeriodEndDate
 import com.flowhack.flowcapital.data.logging.AppLogger
 import com.flowhack.flowcapital.data.settings.SettingsManager
 import kotlinx.coroutines.Dispatchers
@@ -133,7 +134,6 @@ class PremiumStartViewModel(
         viewModelScope.launch {
             AppLogger.d("PremiumStartViewModel", "Создание ПСП: номинал=$nominalAmount, " +
                     "период=$currentPeriod, start1=$firstPeriodStart, startCurrent=$currentPeriodStart")
-            val periodDuration = 14L * 24 * 60 * 60 * 1000
 
             // Считаем начисления за прошлые периоды (1..currentPeriod-1)
             var completedAccruals = 0.0
@@ -153,18 +153,30 @@ class PremiumStartViewModel(
             val flowId = flowRepository.insertFlow(flow)
 
             // Генерируем все 20 периодов с датами
+            // Для периодов до текущего - по алгоритму от firstPeriodStart
+            // Для текущего и после - от даты открытия текущего периода
             var currentCalcStartDate = firstPeriodStart
             val periods = (1..20).map { periodNum ->
                 val percent = pspCoefficientsFlow.value[periodNum] ?: 100.0
                 val accrualAmount = nominalAmount * (percent / 100.0)
 
-                if (periodNum == currentPeriod && currentPeriodStart != null) {
-                    currentCalcStartDate = currentPeriodStart
-                }
+                val periodStartDate: Long
+                val endDate: Long
 
-                val periodStartDate = currentCalcStartDate
-                val endDate = periodStartDate + periodDuration
-                currentCalcStartDate = endDate
+                if (periodNum < currentPeriod) {
+                    // Прошлые периоды - считаем от firstPeriodStart по алгоритму "якорных дней"
+                    periodStartDate = currentCalcStartDate
+                    endDate = calculatePspPeriodEndDate(firstPeriodStart, periodNum)
+                    currentCalcStartDate = endDate
+                } else {
+                    // Текущий и будущие периоды - считаем от currentPeriodStart
+                    if (periodNum == currentPeriod && currentPeriodStart != null) {
+                        currentCalcStartDate = currentPeriodStart
+                    }
+                    periodStartDate = currentCalcStartDate
+                    endDate = calculatePspPeriodEndDate(currentCalcStartDate, 1)
+                    currentCalcStartDate = endDate
+                }
 
                 val isAlreadyDone = periodNum < currentPeriod
 
@@ -221,8 +233,7 @@ class PremiumStartViewModel(
             } else {
                 // Переходим к следующему периоду
                 val newCurrentPeriodNum = period.periodNumber + 1
-                val periodDuration = 14L * 24 * 60 * 60 * 1000
-                val endDate = contributionDate + periodDuration
+                val endDate = calculatePspPeriodEndDate(contributionDate, 1)
                 val percent = pspCoefficientsFlow.value[newCurrentPeriodNum] ?: 100.0
                 val accrualAmount = flow.nominalAmount * (percent / 100.0)
 
