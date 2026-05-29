@@ -76,7 +76,6 @@ class FlowViewModel(
     private val _pnCycleEndForecast = MutableStateFlow<List<NoviceFlowEntity>>(emptyList())
     val pnCycleEndForecast: StateFlow<List<NoviceFlowEntity>> = _pnCycleEndForecast
 
-    /** Ошибка реинвеста ПН (превышение лимита 750000) */
     private val _pnReinvestError = MutableStateFlow<String?>(null)
     val pnReinvestError: StateFlow<String?> = _pnReinvestError
 
@@ -432,14 +431,6 @@ class FlowViewModel(
             val lastEntry = noviceRepository.getLastEntry()
             val previousInFlow = lastEntry?.inFlowAmount ?: 0.0
             val newInFlowAmount = previousInFlow + inFlow
-
-            // Проверка лимита 750000 для "В потоке"
-            if (newInFlowAmount > 750_000.0) {
-                _pnReinvestError.value = "Сумма потока не может быть более 750000"
-                Timber.d("addToNoviceFlow: превышен лимит 750000. Текущий=%.2f, добавляем=%.2f, итого=%.2f",
-                    previousInFlow, inFlow, newInFlowAmount)
-                return@launch
-            }
 
             val newWallet = wallet
             val dailyPercent = lastEntry?.percent ?: settingsManager.pnDailyPercentFlow.first()
@@ -805,17 +796,8 @@ class FlowViewModel(
                          val reinvestAmountActual = simWallet
                          // Реинвест с учётом бонуса (как при обычном взносе)
                          val withBonus = reinvestAmountActual + reinvestAmountActual * (bonusPercent / 100.0)
-                         val potentialInFlow = simInFlow + withBonus
 
-                         if (potentialInFlow > 750_000.0) {
-                             // Добиваем "В потоке" до 750000, остальное считается выведенным
-                             val withdrawn = potentialInFlow - 750_000.0
-                             simInFlow = 750_000.0
-                             Timber.d("REINVEST ПН: лимит 750000. Потенциально %.2f, выведено на карту %.2f",
-                                 potentialInFlow, withdrawn)
-                         } else {
-                             simInFlow += withBonus
-                         }
+                         simInFlow += withBonus
                          simWallet = 0.0
                          simAccrual = if (simInFlow > 0) simInFlow * (dailyPercent / 100.0) else 0.0
                          step++

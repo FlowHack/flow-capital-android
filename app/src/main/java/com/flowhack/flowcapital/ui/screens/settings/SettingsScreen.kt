@@ -3111,10 +3111,8 @@ private fun CalculateNoviceFlowDialog(
     val wallet = if (walletText.isBlank()) 0.0 else parseDouble(walletText)
 
     val bonusPercent = savedBonusPercent
-    val inFlow = if (contribution > 0) minOf(750_000.0, contribution + contribution * bonusPercent / 100.0) else contribution
+    val inFlow = if (contribution > 0) contribution + contribution * bonusPercent / 100.0 else contribution
     val dailyAccrual = if (inFlow > 0) inFlow * (savedDailyPercent / 100.0) else 0.0
-
-    val exceedsLimit = inFlow > 750_000.0
 
     var compoundInterest by remember { mutableStateOf(false) }
     var reinvestAmountText by remember { mutableStateOf("2000") }
@@ -3192,16 +3190,11 @@ private fun CalculateNoviceFlowDialog(
 
                 if (contribution > 0) {
                     Spacer(modifier = Modifier.height(12.dp))
-                    val textColor = if (exceedsLimit) MaterialTheme.colorScheme.error else Color(0xFF4CAF50)
                     Text(
                         "После старта: В потоке=${String.format(Locale.US, "%.2f", inFlow)}, Начисление=${String.format(Locale.US, "%.2f", dailyAccrual)}",
                         fontSize = 12.sp,
-                        color = textColor
+                        color = Color(0xFF4CAF50)
                     )
-                    if (exceedsLimit) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("Сумма потока не может быть более 750000", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
-                    }
                 }
             }
         },
@@ -3221,7 +3214,7 @@ private fun CalculateNoviceFlowDialog(
                     forecastResults = results
                     showResults = true
                 }
-            }, enabled = contribution > 0 && isReinvestAmountValid && !exceedsLimit) { Text("Рассчитать") }
+            }, enabled = contribution > 0 && isReinvestAmountValid) { Text("Рассчитать") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
     )
@@ -3305,17 +3298,14 @@ private fun CalculateExistingNoviceFlowDialog(
     val wallet = if (walletText.isBlank()) 0.0 else parseDouble(walletText)
     val dailyPercent = savedDailyPercent
 
-    val totalInFlowWithLimit = minOf(750_000.0, inFlow)
-    val dailyAccrual = if (totalInFlowWithLimit > 0) totalInFlowWithLimit * (savedDailyPercent / 100.0) else 0.0
-
-    val exceedsLimit = inFlow > 750_000.0
+    val dailyAccrual = if (inFlow > 0) inFlow * (savedDailyPercent / 100.0) else 0.0
 
     var compoundInterest by remember { mutableStateOf(false) }
     var reinvestAmountText by remember { mutableStateOf("2000") }
     val reinvestAmount = reinvestAmountText.replace(",", ".").toDoubleOrNull() ?: 0.0
     val isReinvestAmountValid = !compoundInterest || (compoundInterest && reinvestAmount > 0)
 
-    val isFormValid = inFlow > 0 && dailyPercent > 0 && isReinvestAmountValid && !exceedsLimit
+    val isFormValid = inFlow > 0 && dailyPercent > 0 && isReinvestAmountValid
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -3394,7 +3384,7 @@ private fun CalculateExistingNoviceFlowDialog(
                     Spacer(modifier = Modifier.height(12.dp))
                     Text("Параметры прогноза:", fontSize = 12.sp)
                     Text("Ежедневный %: ${String.format(Locale.US, "%.2f", dailyPercent)}%", fontSize = 14.sp)
-                    Text("В потоке: ${String.format(Locale.US, "%.2f", totalInFlowWithLimit)}", fontSize = 14.sp)
+                    Text("В потоке: ${String.format(Locale.US, "%.2f", inFlow)}", fontSize = 14.sp)
                     Text("Начисление: ${String.format(Locale.US, "%.2f", dailyAccrual)}", fontSize = 14.sp)
                 }
             }
@@ -3404,7 +3394,7 @@ private fun CalculateExistingNoviceFlowDialog(
                 onClick = {
                     if (isFormValid) {
                         val results = calculateNoviceFlowForecast(
-                            inFlow = totalInFlowWithLimit,
+                            inFlow = inFlow,
                             dailyPercent = dailyPercent,
                             wallet = wallet,
                             startDateMillis = System.currentTimeMillis(),

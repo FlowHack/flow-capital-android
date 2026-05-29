@@ -4,9 +4,6 @@ import com.flowhack.flowcapital.data.db.NoviceFlowEntity
 import timber.log.Timber
 import java.util.Calendar
 
-/** Максимальная сумма "В потоке" для ПН */
-const val PN_MAX_IN_FLOW = 750_000.0
-
 /**
  * Рассчитывает прогноз ПН (Поток Новичка).
  *
@@ -168,17 +165,7 @@ fun calculateNoviceFlowForecast(
             if (compoundInterest && simWallet >= reinvestAmount) {
                 val reinvestAmountActual = simWallet
                 val withBonus = reinvestAmountActual + reinvestAmountActual * (bonusPercent / 100.0)
-                val potentialInFlow = simInFlow + withBonus
-
-                if (potentialInFlow > PN_MAX_IN_FLOW) {
-                    // Добиваем "В потоке" до 750000, остальное считается выведенным
-                    val allowedAdd = PN_MAX_IN_FLOW - simInFlow
-                    simInFlow = PN_MAX_IN_FLOW
-                    Timber.d("REINVEST ПН: лимит 750000. Добавлено %.2f, выведено на карту %.2f",
-                        allowedAdd, withBonus - allowedAdd)
-                } else {
-                    simInFlow += withBonus
-                }
+                simInFlow += withBonus
                 simWallet = 0.0
                 simAccrual = if (simInFlow > 0) simInFlow * (dailyPercent / 100.0) else 0.0
 
