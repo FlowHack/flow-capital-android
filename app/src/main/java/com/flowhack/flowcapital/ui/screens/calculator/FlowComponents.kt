@@ -577,7 +577,7 @@ fun GrowingFlowContent(
                 shape = RoundedCornerShape(10.dp)
             ) {
                 Text(
-                    text = if (isRpVip) "Думаю, стоит завести Растущий Поток VIP!" else "Думаю, стоит завести Растущий Поток!",
+                    text = if (isRpVip) "Думаю, стоит завести РП VIP!" else "Думаю, стоит завести Растущий Поток!",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
                 )
