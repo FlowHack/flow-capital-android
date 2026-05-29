@@ -13,6 +13,8 @@ import com.flowhack.flowcapital.data.forecast.MissedDaysCalculator
 import com.flowhack.flowcapital.data.logging.AppLogger
 import com.flowhack.flowcapital.data.settings.SettingsManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import timber.log.Timber
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,6 +47,9 @@ class FlowViewModel(
     private val noviceRepository: NoviceFlowRepository,
     private val settingsManager: SettingsManager
 ) : ViewModel() {
+
+    private val growingMissedMutex = Mutex()
+    private val noviceMissedMutex = Mutex()
 
     /** История РП */
     val growingHistory = growingRepository.allHistory
@@ -267,6 +272,7 @@ class FlowViewModel(
      */
     fun generateMissedDaysForGrowingFlow() {
         viewModelScope.launch {
+            growingMissedMutex.withLock {
             val zoneId = ZoneId.systemDefault()
             val today = LocalDate.now(zoneId)
 
@@ -359,6 +365,7 @@ class FlowViewModel(
 
                 isFirstIteration = false
                 checkDate = checkDate.minusDays(1) // Переходим к предыдущему дню
+            }
             }
         }
     }
@@ -578,6 +585,7 @@ class FlowViewModel(
      */
     fun generateMissedDaysForNoviceFlow() {
         viewModelScope.launch {
+            noviceMissedMutex.withLock {
             val zoneId = ZoneId.systemDefault()
             val today = LocalDate.now(zoneId)
 
@@ -665,6 +673,7 @@ class FlowViewModel(
 
                 isFirstIteration = false
                 checkDate = checkDate.minusDays(1)
+            }
             }
         }
     }
