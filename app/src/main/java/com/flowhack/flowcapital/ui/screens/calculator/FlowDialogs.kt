@@ -782,11 +782,8 @@ fun NoviceReinvestDialog(
 
     val amount = parseDouble(amountText)
     val inFlow = if (isExistingFlow) amount else amount + amount * bonusPercent / 100.0
-    val totalInFlowWithLimit = minOf(750_000.0, currentInFlow + inFlow)
-    val dailyAccrual = totalInFlowWithLimit * dailyPercent / 100.0
-
     val newTotalInFlow = currentInFlow + inFlow
-    val exceedsLimit = newTotalInFlow > 750_000.0
+    val dailyAccrual = newTotalInFlow * dailyPercent / 100.0
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
@@ -822,15 +819,7 @@ fun NoviceReinvestDialog(
                         Text(
                             "Итого в потоке: ${String.format(Locale.US, "%.2f", newTotalInFlow)}",
                             fontSize = 11.sp,
-                            color = if (exceedsLimit) MaterialTheme.colorScheme.error else Color(0xFF4CAF50)
-                        )
-                    }
-                    if (exceedsLimit) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            "Сумма потока не может быть более 750000",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.error
+                            color = Color(0xFF4CAF50)
                         )
                     }
                 } else {
@@ -847,15 +836,7 @@ fun NoviceReinvestDialog(
                             Text(
                                 "Итого в потоке: ${String.format(Locale.US, "%.2f", newTotalInFlow)}",
                                 fontSize = 11.sp,
-                                color = if (exceedsLimit) MaterialTheme.colorScheme.error else Color(0xFF4CAF50)
-                            )
-                        }
-                        if (exceedsLimit) {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                "Сумма потока не может быть более 750000",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.error
+                                color = Color(0xFF4CAF50)
                             )
                         }
                         Text(
@@ -918,11 +899,11 @@ fun NoviceReinvestDialog(
                     val wallet = if (walletExplicitlySet) parseDouble(walletText) else 0.0
                     Button(
                         onClick = {
-                            if (amount > 0 && !exceedsLimit) {
+                            if (amount > 0) {
                                 onConfirm(inFlow, dailyAccrual, wallet)
                             }
                         },
-                        enabled = amount > 0 && !exceedsLimit,
+                        enabled = amount > 0,
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF44336))
                     ) { Text("Внести") }
                 }

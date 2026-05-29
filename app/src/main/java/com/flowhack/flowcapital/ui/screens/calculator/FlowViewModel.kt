@@ -13,6 +13,8 @@ import com.flowhack.flowcapital.data.forecast.MissedDaysCalculator
 import com.flowhack.flowcapital.data.logging.AppLogger
 import com.flowhack.flowcapital.data.settings.SettingsManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import timber.log.Timber
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,6 +48,9 @@ class FlowViewModel(
     private val settingsManager: SettingsManager
 ) : ViewModel() {
 
+    private val growingMissedMutex = Mutex()
+    private val noviceMissedMutex = Mutex()
+
     /** История РП */
     val growingHistory = growingRepository.allHistory
     /** История ПН */
@@ -76,7 +81,6 @@ class FlowViewModel(
     private val _pnCycleEndForecast = MutableStateFlow<List<NoviceFlowEntity>>(emptyList())
     val pnCycleEndForecast: StateFlow<List<NoviceFlowEntity>> = _pnCycleEndForecast
 
-    /** Ошибка реинвеста ПН (превышение лимита 750000) */
     private val _pnReinvestError = MutableStateFlow<String?>(null)
     val pnReinvestError: StateFlow<String?> = _pnReinvestError
 
@@ -268,6 +272,7 @@ class FlowViewModel(
      */
     fun generateMissedDaysForGrowingFlow() {
         viewModelScope.launch {
+            growingMissedMutex.withLock {
             val zoneId = ZoneId.systemDefault()
             val today = LocalDate.now(zoneId)
 
@@ -290,7 +295,10 @@ class FlowViewModel(
                 // Определяем, какие типы записей есть в этот день
                 val hasStartInDay = entriesForDate.any { it.actionType == "START" }
                 val hasSundayRecord = entriesForDate.any { it.actionType == "SUNDAY" }
-                val hasDailyRecord = entriesForDate.any { it.actionType == "DAILY" }
+                val hasDailyRecord = entriesForDate.any {
+                    it.actionType == "DAILY" ||
+                    (it.actionType == "CORRECTION" && it.isButtonPressed)
+                }
                 val hasMissedRecord = entriesForDate.any { it.actionType == "MISSED" }
 
                 // Делегируем логику принятия решения MissedDaysCalculator (чистая функция)
@@ -360,6 +368,7 @@ class FlowViewModel(
 
                 isFirstIteration = false
                 checkDate = checkDate.minusDays(1) // Переходим к предыдущему дню
+            }
             }
         }
     }
@@ -432,14 +441,6 @@ class FlowViewModel(
             val lastEntry = noviceRepository.getLastEntry()
             val previousInFlow = lastEntry?.inFlowAmount ?: 0.0
             val newInFlowAmount = previousInFlow + inFlow
-
-            // Проверка лимита 750000 для "В потоке"
-            if (newInFlowAmount > 750_000.0) {
-                _pnReinvestError.value = "Сумма потока не может быть более 750000"
-                Timber.d("addToNoviceFlow: превышен лимит 750000. Текущий=%.2f, добавляем=%.2f, итого=%.2f",
-                    previousInFlow, inFlow, newInFlowAmount)
-                return@launch
-            }
 
             val newWallet = wallet
             val dailyPercent = lastEntry?.percent ?: settingsManager.pnDailyPercentFlow.first()
@@ -587,6 +588,7 @@ class FlowViewModel(
      */
     fun generateMissedDaysForNoviceFlow() {
         viewModelScope.launch {
+            noviceMissedMutex.withLock {
             val zoneId = ZoneId.systemDefault()
             val today = LocalDate.now(zoneId)
 
@@ -606,7 +608,10 @@ class FlowViewModel(
 
                 val hasStartInDay = entriesForDate.any { it.actionType == "PN_START" }
                 val hasSundayRecord = entriesForDate.any { it.actionType == "SUNDAY" }
-                val hasDailyRecord = entriesForDate.any { it.actionType == "PN_DAILY" }
+                val hasDailyRecord = entriesForDate.any {
+                    it.actionType == "PN_DAILY" ||
+                    (it.actionType == "PN_CORRECTION" && it.isButtonPressed)
+                }
                 val hasMissedRecord = entriesForDate.any { it.actionType == "MISSED" }
 
                 val result = MissedDaysCalculator.checkDayForNoviceFlow(
@@ -674,6 +679,7 @@ class FlowViewModel(
 
                 isFirstIteration = false
                 checkDate = checkDate.minusDays(1)
+            }
             }
         }
     }
@@ -805,17 +811,8 @@ class FlowViewModel(
                          val reinvestAmountActual = simWallet
                          // Реинвест с учётом бонуса (как при обычном взносе)
                          val withBonus = reinvestAmountActual + reinvestAmountActual * (bonusPercent / 100.0)
-                         val potentialInFlow = simInFlow + withBonus
 
-                         if (potentialInFlow > 750_000.0) {
-                             // Добиваем "В потоке" до 750000, остальное считается выведенным
-                             val withdrawn = potentialInFlow - 750_000.0
-                             simInFlow = 750_000.0
-                             Timber.d("REINVEST ПН: лимит 750000. Потенциально %.2f, выведено на карту %.2f",
-                                 potentialInFlow, withdrawn)
-                         } else {
-                             simInFlow += withBonus
-                         }
+                         simInFlow += withBonus
                          simWallet = 0.0
                          simAccrual = if (simInFlow > 0) simInFlow * (dailyPercent / 100.0) else 0.0
                          step++
