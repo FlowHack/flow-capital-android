@@ -552,6 +552,7 @@ fun NoviceHistoryTable(history: List<NoviceFlowEntity>) {
 fun GrowingFlowContent(
     lastEntry: GrowingFlowEntity?,
     history: List<GrowingFlowEntity>,
+    isRpVip: Boolean = false,
     onReinvestClick: () -> Unit,
     onCorrectionClick: () -> Unit,
     onForecastClick: () -> Unit,
@@ -576,7 +577,7 @@ fun GrowingFlowContent(
                 shape = RoundedCornerShape(10.dp)
             ) {
                 Text(
-                    text = "Думаю, стоит завести Растущий Поток!",
+                    text = if (isRpVip) "Думаю, стоит завести Растущий Поток VIP!" else "Думаю, стоит завести Растущий Поток!",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
                 )

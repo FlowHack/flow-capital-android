@@ -20,8 +20,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -50,8 +50,6 @@ import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -59,8 +57,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -69,7 +69,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,6 +82,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.work.BackoffPolicy
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
@@ -96,10 +97,10 @@ import com.flowhack.flowcapital.data.db.NoviceFlowRepository
 import com.flowhack.flowcapital.data.db.PremiumStartFlowEntity
 import com.flowhack.flowcapital.data.db.PremiumStartFlowRepository
 import com.flowhack.flowcapital.data.db.PremiumStartPeriodEntity
+import com.flowhack.flowcapital.data.forecast.PspForecastResult
 import com.flowhack.flowcapital.data.forecast.calculateFlowForecast
 import com.flowhack.flowcapital.data.forecast.calculateNoviceFlowForecast
 import com.flowhack.flowcapital.data.forecast.calculatePspForecast
-import com.flowhack.flowcapital.data.forecast.PspForecastResult
 import com.flowhack.flowcapital.data.logging.AppLogger
 import com.flowhack.flowcapital.data.proxy.ProxyConfig
 import com.flowhack.flowcapital.data.proxy.ProxyStatus
@@ -107,8 +108,6 @@ import com.flowhack.flowcapital.data.proxy.ProxyStorage
 import com.flowhack.flowcapital.data.proxy.ProxyType
 import com.flowhack.flowcapital.data.proxy.ProxyValidator
 import com.flowhack.flowcapital.data.settings.SettingsManager
-import androidx.compose.material3.Switch
-import kotlinx.coroutines.launch
 import com.flowhack.flowcapital.notifications.ReminderWorker
 import com.flowhack.flowcapital.ui.screens.calculator.GrowingForecastResultsDialog
 import com.flowhack.flowcapital.ui.screens.calculator.NoviceForecastResultsDialog
@@ -116,6 +115,7 @@ import com.flowhack.flowcapital.ui.theme.FlowColors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -150,14 +150,19 @@ fun SettingsScreen(onOpenBrowserUrl: (String) -> Unit = {}) {
         selectedFlowTab = savedDefaultTab
     }
 
-    val tabs = listOf("ПН", "БП", "ПСП", "РП", "НП")
-    val fullNames = listOf(
-        "ПОТОК НОВИЧКА",
-        "БЫСТРЫЙ ПОТОК",
-        "ПРЕМИУМ СТАРТОВЫЙ ПОТОК",
-        "РАСТУЩИЙ ПОТОК",
-        "НАКОПИТЕЛЬНЫЙ ПОТОК"
-    )
+    val isRpVip by settingsManager.isRpVipFlow.collectAsState(initial = false)
+    val tabs = remember(isRpVip) {
+        listOf("ПН", "БП", "ПСП", if (isRpVip) "РП VIP" else "РП", "НП")
+    }
+    val fullNames = remember(isRpVip) {
+        listOf(
+            "ПОТОК НОВИЧКА",
+            "БЫСТРЫЙ ПОТОК",
+            "ПРЕМИУМ СТАРТОВЫЙ ПОТОК",
+            if (isRpVip) "РАСТУЩИЙ ПОТОК VIP" else "РАСТУЩИЙ ПОТОК",
+            "НАКОПИТЕЛЬНЫЙ ПОТОК"
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -378,6 +383,62 @@ fun GrowingFlowSettings(
             Text("Математика Растущего потока", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(16.dp))
 
+            // РП VIP переключатель
+            val isRpVip by settingsManager.isRpVipFlow.collectAsState(initial = false)
+            var showRpVipToggleDialog by remember { mutableStateOf(false) }
+            var pendingRpVip by remember { mutableStateOf(false) }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text("РП VIP", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text(
+                        text = if (isRpVip) "Стартовый: 0.3%, Ежедневный: 0.003%" else "Стартовый: 0.1%, Ежедневный: 0.003%",
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
+                }
+                Switch(
+                    checked = isRpVip,
+                    onCheckedChange = { checked ->
+                        pendingRpVip = checked
+                        showRpVipToggleDialog = true
+                    }
+                )
+            }
+
+            if (showRpVipToggleDialog) {
+                AlertDialog(
+                    onDismissRequest = {
+                        showRpVipToggleDialog = false
+                    },
+                    title = { Text(if (pendingRpVip) "Включить РП VIP?" else "Выключить РП VIP?") },
+                    text = {
+                        Text("История Растущего потока будет очищена, коэффициенты сброшены на дефолтные для выбранного режима. Продолжить?")
+                    },
+                    confirmButton = {
+                        Button(onClick = {
+                            scope.launch {
+                                settingsManager.setRpVip(pendingRpVip)
+                                repository.clearHistory()
+                                Toast.makeText(context, if (pendingRpVip) "РП VIP включён" else "РП VIP выключен", Toast.LENGTH_SHORT).show()
+                            }
+                            showRpVipToggleDialog = false
+                        }) { Text("Продолжить") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showRpVipToggleDialog = false }) { Text("Отмена") }
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider()
+            Spacer(modifier = Modifier.height(16.dp))
+
             Text("Стартовый и добавочный проценты", fontWeight = FontWeight.Bold, fontSize = 14.sp)
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(
@@ -443,10 +504,6 @@ fun GrowingFlowSettings(
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Сохранить коэффициенты") }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            HorizontalDivider()
-            Spacer(modifier = Modifier.height(16.dp))
 
             Text("Данные", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(12.dp))

@@ -14,7 +14,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -25,12 +24,12 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.flowhack.flowcapital.data.db.AppDatabase
 import com.flowhack.flowcapital.data.db.GrowingFlowRepository
@@ -108,14 +107,19 @@ fun CalculatorScreen() {
     val eCurrencyBonusPercent by settingsManager.eCurrencyBonusPercentState.collectAsState(initial = 0.0)
 
     // Краткие и полные названия вкладок
-    val tabs = listOf("ПН", "БП", "ПСП", "РП", "НП")
-    val fullNames = listOf(
-        "ПОТОК НОВИЧКА",
-        "БЫСТРЫЙ ПОТОК",
-        "ПРЕМИУМ СТАРТОВЫЙ ПОТОК",
-        "РАСТУЩИЙ ПОТОК",
-        "НАКОПИТЕЛЬНЫЙ ПОТОК"
-    )
+    val isRpVip by settingsManager.isRpVipFlow.collectAsState(initial = false)
+    val tabs = remember(isRpVip) {
+        listOf("ПН", "БП", "ПСП", if (isRpVip) "РП VIP" else "РП", "НП")
+    }
+    val fullNames = remember(isRpVip) {
+        listOf(
+            "ПОТОК НОВИЧКА",
+            "БЫСТРЫЙ ПОТОК",
+            "ПРЕМИУМ СТАРТОВЫЙ ПОТОК",
+            if (isRpVip) "РАСТУЩИЙ ПОТОК VIP" else "РАСТУЩИЙ ПОТОК",
+            "НАКОПИТЕЛЬНЫЙ ПОТОК"
+        )
+    }
 
     // Состояния видимости диалогов
     var showReinvestDialog by remember { mutableStateOf(false) }
@@ -207,6 +211,7 @@ fun CalculatorScreen() {
             3 -> GrowingFlowContent(
                 lastEntry = growingHistory.firstOrNull(),
                 history = growingHistory,
+                isRpVip = isRpVip,
                 onReinvestClick = { showReinvestDialog = true },
                 onCorrectionClick = { showCorrectionDialog = true },
                 onForecastClick = { showDatePicker = true },

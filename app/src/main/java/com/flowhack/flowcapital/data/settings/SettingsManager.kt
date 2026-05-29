@@ -53,6 +53,8 @@ class SettingsManager(context: Context) {
         val PSP_REMINDERS_KEY = stringSetPreferencesKey("psp_reminders_list")
         /** Ключ для процентов периодов ПСП (сериализованная строка) */
         val PSP_PERIOD_PERCENTAGES = stringPreferencesKey("psp_period_percentages")
+                /** Ключ для флага РП VIP */
+        val IS_RP_VIP = booleanPreferencesKey("is_rp_vip")
         /** Ключ для коэффициентов E-currency РП */
         val E_CURRENCY_COEFFICIENTS = stringPreferencesKey("e_currency_coefficients")
         /** Ключ для пропуска автопроверки обновлений */
@@ -87,6 +89,19 @@ val BROWSER_FAB_OFFSET_Y = intPreferencesKey("browser_fab_offset_y")
             500000.0 to 175.0,
             1000000.0 to 200.0
         )
+
+        /** Дефолтные коэффициенты для РП VIP (стартовый 0.3%, daily 0.003%) */
+        val VIP_START_PERCENT = 0.3
+        val VIP_DAILY_ADDITION = 0.003
+        val VIP_E_CURRENCY_COEFFICIENTS = mapOf(
+            1000.0 to 75.0,
+            5000.0 to 100.0,
+            10000.0 to 125.0,
+            50000.0 to 150.0,
+            100000.0 to 175.0,
+            500000.0 to 200.0,
+            1000000.0 to 225.0
+        )
     }
 
     /**
@@ -100,6 +115,13 @@ val BROWSER_FAB_OFFSET_Y = intPreferencesKey("browser_fab_offset_y")
      * По умолчанию 0.003%.
      */
     val dailyAdditionFlow: Flow<Double> = dataStore.data.map { it[DAILY_ADDITION] ?: 0.003 }
+
+    /**
+     * Поток с флагом РП VIP.
+     * true — VIP-режим (стартовый 0.3%, daily 0.003%).
+     * false — обычный РП.
+     */
+    val isRpVipFlow: Flow<Boolean> = dataStore.data.map { it[IS_RP_VIP] ?: false }
 
     /**
      * Поток с бонусным процентом при взносе в ПН.
@@ -142,6 +164,23 @@ val BROWSER_FAB_OFFSET_Y = intPreferencesKey("browser_fab_offset_y")
      * Поток для запомненной пропущенной версии.
      */
     val skippedVersionFlow: Flow<String?> = dataStore.data.map { it[SKIPPED_VERSION] }
+
+    /**
+     * Установить режим РП VIP и записать дефолтные коэффициенты.
+     * @param vip true — VIP (0.3%, 0.003%), false — обычный РП (0.1%, 0.003%)
+     */
+    suspend fun setRpVip(vip: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[IS_RP_VIP] = vip
+            prefs[START_PERCENT] = if (vip) VIP_START_PERCENT else 0.1
+            prefs[DAILY_ADDITION] = if (vip) VIP_DAILY_ADDITION else 0.003
+            val coefficients = if (vip) VIP_E_CURRENCY_COEFFICIENTS else DEFAULT_E_CURRENCY_COEFFICIENTS
+            val entries = coefficients.entries.joinToString(";") { "${it.key}=${it.value}" }
+            prefs[E_CURRENCY_COEFFICIENTS] = entries
+            _eCurrencyCoefficientsFlow.value = coefficients
+            cachedECurrencyCoefficients = coefficients
+        }
+    }
 
     /**
      * Сохранить проценты для РП.
