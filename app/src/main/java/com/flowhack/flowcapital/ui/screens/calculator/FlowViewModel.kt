@@ -297,7 +297,7 @@ class FlowViewModel(
                 val hasSundayRecord = entriesForDate.any { it.actionType == "SUNDAY" }
                 val hasDailyRecord = entriesForDate.any {
                     it.actionType == "DAILY" ||
-                    (it.actionType == "CORRECTION" && !it.isButtonPressed)
+                    (it.actionType == "CORRECTION" && it.isButtonPressed)
                 }
                 val hasMissedRecord = entriesForDate.any { it.actionType == "MISSED" }
 
@@ -610,7 +610,7 @@ class FlowViewModel(
                 val hasSundayRecord = entriesForDate.any { it.actionType == "SUNDAY" }
                 val hasDailyRecord = entriesForDate.any {
                     it.actionType == "PN_DAILY" ||
-                    (it.actionType == "PN_CORRECTION" && !it.isButtonPressed)
+                    (it.actionType == "PN_CORRECTION" && it.isButtonPressed)
                 }
                 val hasMissedRecord = entriesForDate.any { it.actionType == "MISSED" }
 
