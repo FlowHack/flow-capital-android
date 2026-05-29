@@ -94,13 +94,18 @@ val BROWSER_FAB_OFFSET_Y = intPreferencesKey("browser_fab_offset_y")
         val VIP_START_PERCENT = 0.3
         val VIP_DAILY_ADDITION = 0.003
         val VIP_E_CURRENCY_COEFFICIENTS = mapOf(
-            1000.0 to 75.0,
-            5000.0 to 100.0,
-            10000.0 to 125.0,
-            50000.0 to 150.0,
-            100000.0 to 175.0,
-            500000.0 to 200.0,
-            1000000.0 to 225.0
+            100.0 to 30.0,
+            500.0 to 40.0,
+            1000.0 to 50.0,
+            2500.0 to 60.0,
+            5000.0 to 70.0,
+            10000.0 to 100.0,
+            25000.0 to 110.0,
+            50000.0 to 130.0,
+            100000.0 to 150.0,
+            250000.0 to 160.0,
+            500000.0 to 170.0,
+            1000000.0 to 180.0
         )
     }
 
