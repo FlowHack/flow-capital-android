@@ -7,6 +7,7 @@ import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.flowhack.flowcapital.data.db.AppDatabase
+import com.flowhack.flowcapital.data.logging.AppLogger
 import kotlinx.coroutines.flow.first
 import java.util.Calendar
 
@@ -22,6 +23,7 @@ import java.util.Calendar
 class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
+        AppLogger.d("ReminderWorker", "Запуск проверки напоминаний")
         val db = AppDatabase.getDatabase(applicationContext)
         val calendar = Calendar.getInstance()
         val isSunday = calendar.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY

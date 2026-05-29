@@ -1,7 +1,6 @@
 package com.flowhack.flowcapital.data.forecast
 
 import java.time.DayOfWeek
-import java.time.LocalDate
 
 /**
  * Результат проверки конкретного дня на необходимость создания записей пропусков или воскресений.

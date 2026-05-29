@@ -13,9 +13,6 @@ import com.flowhack.flowcapital.data.forecast.MissedDaysCalculator
 import com.flowhack.flowcapital.data.logging.AppLogger
 import com.flowhack.flowcapital.data.settings.SettingsManager
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import timber.log.Timber
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -23,8 +20,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import timber.log.Timber
 import java.text.SimpleDateFormat
-import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -84,6 +83,10 @@ class FlowViewModel(
     private val _pnReinvestError = MutableStateFlow<String?>(null)
     val pnReinvestError: StateFlow<String?> = _pnReinvestError
 
+    /**
+     * Очистить ошибку реинвеста ПН.
+     * Вызывается после отображения сообщения пользователю.
+     */
     fun clearPnReinvestError() {
         _pnReinvestError.value = null
     }
