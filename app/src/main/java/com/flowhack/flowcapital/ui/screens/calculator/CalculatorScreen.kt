@@ -61,7 +61,7 @@ fun CalculatorScreen() {
     val noviceRepository = remember { NoviceFlowRepository(database.noviceFlowDao()) }
     val settingsManager = remember { SettingsManager(context) }
 
-    // Загружаем сохранённую вкладку расчётов или используем РП (индекс 3) [RU:Загружаем сохранённую вкладку расчётов или используем РП]
+    // Загружаем сохранённую вкладку расчётов или используем РП (индекс 3)
     val savedCalcTab by settingsManager.defaultCalcTabFlow.collectAsState(initial = 3)
     var selectedTabIndex by remember { mutableIntStateOf(savedCalcTab) }
 

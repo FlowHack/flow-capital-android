@@ -45,6 +45,13 @@ import timber.log.Timber
 import java.util.concurrent.Executors
 import androidx.webkit.ProxyConfig as WebKitProxyConfig
 
+/**
+ * Главный экран встроенного браузера.
+ * Отображает WebView с указанным URL, поддерживает прокси (SOCKS5, MTProto),
+ * перемещаемую кнопку обновления и управление куками.
+ *
+ * @param url URL для загрузки в WebView
+ */
 @SuppressLint("SetJavaScriptEnabled", "DEPRECATION")
 @Composable
 fun BrowserScreen(url: String) {

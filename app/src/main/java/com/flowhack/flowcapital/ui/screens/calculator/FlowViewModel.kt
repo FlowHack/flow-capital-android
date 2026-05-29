@@ -83,6 +83,10 @@ class FlowViewModel(
     private val _pnReinvestError = MutableStateFlow<String?>(null)
     val pnReinvestError: StateFlow<String?> = _pnReinvestError
 
+    /**
+     * Очистить ошибку реинвеста ПН.
+     * Вызывается после отображения сообщения пользователю.
+     */
     fun clearPnReinvestError() {
         _pnReinvestError.value = null
     }

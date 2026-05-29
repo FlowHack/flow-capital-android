@@ -57,13 +57,28 @@ data class ProxyConfig(
     }
 }
 
+/**
+ * Результат валидации прокси-конфигурации.
+ *
+ * @property isValid true если ошибок нет
+ * @property errors Список сообщений об ошибках
+ */
 data class ProxyValidationResult(
     val isValid: Boolean,
     val errors: List<String> = emptyList()
 )
 
+/**
+ * Валидатор параметров прокси.
+ * Проверяет IP-адреса, порты и обязательные поля для разных типов прокси.
+ */
 object ProxyValidator {
 
+    /**
+     * Проверить корректность IP-адреса (4 октета от 0 до 255).
+     * @param ip Строка IP-адреса
+     * @return true если адрес валидный
+     */
     fun validateIpAddress(ip: String): Boolean {
         if (ip.isBlank()) return false
         val parts = ip.split(".")
@@ -74,12 +89,25 @@ object ProxyValidator {
         }
     }
 
+    /**
+     * Проверить корректность порта (1-65535).
+     * @param port Строка порта
+     * @return true если порт валидный
+     */
     fun validatePort(port: String): Boolean {
         if (port.isBlank()) return false
         val portNum = port.toIntOrNull() ?: return false
         return portNum in 1..65535
     }
 
+    /**
+     * Проверить конфигурацию SOCKS5 прокси.
+     * @param server IP-адрес сервера
+     * @param port Порт
+     * @param username Логин
+     * @param password Пароль
+     * @return Результат валидации со списком ошибок
+     */
     fun validateSocks5Proxy(
         server: String,
         port: String,
@@ -110,6 +138,13 @@ object ProxyValidator {
         )
     }
 
+    /**
+     * Проверить конфигурацию MTProto прокси.
+     * @param server IP-адрес сервера
+     * @param port Порт
+     * @param secret Ключ
+     * @return Результат валидации со списком ошибок
+     */
     fun validateMtProtoProxy(
         server: String,
         port: String,
@@ -136,7 +171,16 @@ object ProxyValidator {
     }
 }
 
+/**
+ * Калькулятор бонусов E-currency.
+ * Использует прогрессивную шкалу: чем больше сумма, тем выше бонус.
+ */
 object ProxyECurrencyBonus {
+    /**
+     * Рассчитать бонус для указанной суммы.
+     * @param amount Сумма взноса
+     * @return Сумма бонуса (не включая исходную сумму)
+     */
     fun calculateBonus(amount: Double): Double {
         return when {
             amount >= 1_000_000 -> amount * 2.00
@@ -150,6 +194,11 @@ object ProxyECurrencyBonus {
         }
     }
 
+    /**
+     * Получить итоговую сумму с учётом бонуса.
+     * @param amount Сумма взноса
+     * @return Исходная сумма + бонус
+     */
     fun getTotalWithBonus(amount: Double): Double {
         return amount + calculateBonus(amount)
     }

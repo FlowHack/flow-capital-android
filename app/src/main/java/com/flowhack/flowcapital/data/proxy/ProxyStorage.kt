@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.flowhack.flowcapital.data.logging.AppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -60,10 +61,12 @@ class ProxyStorage(private val context: Context) {
                         } ?: emptySet()
                     )
                 } catch (e: Exception) {
+                    AppLogger.e("ProxyStorage", "Ошибка парсинга прокси", e)
                     null
                 }
             }
         } catch (e: Exception) {
+            AppLogger.e("ProxyStorage", "Ошибка парсинга JSON массива прокси", e)
             emptyList()
         }
     }
@@ -88,6 +91,10 @@ class ProxyStorage(private val context: Context) {
         return jsonArray.toString()
     }
 
+    /**
+     * Сохранить список прокси (максимум 3).
+     * @param proxies Список прокси-конфигураций
+     */
     suspend fun saveProxies(proxies: List<ProxyConfig>) {
         if (proxies.size > MAX_PROXIES) return
         dataStore.edit { preferences ->
@@ -95,6 +102,10 @@ class ProxyStorage(private val context: Context) {
         }
     }
 
+    /**
+     * Добавить новый прокси (если не превышен лимит).
+     * @param proxy Прокси-конфигурация
+     */
     suspend fun addProxy(proxy: ProxyConfig) {
         dataStore.edit { preferences ->
             val currentJson = preferences[PROXIES_KEY] ?: "[]"
@@ -106,6 +117,10 @@ class ProxyStorage(private val context: Context) {
         }
     }
 
+    /**
+     * Обновить существующий прокси (по id).
+     * @param proxy Прокси-конфигурация с обновлёнными полями
+     */
     suspend fun updateProxy(proxy: ProxyConfig) {
         dataStore.edit { preferences ->
             val currentJson = preferences[PROXIES_KEY] ?: "[]"
@@ -118,6 +133,10 @@ class ProxyStorage(private val context: Context) {
         }
     }
 
+    /**
+     * Удалить прокси по идентификатору.
+     * @param proxyId Идентификатор прокси
+     */
     suspend fun removeProxy(proxyId: String) {
         dataStore.edit { preferences ->
             val currentJson = preferences[PROXIES_KEY] ?: "[]"
@@ -127,6 +146,12 @@ class ProxyStorage(private val context: Context) {
         }
     }
 
+    /**
+     * Обновить статус и пинг прокси.
+     * @param proxyId Идентификатор прокси
+     * @param status Новый статус
+     * @param pingMs Время пинга в мс (опционально)
+     */
     suspend fun updateProxyStatus(proxyId: String, status: ProxyStatus, pingMs: Int? = null) {
         dataStore.edit { preferences ->
             val currentJson = preferences[PROXIES_KEY] ?: "[]"
@@ -139,6 +164,11 @@ class ProxyStorage(private val context: Context) {
         }
     }
 
+    /**
+     * Обновить список сайтов для прокси.
+     * @param proxyId Идентификатор прокси
+     * @param enabledForSites Набор URL сайтов
+     */
     suspend fun updateProxySites(proxyId: String, enabledForSites: Set<String>) {
         dataStore.edit { preferences ->
             val currentJson = preferences[PROXIES_KEY] ?: "[]"

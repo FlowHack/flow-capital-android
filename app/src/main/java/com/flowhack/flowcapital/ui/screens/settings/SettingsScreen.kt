@@ -1460,6 +1460,7 @@ fun ProxySettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
                         onResult(updatedProxy)
                     }
                 } catch (e: Exception) {
+                    AppLogger.e("ProxySettings", "Ошибка подключения к прокси", e)
                     val updatedProxy = proxy.copy(
                         status = ProxyStatus.UNAVAILABLE,
                         pingMs = null
@@ -1469,6 +1470,7 @@ fun ProxySettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
                     connection.disconnect()
                 }
             } catch (e: Exception) {
+                AppLogger.e("ProxySettings", "Ошибка создания подключения к прокси", e)
                 val updatedProxy = proxy.copy(
                     status = ProxyStatus.UNAVAILABLE,
                     pingMs = null
@@ -2114,6 +2116,7 @@ fun ImportExportSettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
                     exportSettingsToJson(context, uri)
                     Toast.makeText(context, "Данные успешно экспортированы", Toast.LENGTH_SHORT).show()
                 } catch (e: Exception) {
+                    AppLogger.e("SettingsScreen", "Ошибка экспорта настроек", e)
                     Toast.makeText(context, "Ошибка экспорта: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
@@ -2129,6 +2132,7 @@ fun ImportExportSettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
                     importSettingsFromJson(context, uri)
                     Toast.makeText(context, "Данные успешно восстановлены", Toast.LENGTH_SHORT).show()
                 } catch (e: Exception) {
+                    AppLogger.e("SettingsScreen", "Ошибка импорта настроек", e)
                     Toast.makeText(context, "Ошибка импорта. Файл поврежден или имеет неверный формат", Toast.LENGTH_LONG).show()
                 }
             }
