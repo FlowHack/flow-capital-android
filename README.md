@@ -194,12 +194,6 @@ app/src/main/java/com/flowhack/flowcapital/
 
 ---
 
-## Лицензия
-
-Проект распространяется под лицензией **MIT**.
-
----
-
 Copyright (c) 2026 FlowHack. Все права защищены.
 
 ---

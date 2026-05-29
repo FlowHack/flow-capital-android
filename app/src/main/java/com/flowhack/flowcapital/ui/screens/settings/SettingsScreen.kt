@@ -1911,7 +1911,7 @@ private fun ProxyAddEditDialog(
 @Composable
 fun DonateSection(onOpenBrowserUrl: (String) -> Unit = {}) {
     val context = LocalContext.current
-    val email = "dmitriy@flow-hack.ru"
+    val email = "flow.hack.com@gmail.com"
     Column(modifier = Modifier.fillMaxWidth()) {
         Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
             Column(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
