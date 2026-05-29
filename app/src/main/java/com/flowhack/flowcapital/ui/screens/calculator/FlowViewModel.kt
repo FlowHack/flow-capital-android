@@ -295,7 +295,10 @@ class FlowViewModel(
                 // Определяем, какие типы записей есть в этот день
                 val hasStartInDay = entriesForDate.any { it.actionType == "START" }
                 val hasSundayRecord = entriesForDate.any { it.actionType == "SUNDAY" }
-                val hasDailyRecord = entriesForDate.any { it.actionType == "DAILY" }
+                val hasDailyRecord = entriesForDate.any {
+                    it.actionType == "DAILY" ||
+                    (it.actionType == "CORRECTION" && !it.isButtonPressed)
+                }
                 val hasMissedRecord = entriesForDate.any { it.actionType == "MISSED" }
 
                 // Делегируем логику принятия решения MissedDaysCalculator (чистая функция)
@@ -605,7 +608,10 @@ class FlowViewModel(
 
                 val hasStartInDay = entriesForDate.any { it.actionType == "PN_START" }
                 val hasSundayRecord = entriesForDate.any { it.actionType == "SUNDAY" }
-                val hasDailyRecord = entriesForDate.any { it.actionType == "PN_DAILY" }
+                val hasDailyRecord = entriesForDate.any {
+                    it.actionType == "PN_DAILY" ||
+                    (it.actionType == "PN_CORRECTION" && !it.isButtonPressed)
+                }
                 val hasMissedRecord = entriesForDate.any { it.actionType == "MISSED" }
 
                 val result = MissedDaysCalculator.checkDayForNoviceFlow(
