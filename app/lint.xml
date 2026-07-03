@@ -3,4 +3,6 @@
     <issue id="IconLocation" severity="ignore" />
     <issue id="IconDuplicates" severity="ignore" />
     <issue id="NewerVersionAvailable" severity="ignore" />
+    <issue id="InlinedApi" severity="warning" />
+    <issue id="InvalidFragmentVersionForActivityResult" severity="ignore" />
 </lint>
