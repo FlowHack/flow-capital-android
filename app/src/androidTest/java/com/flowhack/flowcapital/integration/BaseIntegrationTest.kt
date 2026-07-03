@@ -8,7 +8,6 @@ import com.flowhack.flowcapital.data.db.GrowingFlowDao
 import com.flowhack.flowcapital.data.db.NoviceFlowDao
 import com.flowhack.flowcapital.data.db.PremiumStartFlowDao
 import com.flowhack.flowcapital.data.db.PremiumStartPeriodDao
-import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
 
