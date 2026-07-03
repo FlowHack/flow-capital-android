@@ -45,6 +45,8 @@ class SettingsManager(context: Context) {
         val DEFAULT_ENTRY_TAB = intPreferencesKey("default_entry_tab")
         /** Ключ для списка напоминаний для РП/ПН */
         val REMINDERS_KEY = stringSetPreferencesKey("reminders_list")
+        /** Ключ для списка будильников (тайм-теги напоминаний в режиме будильника) */
+        val ALARM_REMINDERS_KEY = stringSetPreferencesKey("alarm_reminders_list")
         /** Ключ для бонусного процента ПН */
         val PN_BONUS_PERCENT = doublePreferencesKey("pn_bonus_percent")
         /** Ключ для дневного процента ПН */
@@ -166,6 +168,12 @@ val BROWSER_FAB_OFFSET_Y = intPreferencesKey("browser_fab_offset_y")
     val pspRemindersFlow: Flow<Set<String>> = dataStore.data.map { it[PSP_REMINDERS_KEY] ?: emptySet() }
 
     /**
+     * Поток со списком будильников (тайм-теги напоминаний в режиме будильника).
+     * Если данных нет — возвращает пустой Set.
+     */
+    val alarmRemindersFlow: Flow<Set<String>> = dataStore.data.map { it[ALARM_REMINDERS_KEY] ?: emptySet() }
+
+    /**
      * Поток для запомненной пропущенной версии.
      */
     val skippedVersionFlow: Flow<String?> = dataStore.data.map { it[SKIPPED_VERSION] }
@@ -253,6 +261,8 @@ val BROWSER_FAB_OFFSET_Y = intPreferencesKey("browser_fab_offset_y")
         dataStore.edit { prefs ->
             val current = prefs[REMINDERS_KEY] ?: emptySet()
             prefs[REMINDERS_KEY] = current - time
+            val alarmCurrent = prefs[ALARM_REMINDERS_KEY] ?: emptySet()
+            prefs[ALARM_REMINDERS_KEY] = alarmCurrent - time
         }
     }
 
@@ -279,6 +289,33 @@ val BROWSER_FAB_OFFSET_Y = intPreferencesKey("browser_fab_offset_y")
             val current = prefs[PSP_REMINDERS_KEY] ?: emptySet()
             prefs[PSP_REMINDERS_KEY] = current - time
         }
+    }
+
+    /**
+     * Переключить режим будильника для указанного напоминания.
+     * @param timeTag Тайм-тег в формате "ЧЧ:ММ"
+     * @param isAlarm true — добавить в будильники, false — убрать из будильников
+     */
+    suspend fun updateAlarmModeForReminder(timeTag: String, isAlarm: Boolean) {
+        dataStore.edit { prefs ->
+            val current = prefs[ALARM_REMINDERS_KEY] ?: emptySet()
+            prefs[ALARM_REMINDERS_KEY] = if (isAlarm) current + timeTag else current - timeTag
+        }
+    }
+
+    /** Перезаписать весь список напоминаний РП/ПН (для импорта). */
+    suspend fun saveReminders(reminders: Set<String>) {
+        dataStore.edit { prefs -> prefs[REMINDERS_KEY] = reminders }
+    }
+
+    /** Перезаписать весь список напоминаний ПСП (для импорта). */
+    suspend fun savePspReminders(reminders: Set<String>) {
+        dataStore.edit { prefs -> prefs[PSP_REMINDERS_KEY] = reminders }
+    }
+
+    /** Перезаписать весь список будильников (для импорта). */
+    suspend fun saveAlarmReminders(reminders: Set<String>) {
+        dataStore.edit { prefs -> prefs[ALARM_REMINDERS_KEY] = reminders }
     }
 
     private var cachedPspCoefficients: Map<Int, Double> = DEFAULT_PSP_COEFFICIENTS
@@ -413,6 +450,11 @@ val BROWSER_FAB_OFFSET_Y = intPreferencesKey("browser_fab_offset_y")
  * Поток для проверки обновлений при входе.
  */
 val checkUpdateOnStartFlow: Flow<Boolean> = dataStore.data.map { it[CHECK_UPDATE_ON_START] ?: true }
+
+/**
+ * Поток флага пропуска автопроверки обновлений.
+ */
+val skipAutoUpdateFlow: Flow<Boolean> = dataStore.data.map { it[SKIP_AUTO_UPDATE] ?: false }
 
 /**
  * Поток для состояния темной темы.

@@ -10,6 +10,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.flowhack.flowcapital.data.db.AppDatabase
 import com.flowhack.flowcapital.data.logging.AppLogger
+import com.flowhack.flowcapital.data.settings.SettingsManager
 import kotlinx.coroutines.flow.first
 import java.util.Calendar
 
@@ -26,6 +27,18 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
 
     override suspend fun doWork(): Result {
         AppLogger.d("ReminderWorker", "Запуск проверки напоминаний")
+
+        // Если напоминание в режиме будильника (AlarmManager) — WorkManager не должен дублировать
+        val timeTag = inputData.getString("timeTag")
+        if (timeTag != null) {
+            val settingsManager = SettingsManager(applicationContext)
+            val alarmSet = settingsManager.alarmRemindersFlow.first()
+            if (timeTag in alarmSet) {
+                AppLogger.d("ReminderWorker", "Напоминание $timeTag в режиме будильника — пропуск")
+                return Result.success()
+            }
+        }
+
         val db = AppDatabase.getDatabase(applicationContext)
         val calendar = Calendar.getInstance()
         val isSunday = calendar.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
@@ -68,7 +81,7 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
 
             // Воскресенье - пропускаем для РП/ПН
             if (!isPressedToday && !isSunday) {
-                messages.add("Растущий Поток - нажмите кнопку")
+                messages.add("РП - нажмите кнопку")
                 hasAnyAction = true
             }
         }
@@ -83,7 +96,7 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
 
             // Воскресенье - пропускаем для ПН
             if (!isPressedToday && !isSunday) {
-                messages.add("Поток Новичка - нажмите кнопку")
+                messages.add("ПН - нажмите кнопку")
                 hasAnyAction = true
             }
         }
