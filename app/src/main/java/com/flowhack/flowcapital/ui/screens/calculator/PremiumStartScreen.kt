@@ -937,14 +937,14 @@ fun CorrectionPSPDialog(
     }
 }
 
-/** Взнос номинала ПСП: toWalletAll или сумма в копилку */
+/** Взнос номинала ПСП: toWalletAll или сумма в кошелёк */
 @Composable
 fun ContributionDialog(
     /** Начисление за период */
     accrualForPeriod: Double,
     /** Закрыть без сохранения */
     onDismiss: () -> Unit,
-    /** Подтвердить взнос (сумма в копилку) */
+    /** Подтвердить взнос (сумма в кошелёк) */
     onConfirm: (Double) -> Unit
 ) {
     AppLogger.d(TAG_PSP_SCREEN, "Открыт диалог взноса: начисление=$accrualForPeriod")
@@ -988,7 +988,7 @@ fun ContributionDialog(
                     OutlinedTextField(
                         value = piggyBankText,
                         onValueChange = { piggyBankText = it },
-                        label = { Text("Сумма в копилку") },
+                        label = { Text("Сумма в кошелёк") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
@@ -1007,7 +1007,7 @@ fun ContributionDialog(
                 ) {
                     TextButton(onClick = onDismiss) { Text("Отмена") }
                     Spacer(modifier = Modifier.width(8.dp))
-                    val amountToPass = if (toWalletAll) 0.0 else piggyBankAmount
+                    val amountToPass = if (toWalletAll) accrualForPeriod else piggyBankAmount
                     Button(
                         onClick = { onConfirm(amountToPass) },
                         enabled = !isPiggyBankError
