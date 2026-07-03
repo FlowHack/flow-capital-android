@@ -512,8 +512,8 @@ fun PSPContributionHistory(history: List<PremiumStartPeriodEntity>) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
-                    .padding(8.dp),
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+                    .padding(6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text("Пер.", modifier = Modifier.weight(0.5f), fontSize = 10.sp, textAlign = TextAlign.Center)
