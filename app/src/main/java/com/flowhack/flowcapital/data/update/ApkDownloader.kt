@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.flowhack.flowcapital.data.logging.AppLogger
@@ -421,23 +420,15 @@ private fun findMatchingBracket(json: String, start: Int): Int {
      * Проверка возможности установки из неизвестных источников.
      */
     fun canInstallUnknownApps(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.packageManager.canRequestPackageInstalls()
-        } else {
-            true
-        }
+        return context.packageManager.canRequestPackageInstalls()
     }
 
     /**
      * Получение Intent для запроса разрешения на установку.
      */
-    fun getInstallPermissionIntent(): Intent? {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                data = Uri.parse("package:${context.packageName}")
-            }
-        } else {
-            null
+    fun getInstallPermissionIntent(): Intent {
+        return Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+            data = Uri.parse("package:${context.packageName}")
         }
     }
 
@@ -474,7 +465,7 @@ private fun findMatchingBracket(json: String, start: Int): Int {
         if (!canInstallUnknownApps()) {
             Timber.tag(TAG).w("Нет разрешения на установку из неизвестных источников")
             return InstallResult.PermissionRequired(
-                getInstallPermissionIntent() ?: Intent(Intent.ACTION_VIEW, Uri.parse(releaseUrl))
+                getInstallPermissionIntent()
             )
         }
 

@@ -853,7 +853,7 @@ fun CorrectionPSPDialog(
     var totalAccruedText by remember { mutableStateOf(currentTotalAccrued.toString()) }
     var showDatePicker by remember { mutableStateOf(false) }
     val initialEndDate: Long = currentPeriod?.endDate ?: 0L
-    var newEndDate by remember { mutableStateOf(initialEndDate) }
+    var newEndDate by remember { mutableLongStateOf(initialEndDate) }
 
     val dateFormat = SimpleDateFormat("dd.MM.yy", Locale.getDefault())
     val hasEndDate = initialEndDate > 0

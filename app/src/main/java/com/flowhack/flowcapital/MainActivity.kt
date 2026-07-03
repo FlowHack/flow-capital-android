@@ -49,6 +49,7 @@ import androidx.navigation.compose.rememberNavController
 import com.flowhack.flowcapital.data.logging.AppLogger
 import com.flowhack.flowcapital.data.settings.SettingsManager
 import com.flowhack.flowcapital.data.update.UpdateChecker
+import com.flowhack.flowcapital.notifications.rescheduleSavedReminders
 import com.flowhack.flowcapital.ui.screens.browser.BrowserScreen
 import com.flowhack.flowcapital.ui.screens.calculator.CalculatorScreen
 import com.flowhack.flowcapital.ui.screens.settings.SettingsScreen
@@ -79,6 +80,7 @@ class MainActivity : ComponentActivity() {
         scope.launch {
             settingsManager.initializeDefaults()
             settingsManager.setSkippedVersion(null)
+            rescheduleSavedReminders(this@MainActivity, settingsManager)
         }
 
         setContent {

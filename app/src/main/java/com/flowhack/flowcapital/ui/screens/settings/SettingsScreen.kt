@@ -66,6 +66,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -84,9 +85,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.work.BackoffPolicy
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.flowhack.flowcapital.BuildConfig
 import com.flowhack.flowcapital.data.db.AppDatabase
@@ -109,6 +107,8 @@ import com.flowhack.flowcapital.data.proxy.ProxyType
 import com.flowhack.flowcapital.data.proxy.ProxyValidator
 import com.flowhack.flowcapital.data.settings.SettingsManager
 import com.flowhack.flowcapital.notifications.ReminderWorker
+import com.flowhack.flowcapital.notifications.scheduleDailyReminder
+import com.flowhack.flowcapital.notifications.scheduleFinalReminder
 import com.flowhack.flowcapital.ui.screens.calculator.GrowingForecastResultsDialog
 import com.flowhack.flowcapital.ui.screens.calculator.NoviceForecastResultsDialog
 import com.flowhack.flowcapital.ui.theme.FlowColors
@@ -122,10 +122,8 @@ import kotlinx.serialization.json.Json
 import java.net.HttpURLConnection
 import java.net.URL
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import java.util.concurrent.TimeUnit
 
 /**
  * Главный экран настроек приложения.
@@ -1343,7 +1341,8 @@ fun NotificationsSettings(context: Context, settingsManager: SettingsManager, sc
         val timeString = String.format(java.util.Locale.US, "%02d:%02d", hour, min)
         scope.launch {
             settingsManager.addReminder(timeString)
-            scheduleNotification(context, hour, min, timeString)
+            scheduleDailyReminder(context, hour, min, timeString)
+            scheduleFinalReminder(context)
         }
     }, 10, 0, true)
 
@@ -2278,42 +2277,6 @@ fun UpdateCheckerCard() {
 }
 
 /**
- * Запланировать напоминание.
- *
- * @param context Контекст приложения
- * @param hour Час
- * @param min Минута
- * @param timeTag Уникальный идентификатор
- */
-fun scheduleNotification(context: Context, hour: Int, min: Int, timeTag: String) {
-    val now = Calendar.getInstance()
-    val target = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, hour); set(Calendar.MINUTE, min); set(Calendar.SECOND, 0) }
-    if (target.before(now)) target.add(Calendar.DAY_OF_YEAR, 1)
-    val delay = target.timeInMillis - now.timeInMillis
-
-    val request = PeriodicWorkRequestBuilder<ReminderWorker>(24, TimeUnit.HOURS)
-        .setInitialDelay(delay, TimeUnit.MILLISECONDS)
-        .setBackoffCriteria(BackoffPolicy.LINEAR, 10, TimeUnit.MINUTES)
-        .build()
-
-    WorkManager.getInstance(context).enqueueUniquePeriodicWork("potok_rem_$timeTag", ExistingPeriodicWorkPolicy.REPLACE, request)
-    scheduleFinalReminder(context)
-}
-
-/**
- * Финальное напоминание в 23:00.
- *
- * @param context Контекст приложения
- */
-fun scheduleFinalReminder(context: Context) {
-    val now = Calendar.getInstance()
-    val target23 = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }
-    if (target23.before(now)) target23.add(Calendar.DAY_OF_YEAR, 1)
-    val request23 = PeriodicWorkRequestBuilder<ReminderWorker>(24, TimeUnit.HOURS).setInitialDelay(target23.timeInMillis - now.timeInMillis, TimeUnit.MILLISECONDS).build()
-    WorkManager.getInstance(context).enqueueUniquePeriodicWork("potok_final", ExistingPeriodicWorkPolicy.KEEP, request23)
-}
-
-/**
  * Открыть настройки батареи.
  * Маршрут зависит от производителя устройства.
  *
@@ -2710,8 +2673,8 @@ private fun CalculateGrowingFlowDialog(
     var contributionText by remember { mutableStateOf("") }
     var percentText by remember { mutableStateOf(savedStartPercent.toString()) }
     var walletText by remember { mutableStateOf("") }
-    var startDateMillis by remember { mutableStateOf(System.currentTimeMillis()) }
-    var targetDateMillis by remember { mutableStateOf(System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000) }
+    var startDateMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var targetDateMillis by remember { mutableLongStateOf(System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000) }
     var showStartDatePicker by remember { mutableStateOf(false) }
     var showTargetDatePicker by remember { mutableStateOf(false) }
 
@@ -2895,7 +2858,7 @@ private fun CalculateExistingGrowingFlowDialog(
     var inFlowText by remember { mutableStateOf("") }
     var accrualText by remember { mutableStateOf("") }
     var walletText by remember { mutableStateOf("") }
-    var targetDateMillis by remember { mutableStateOf(System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000) }
+    var targetDateMillis by remember { mutableLongStateOf(System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000) }
     var showTargetDatePicker by remember { mutableStateOf(false) }
 
     var forecastResults by remember { mutableStateOf<List<GrowingFlowEntity>>(emptyList()) }
@@ -3147,8 +3110,8 @@ private fun CalculateNoviceFlowDialog(
 
     var contributionText by remember { mutableStateOf("") }
     var walletText by remember { mutableStateOf("") }
-    var startDateMillis by remember { mutableStateOf(System.currentTimeMillis()) }
-    var targetDateMillis by remember { mutableStateOf(System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000) }
+    var startDateMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var targetDateMillis by remember { mutableLongStateOf(System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000) }
     var showStartDatePicker by remember { mutableStateOf(false) }
     var showTargetDatePicker by remember { mutableStateOf(false) }
 
@@ -3338,7 +3301,7 @@ private fun CalculateExistingNoviceFlowDialog(
 
     var inFlowText by remember { mutableStateOf("") }
     var walletText by remember { mutableStateOf("") }
-    var targetDateMillis by remember { mutableStateOf(System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000) }
+    var targetDateMillis by remember { mutableLongStateOf(System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000) }
     var showTargetDatePicker by remember { mutableStateOf(false) }
 
     var forecastResults by remember { mutableStateOf<List<NoviceFlowEntity>>(emptyList()) }
@@ -3605,7 +3568,7 @@ private fun CalculatePspDialog(
     val savedPspCoeffs by settingsManager.pspCoefficientsFlow.collectAsState(initial = null)
 
     var nominalText by remember { mutableStateOf("") }
-    var startDateMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+    var startDateMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var showDatePicker by remember { mutableStateOf(false) }
 
     var forecastResults by remember { mutableStateOf<List<PspForecastResult>>(emptyList()) }
