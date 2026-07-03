@@ -1364,7 +1364,7 @@ fun NotificationsSettings(context: Context, settingsManager: SettingsManager, sc
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Напоминания", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Spacer(modifier = Modifier.height(8.dp))
-            Text("Чтобы напоминания приходили вовремя при закрытом приложении, необходимо отключить оптимизацию батареи.", fontSize = 12.sp, lineHeight = 16.sp)
+            Text("Для своевременной доставки напоминаний и будильников отключите оптимизацию батареи. Для точного срабатывания будильников и показа экрана на заблокированном устройстве необходимы дополнительные разрешения.", fontSize = 12.sp, lineHeight = 16.sp)
             Spacer(modifier = Modifier.height(12.dp))
             Button(
                 onClick = { openBatterySettings(context) },
@@ -1462,7 +1462,7 @@ fun NotificationsSettings(context: Context, settingsManager: SettingsManager, sc
             Spacer(modifier = Modifier.height(16.dp))
             HorizontalDivider()
             Spacer(modifier = Modifier.height(12.dp))
-            Text("В 23:00 будет напоминание, если по одному из потоков требуется действие (ПН-СБ/ВС), независимо от установленных напоминаний", fontSize = 12.sp, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Medium)
+            Text("В 23:00 сработает будильник, если по одному из потоков требуется действие, независимо от установленных напоминаний или будильников", fontSize = 12.sp, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Medium)
         }
     }
 }
