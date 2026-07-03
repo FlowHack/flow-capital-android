@@ -1,0 +1,166 @@
+package com.flowhack.flowcapital.notifications
+
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.os.Build
+import androidx.work.BackoffPolicy
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.workDataOf
+import com.flowhack.flowcapital.data.logging.AppLogger
+import com.flowhack.flowcapital.data.settings.SettingsManager
+import kotlinx.coroutines.flow.first
+import java.util.Calendar
+import java.util.concurrent.TimeUnit
+
+
+/**
+ * Перепланировать все сохранённые напоминания при старте приложения.
+ * Читает список напоминаний из DataStore и создаёт задачи WorkManager или AlarmManager.
+ * Всегда планирует финальное напоминание в 23:00.
+ */
+suspend fun rescheduleSavedReminders(context: Context, settingsManager: SettingsManager) {
+    AppLogger.d("ReminderScheduler", "Перепланирование всех напоминаний")
+    val reminders = settingsManager.remindersFlow.first()
+    val alarmSet = settingsManager.alarmRemindersFlow.first()
+    AppLogger.d("ReminderScheduler", "Напоминаний: ${reminders.size}, будильников: ${alarmSet.size}")
+    for (time in reminders) {
+        val parts = time.split(":")
+        if (parts.size == 2) {
+            val hour = parts[0].toIntOrNull() ?: continue
+            val min = parts[1].toIntOrNull() ?: continue
+            if (time in alarmSet) {
+                scheduleAlarmReminder(context, hour, min, time)
+            } else {
+                scheduleDailyReminder(context, hour, min, time)
+            }
+        }
+    }
+    scheduleFinalReminder(context)
+}
+
+/**
+ * Запланировать ежедневное напоминание через WorkManager.
+ */
+fun scheduleDailyReminder(context: Context, hour: Int, min: Int, timeTag: String) {
+    AppLogger.d("ReminderScheduler", "Планирование WorkManager напоминания: $timeTag ($hour:$min)")
+    val now = Calendar.getInstance()
+    val target = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, hour)
+        set(Calendar.MINUTE, min)
+        set(Calendar.SECOND, 0)
+    }
+    if (target.before(now)) target.add(Calendar.DAY_OF_YEAR, 1)
+    val delay = target.timeInMillis - now.timeInMillis
+
+    val request = PeriodicWorkRequestBuilder<ReminderWorker>(24, TimeUnit.HOURS)
+        .setInitialDelay(delay, TimeUnit.MILLISECONDS)
+        .setBackoffCriteria(BackoffPolicy.LINEAR, 10, TimeUnit.MINUTES)
+        .setInputData(workDataOf("timeTag" to timeTag))
+        .build()
+
+    WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+        "potok_rem_$timeTag",
+        ExistingPeriodicWorkPolicy.REPLACE,
+        request
+    )
+}
+
+/**
+ * Запланировать точное срабатывание будильника через AlarmManager.
+ * Использует setExactAndAllowWhileIdle() для пробуждения устройства.
+ * На Android 12+ проверяет canScheduleExactAlarms(), при отказе — inexact fallback.
+ */
+fun scheduleAlarmReminder(context: Context, hour: Int, min: Int, timeTag: String) {
+    AppLogger.d("ReminderScheduler", "Планирование будильника: $timeTag ($hour:$min)")
+    val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+    val intent = Intent(context, AlarmReceiver::class.java).apply {
+        putExtra(AlarmReceiver.EXTRA_TIME_TAG, timeTag)
+    }
+    val pendingIntent = PendingIntent.getBroadcast(
+        context,
+        timeTag.hashCode(),
+        intent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    val now = Calendar.getInstance()
+    val target = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, hour)
+        set(Calendar.MINUTE, min)
+        set(Calendar.SECOND, 0)
+    }
+    if (target.before(now)) target.add(Calendar.DAY_OF_YEAR, 1)
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        if (alarmManager.canScheduleExactAlarms()) {
+            AppLogger.d("ReminderScheduler", "Точное срабатывание разрешено")
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, pendingIntent)
+        } else {
+            AppLogger.d("ReminderScheduler", "Точное срабатывание не разрешено — inexact fallback")
+            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, pendingIntent)
+        }
+    } else {
+        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, pendingIntent)
+    }
+}
+
+/**
+ * Отменить будильник для указанного тайм-тега.
+ */
+fun cancelAlarmReminder(context: Context, timeTag: String) {
+    AppLogger.d("ReminderScheduler", "Отмена будильника: $timeTag")
+    val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+    val intent = Intent(context, AlarmReceiver::class.java).apply {
+        putExtra(AlarmReceiver.EXTRA_TIME_TAG, timeTag)
+    }
+    val pendingIntent = PendingIntent.getBroadcast(
+        context,
+        timeTag.hashCode(),
+        intent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+    alarmManager.cancel(pendingIntent)
+}
+
+/**
+ * Финальное напоминание в 23:00 через AlarmManager.
+ * При срабатывании показывает AlarmActivity с текстом "Есть потоки требующие внимания: …",
+ * если хотя бы один поток требует действия.
+ * Перепланируется на следующий день после срабатывания.
+ */
+fun scheduleFinalReminder(context: Context) {
+    AppLogger.d("ReminderScheduler", "Планирование финального будильника 23:00")
+    val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+    val intent = Intent(context, AlarmReceiver::class.java).apply {
+        putExtra(AlarmReceiver.EXTRA_TIME_TAG, AlarmReceiver.FINAL_2300_TAG)
+    }
+    val pendingIntent = PendingIntent.getBroadcast(
+        context,
+        AlarmReceiver.FINAL_2300_TAG.hashCode(),
+        intent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+    val now = Calendar.getInstance()
+    val target = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, 23)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+    }
+    if (target.before(now)) target.add(Calendar.DAY_OF_YEAR, 1)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        if (alarmManager.canScheduleExactAlarms()) {
+            AppLogger.d("ReminderScheduler", "Финальный будильник — точное срабатывание")
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, pendingIntent)
+        } else {
+            AppLogger.d("ReminderScheduler", "Финальный будильник — inexact fallback (нет SCHEDULE_EXACT_ALARM)")
+            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, pendingIntent)
+        }
+    } else {
+        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, pendingIntent)
+    }
+}

@@ -1,18 +1,12 @@
 package com.flowhack.flowcapital.integration
 
-import androidx.room.Room
-import androidx.test.core.app.ApplicationProvider
-import com.flowhack.flowcapital.data.db.AppDatabase
 import com.flowhack.flowcapital.data.db.PremiumStartFlowEntity
 import com.flowhack.flowcapital.data.db.PremiumStartPeriodEntity
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Test
 import java.util.Calendar
 

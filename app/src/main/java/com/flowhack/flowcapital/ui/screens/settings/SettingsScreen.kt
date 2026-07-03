@@ -35,7 +35,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
@@ -66,6 +68,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -84,9 +87,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.work.BackoffPolicy
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.PeriodicWorkRequestBuilder
+import androidx.room.withTransaction
 import androidx.work.WorkManager
 import com.flowhack.flowcapital.BuildConfig
 import com.flowhack.flowcapital.data.db.AppDatabase
@@ -109,6 +110,11 @@ import com.flowhack.flowcapital.data.proxy.ProxyType
 import com.flowhack.flowcapital.data.proxy.ProxyValidator
 import com.flowhack.flowcapital.data.settings.SettingsManager
 import com.flowhack.flowcapital.notifications.ReminderWorker
+import com.flowhack.flowcapital.notifications.cancelAlarmReminder
+import com.flowhack.flowcapital.notifications.rescheduleSavedReminders
+import com.flowhack.flowcapital.notifications.scheduleAlarmReminder
+import com.flowhack.flowcapital.notifications.scheduleDailyReminder
+import com.flowhack.flowcapital.notifications.scheduleFinalReminder
 import com.flowhack.flowcapital.ui.screens.calculator.GrowingForecastResultsDialog
 import com.flowhack.flowcapital.ui.screens.calculator.NoviceForecastResultsDialog
 import com.flowhack.flowcapital.ui.theme.FlowColors
@@ -122,10 +128,8 @@ import kotlinx.serialization.json.Json
 import java.net.HttpURLConnection
 import java.net.URL
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import java.util.concurrent.TimeUnit
 
 /**
  * Главный экран настроек приложения.
@@ -219,7 +223,7 @@ fun SettingsScreen(onOpenBrowserUrl: (String) -> Unit = {}) {
         ProxySettingsCard(scope = scope)
 
         Spacer(modifier = Modifier.height(20.dp))
-        ImportExportSettingsCard(scope = scope)
+        ImportExportSettingsCard(scope = scope, settingsManager = settingsManager)
 
         Spacer(modifier = Modifier.height(32.dp))
         UpdateCheckerCard()
@@ -1337,15 +1341,24 @@ fun DefaultEntryTabSettings(settingsManager: SettingsManager, scope: kotlinx.cor
 @Composable
 fun NotificationsSettings(context: Context, settingsManager: SettingsManager, scope: kotlinx.coroutines.CoroutineScope) {
     val savedReminders by settingsManager.remindersFlow.collectAsState(initial = emptySet())
+    val alarmSet by settingsManager.alarmRemindersFlow.collectAsState(initial = emptySet())
     val sortedReminders = savedReminders.toList().sorted()
 
     val timePickerDialog = TimePickerDialog(context, { _, hour, min ->
         val timeString = String.format(java.util.Locale.US, "%02d:%02d", hour, min)
         scope.launch {
             settingsManager.addReminder(timeString)
-            scheduleNotification(context, hour, min, timeString)
+            scheduleDailyReminder(context, hour, min, timeString)
+            scheduleFinalReminder(context)
         }
     }, 10, 0, true)
+
+    // Проверка разрешений
+    val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+    val canScheduleExact = android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+
+    val powerManager = context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+    val isIgnoringBattery = powerManager.isIgnoringBatteryOptimizations(context.packageName)
 
     Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -1359,6 +1372,37 @@ fun NotificationsSettings(context: Context, settingsManager: SettingsManager, sc
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp)
             ) { Text("Настроить работу в фоне", fontSize = 12.sp) }
+
+            // Блок разрешения точных будильников
+            if (!canScheduleExact) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                            data = Uri.parse("package:${context.packageName}")
+                        }
+                        try { context.startActivity(intent) } catch (_: Exception) {}
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
+                ) { Text("Разрешить точные будильники", fontSize = 12.sp) }
+            }
+
+            if (!isIgnoringBattery) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                            data = Uri.parse("package:${context.packageName}")
+                        }
+                        try { context.startActivity(intent) } catch (_: Exception) {}
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
+                ) { Text("Отключить оптимизацию батареи", fontSize = 12.sp) }
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -1378,12 +1422,40 @@ fun NotificationsSettings(context: Context, settingsManager: SettingsManager, sc
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(time, fontWeight = FontWeight.Medium, fontSize = 16.sp)
-                    IconButton(onClick = {
-                        scope.launch {
-                            settingsManager.removeReminder(time)
-                            WorkManager.getInstance(context).cancelUniqueWork("potok_rem_$time")
-                        }
-                    }) { Icon(Icons.Default.Delete, "Удалить", tint = MaterialTheme.colorScheme.error) }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Notifications, contentDescription = "Напоминание", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Switch(
+                            checked = time in alarmSet,
+                            onCheckedChange = { checked ->
+                                scope.launch {
+                                    settingsManager.updateAlarmModeForReminder(time, checked)
+                                    val parts = time.split(":")
+                                    val hour = parts[0].toIntOrNull() ?: return@launch
+                                    val min = parts[1].toIntOrNull() ?: return@launch
+                                    if (checked) {
+                                        WorkManager.getInstance(context).cancelUniqueWork("potok_rem_$time")
+                                        scheduleAlarmReminder(context, hour, min, time)
+                                    } else {
+                                        cancelAlarmReminder(context, time)
+                                        scheduleDailyReminder(context, hour, min, time)
+                                    }
+                                    scheduleFinalReminder(context)
+                                }
+                            }
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(Icons.Default.Alarm, contentDescription = "Будильник", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        IconButton(onClick = {
+                            scope.launch {
+                                settingsManager.removeReminder(time)
+                                WorkManager.getInstance(context).cancelUniqueWork("potok_rem_$time")
+                                cancelAlarmReminder(context, time)
+                                scheduleFinalReminder(context)
+                            }
+                        }) { Icon(Icons.Default.Delete, "Удалить", tint = MaterialTheme.colorScheme.error) }
+                    }
                 }
             }
 
@@ -2104,7 +2176,7 @@ fun SupportSection() {
  * Карточка импорта/экспорта настроек.
  */
 @Composable
-fun ImportExportSettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
+fun ImportExportSettingsCard(scope: CoroutineScope = rememberCoroutineScope(), settingsManager: SettingsManager) {
     val context = LocalContext.current
 
     val exportLauncher = rememberLauncherForActivityResult(
@@ -2113,7 +2185,7 @@ fun ImportExportSettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
         if (uri != null) {
             scope.launch {
                 try {
-                    exportSettingsToJson(context, uri)
+                    exportSettingsToJson(context, uri, settingsManager)
                     Toast.makeText(context, "Данные успешно экспортированы", Toast.LENGTH_SHORT).show()
                 } catch (e: Exception) {
                     AppLogger.e("SettingsScreen", "Ошибка экспорта настроек", e)
@@ -2129,7 +2201,7 @@ fun ImportExportSettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
         if (uri != null) {
             scope.launch {
                 try {
-                    importSettingsFromJson(context, uri)
+                    importSettingsFromJson(context, uri, settingsManager)
                     Toast.makeText(context, "Данные успешно восстановлены", Toast.LENGTH_SHORT).show()
                 } catch (e: Exception) {
                     AppLogger.e("SettingsScreen", "Ошибка импорта настроек", e)
@@ -2275,42 +2347,6 @@ fun UpdateCheckerCard() {
             )
         }
     }
-}
-
-/**
- * Запланировать напоминание.
- *
- * @param context Контекст приложения
- * @param hour Час
- * @param min Минута
- * @param timeTag Уникальный идентификатор
- */
-fun scheduleNotification(context: Context, hour: Int, min: Int, timeTag: String) {
-    val now = Calendar.getInstance()
-    val target = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, hour); set(Calendar.MINUTE, min); set(Calendar.SECOND, 0) }
-    if (target.before(now)) target.add(Calendar.DAY_OF_YEAR, 1)
-    val delay = target.timeInMillis - now.timeInMillis
-
-    val request = PeriodicWorkRequestBuilder<ReminderWorker>(24, TimeUnit.HOURS)
-        .setInitialDelay(delay, TimeUnit.MILLISECONDS)
-        .setBackoffCriteria(BackoffPolicy.LINEAR, 10, TimeUnit.MINUTES)
-        .build()
-
-    WorkManager.getInstance(context).enqueueUniquePeriodicWork("potok_rem_$timeTag", ExistingPeriodicWorkPolicy.REPLACE, request)
-    scheduleFinalReminder(context)
-}
-
-/**
- * Финальное напоминание в 23:00.
- *
- * @param context Контекст приложения
- */
-fun scheduleFinalReminder(context: Context) {
-    val now = Calendar.getInstance()
-    val target23 = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0) }
-    if (target23.before(now)) target23.add(Calendar.DAY_OF_YEAR, 1)
-    val request23 = PeriodicWorkRequestBuilder<ReminderWorker>(24, TimeUnit.HOURS).setInitialDelay(target23.timeInMillis - now.timeInMillis, TimeUnit.MILLISECONDS).build()
-    WorkManager.getInstance(context).enqueueUniquePeriodicWork("potok_final", ExistingPeriodicWorkPolicy.KEEP, request23)
 }
 
 /**
@@ -2469,16 +2505,27 @@ fun openBatterySettings(context: Context) {
     }
 }
 
-/** Экспорт настроек в JSON файл */
-private suspend fun exportSettingsToJson(context: Context, uri: Uri) {
+/**
+ * Экспортировать все настройки и историю потоков в JSON-файл.
+ *
+ * Читает:
+ * - Все настройки из DataStore (SettingsManager + ProxyStorage)
+ * - Историю РП, ПН, ПСП из Room (включая периоды)
+ *
+ * @param context Контекст приложения
+ * @param uri URI файла, выбранного через SAF
+ * @param settingsManager Экземпляр SettingsManager (должен быть тот же, что наблюдает UI для реактивности)
+ */
+private suspend fun exportSettingsToJson(context: Context, uri: Uri, settingsManager: SettingsManager) {
     withContext(Dispatchers.IO) {
-        val settingsManager = SettingsManager(context)
+        AppLogger.d("SettingsScreen", "Начат экспорт настроек")
         val database = AppDatabase.getDatabase(context)
 
         // Сбор данных из БД
         val growingHistory = database.growingFlowDao().getAllHistory().first()
         val noviceHistory = database.noviceFlowDao().getAllHistory().first()
         val pspFlows = database.premiumStartFlowDao().getAllFlows().first()
+        AppLogger.d("SettingsScreen", "Собрано: РП=${growingHistory.size}, ПН=${noviceHistory.size}, ПСП=${pspFlows.size} потоков")
 
         // Сбор периодов для всех ПСП
         val allPeriods = mutableListOf<PremiumStartPeriodBackup>()
@@ -2495,11 +2542,13 @@ private suspend fun exportSettingsToJson(context: Context, uri: Uri) {
                         endDate = period.endDate,
                         accrualAmount = period.accrualAmount,
                         isContributionMade = period.isContributionMade,
-                        isCompleted = period.isCompleted
+                        isCompleted = period.isCompleted,
+                        contributionDate = period.contributionDate
                     )
                 )
             }
         }
+        AppLogger.d("SettingsScreen", "Собрано периодов ПСП: ${allPeriods.size}")
 
         val exportData = FullBackupData(
             appMarker = "FlowCapital_Backup",
@@ -2511,41 +2560,158 @@ private suspend fun exportSettingsToJson(context: Context, uri: Uri) {
             eCurrencyCoefficients = settingsManager.eCurrencyCoefficientsFlow.first(),
             pspCoefficients = settingsManager.pspCoefficientsFlow.first(),
             growingFlowHistory = growingHistory.map {
-                GrowingFlowEntityBackup(it.id, it.date, it.percent, it.inFlowAmount, it.dailyAccrual, it.walletAmount, it.isButtonPressed, it.actionType)
+                GrowingFlowEntityBackup(it.id, it.date, it.percent, it.inFlowAmount, it.dailyAccrual, it.walletAmount, it.isButtonPressed, it.actionType, step = it.step)
             },
             noviceFlowHistory = noviceHistory.map {
-                NoviceFlowEntityBackup(it.id, it.date, it.percent, it.inFlowAmount, it.dailyAccrual, it.walletAmount, it.isButtonPressed, it.actionType)
+                NoviceFlowEntityBackup(it.id, it.date, it.percent, it.inFlowAmount, it.dailyAccrual, it.walletAmount, it.isButtonPressed, it.actionType, step = it.step)
             },
             pspFlows = pspFlows.map {
                 PremiumStartFlowBackup(it.id, it.nominalAmount, it.startDate, it.totalAccrued, it.isActive, it.currentPeriod)
             },
-            pspPeriods = allPeriods
+            pspPeriods = allPeriods,
+            isRpVip = settingsManager.isRpVipFlow.first(),
+            checkUpdateOnStart = settingsManager.checkUpdateOnStartFlow.first(),
+            darkTheme = settingsManager.darkThemeFlow.first(),
+            reminders = settingsManager.remindersFlow.first(),
+            alarmReminders = settingsManager.alarmRemindersFlow.first(),
+            pspReminders = settingsManager.pspRemindersFlow.first(),
+            defaultEntryTab = settingsManager.defaultEntryTabFlow.first(),
+            defaultCalcTab = settingsManager.defaultCalcTabFlow.first(),
+            browserFabOffsetX = settingsManager.browserFabOffsetXFlow.first(),
+            browserFabOffsetY = settingsManager.browserFabOffsetYFlow.first(),
+            skipAutoUpdate = settingsManager.skipAutoUpdateFlow.first(),
+            skippedVersion = settingsManager.skippedVersionFlow.first(),
+            proxiesJson = ProxyStorage(context).getProxiesJson()
         )
 
         val json = Json.encodeToString(FullBackupData.serializer(), exportData)
-        context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-            outputStream.write(json.toByteArray(Charsets.UTF_8))
+        val outputStream = context.contentResolver.openOutputStream(uri)
+            ?: throw Exception("Не удалось открыть файл для записи")
+        outputStream.use { stream ->
+            stream.write(json.toByteArray(Charsets.UTF_8))
         }
+        AppLogger.d("SettingsScreen", "Экспорт завершён (${json.length} байт)")
     }
 }
 
-/** Импорт настроек из JSON файла */
-private suspend fun importSettingsFromJson(context: Context, uri: Uri) {
+/**
+ * Импортировать настройки и историю потоков из JSON-файла.
+ *
+ * Порядок (критически важен для консистентности):
+ * 1. Валидация файла (appMarker, структура JSON)
+ * 2. Заливка истории в Room в единой транзакции (атомарно)
+ * 3. Заливка настроек в DataStore
+ *
+ * Если Room-транзакция падает — все изменения БД откатываются, DataStore не тронут.
+ * Если DataStore падает — Room уже записан консистентно, можно переимпортировать.
+ *
+ * @param context Контекст приложения
+ * @param uri URI файла, выбранного через SAF
+ * @param settingsManager Экземпляр SettingsManager (должен быть тот же, что наблюдает UI для реактивности кеша коэффициентов)
+ * @throws Exception при ошибке чтения, неверном формате или повреждённом файле
+ */
+private suspend fun importSettingsFromJson(context: Context, uri: Uri, settingsManager: SettingsManager) {
     withContext(Dispatchers.IO) {
+        AppLogger.d("SettingsScreen", "Начат импорт настроек")
+
+        // 1. Чтение и парсинг файла
         val json = context.contentResolver.openInputStream(uri)?.use { inputStream ->
             inputStream.bufferedReader().readText()
         } ?: throw Exception("Не удалось прочитать файл")
+        AppLogger.d("SettingsScreen", "Файл прочитан (${json.length} байт)")
 
-        val importData = Json.decodeFromString(FullBackupData.serializer(), json)
+        val importData: FullBackupData
+        try {
+            importData = Json.decodeFromString(FullBackupData.serializer(), json)
+        } catch (e: Exception) {
+            AppLogger.e("SettingsScreen", "Ошибка парсинга JSON", e)
+            throw Exception("Файл поврежден или имеет неверный формат")
+        }
 
         if (importData.appMarker != "FlowCapital_Backup") {
+            AppLogger.e("SettingsScreen", "Неверный appMarker: ${importData.appMarker}")
             throw Exception("Неверный формат файла")
         }
 
-        val settingsManager = SettingsManager(context)
         val database = AppDatabase.getDatabase(context)
 
-        // Импорт настроек
+        // 2. Импорт истории в Room (атомарно — единая транзакция)
+        database.withTransaction {
+            AppLogger.d("SettingsScreen", "Начата транзакция Room")
+
+            database.growingFlowDao().clearAll()
+            importData.growingFlowHistory.forEach { backup ->
+                database.growingFlowDao().insert(
+                    GrowingFlowEntity(
+                        id = backup.id,
+                        date = backup.date,
+                        percent = backup.percent,
+                        inFlowAmount = backup.inFlowAmount,
+                        dailyAccrual = backup.dailyAccrual,
+                        walletAmount = backup.walletAmount,
+                        isButtonPressed = backup.isButtonPressed,
+                        actionType = backup.actionType,
+                        step = backup.step
+                    )
+                )
+            }
+            AppLogger.d("SettingsScreen", "Импортировано РП: ${importData.growingFlowHistory.size} записей")
+
+            database.noviceFlowDao().clearAll()
+            importData.noviceFlowHistory.forEach { backup ->
+                database.noviceFlowDao().insert(
+                    NoviceFlowEntity(
+                        id = backup.id,
+                        date = backup.date,
+                        percent = backup.percent,
+                        inFlowAmount = backup.inFlowAmount,
+                        dailyAccrual = backup.dailyAccrual,
+                        walletAmount = backup.walletAmount,
+                        isButtonPressed = backup.isButtonPressed,
+                        actionType = backup.actionType,
+                        step = backup.step
+                    )
+                )
+            }
+            AppLogger.d("SettingsScreen", "Импортировано ПН: ${importData.noviceFlowHistory.size} записей")
+
+            database.premiumStartPeriodDao().clearAll()
+            database.premiumStartFlowDao().clearAll()
+            importData.pspFlows.forEach { backup ->
+                database.premiumStartFlowDao().insert(
+                    PremiumStartFlowEntity(
+                        id = backup.id,
+                        nominalAmount = backup.nominalAmount,
+                        startDate = backup.startDate,
+                        totalAccrued = backup.totalAccrued,
+                        isActive = backup.isActive,
+                        currentPeriod = backup.currentPeriod
+                    )
+                )
+            }
+            AppLogger.d("SettingsScreen", "Импортировано ПСП потоков: ${importData.pspFlows.size}")
+
+            importData.pspPeriods.forEach { backup ->
+                database.premiumStartPeriodDao().insert(
+                    PremiumStartPeriodEntity(
+                        id = backup.id,
+                        flowId = backup.flowId,
+                        periodNumber = backup.periodNumber,
+                        percent = backup.percent,
+                        startDate = backup.startDate,
+                        endDate = backup.endDate,
+                        accrualAmount = backup.accrualAmount,
+                        isContributionMade = backup.isContributionMade,
+                        isCompleted = backup.isCompleted,
+                        contributionDate = backup.contributionDate
+                    )
+                )
+            }
+            AppLogger.d("SettingsScreen", "Импортировано периодов ПСП: ${importData.pspPeriods.size}")
+        }
+
+        // 3. Импорт настроек в DataStore — только после успешной Room-транзакции
+        importData.isRpVip?.let { settingsManager.setRpVip(it) }
         importData.startPercent?.let {
             settingsManager.savePercentages(it, importData.dailyAddition ?: 0.003)
         }
@@ -2558,71 +2724,24 @@ private suspend fun importSettingsFromJson(context: Context, uri: Uri) {
         importData.pspCoefficients.let {
             settingsManager.savePspCoefficients(it)
         }
-
-        // Импорт истории РП
-        database.growingFlowDao().clearAll()
-        importData.growingFlowHistory.forEach { backup ->
-            database.growingFlowDao().insert(
-                GrowingFlowEntity(
-                    id = backup.id,
-                    date = backup.date,
-                    percent = backup.percent,
-                    inFlowAmount = backup.inFlowAmount,
-                    dailyAccrual = backup.dailyAccrual,
-                    walletAmount = backup.walletAmount,
-                    isButtonPressed = backup.isButtonPressed,
-                    actionType = backup.actionType
-                )
-            )
+        importData.reminders?.let { settingsManager.saveReminders(it) }
+        importData.alarmReminders?.let { settingsManager.saveAlarmReminders(it) }
+        importData.pspReminders?.let { settingsManager.savePspReminders(it) }
+        importData.defaultEntryTab?.let { settingsManager.setDefaultEntryTab(it) }
+        importData.defaultCalcTab?.let { settingsManager.setDefaultCalcTab(it) }
+        importData.checkUpdateOnStart?.let { settingsManager.setCheckUpdateOnStart(it) }
+        importData.darkTheme?.let { settingsManager.setDarkTheme(it) }
+        importData.browserFabOffsetX?.let { x ->
+            importData.browserFabOffsetY?.let { y ->
+                settingsManager.saveBrowserFabOffset(x, y)
+            }
         }
+        importData.skipAutoUpdate?.let { settingsManager.setSkipAutoUpdate(it) }
+        importData.skippedVersion?.let { settingsManager.setSkippedVersion(it) }
+        importData.proxiesJson?.let { ProxyStorage(context).saveProxiesJson(it) }
 
-        // Импорт истории ПН
-        importData.noviceFlowHistory.forEach { backup ->
-            database.noviceFlowDao().insert(
-                NoviceFlowEntity(
-                    id = backup.id,
-                    date = backup.date,
-                    percent = backup.percent,
-                    inFlowAmount = backup.inFlowAmount,
-                    dailyAccrual = backup.dailyAccrual,
-                    walletAmount = backup.walletAmount,
-                    isButtonPressed = backup.isButtonPressed,
-                    actionType = backup.actionType
-                )
-            )
-        }
-
-        // Импорт ПСП - сначала удаляем старые
-        database.premiumStartFlowDao().clearAll()
-        importData.pspFlows.forEach { backup ->
-            database.premiumStartFlowDao().insert(
-                PremiumStartFlowEntity(
-                    id = backup.id,
-                    nominalAmount = backup.nominalAmount,
-                    startDate = backup.startDate,
-                    totalAccrued = backup.totalAccrued,
-                    isActive = backup.isActive,
-                    currentPeriod = backup.currentPeriod
-                )
-            )
-        }
-
-        // Импорт периодов ПСП
-        importData.pspPeriods.forEach { backup ->
-            database.premiumStartPeriodDao().insert(
-                PremiumStartPeriodEntity(
-                    id = backup.id,
-                    flowId = backup.flowId,
-                    periodNumber = backup.periodNumber,
-                    percent = backup.percent,
-                    startDate = backup.startDate,
-                    endDate = backup.endDate,
-                    accrualAmount = backup.accrualAmount,
-                    isContributionMade = backup.isContributionMade,
-                    isCompleted = backup.isCompleted
-                )
-            )
-        }
+        rescheduleSavedReminders(context, settingsManager)
+        AppLogger.d("SettingsScreen", "Импорт завершён успешно")
     }
 }
 
@@ -2636,7 +2755,8 @@ data class GrowingFlowEntityBackup(
     val dailyAccrual: Double,
     val walletAmount: Double,
     val isButtonPressed: Boolean,
-    val actionType: String
+    val actionType: String,
+    val step: Int = 1
 )
 
 @Serializable
@@ -2648,7 +2768,8 @@ data class NoviceFlowEntityBackup(
     val dailyAccrual: Double,
     val walletAmount: Double,
     val isButtonPressed: Boolean,
-    val actionType: String
+    val actionType: String,
+    val step: Int = 1
 )
 
 @Serializable
@@ -2671,7 +2792,8 @@ data class PremiumStartPeriodBackup(
     val endDate: Long,
     val accrualAmount: Double,
     val isContributionMade: Boolean,
-    val isCompleted: Boolean
+    val isCompleted: Boolean,
+    val contributionDate: Long? = null
 )
 
 @Serializable
@@ -2687,7 +2809,20 @@ data class FullBackupData(
     val growingFlowHistory: List<GrowingFlowEntityBackup>,
     val noviceFlowHistory: List<NoviceFlowEntityBackup>,
     val pspFlows: List<PremiumStartFlowBackup>,
-    val pspPeriods: List<PremiumStartPeriodBackup>
+    val pspPeriods: List<PremiumStartPeriodBackup>,
+    val reminders: Set<String>? = null,
+    val alarmReminders: Set<String>? = null,
+    val pspReminders: Set<String>? = null,
+    val defaultEntryTab: Int? = null,
+    val defaultCalcTab: Int? = null,
+    val isRpVip: Boolean? = null,
+    val checkUpdateOnStart: Boolean? = null,
+    val darkTheme: Boolean? = null,
+    val browserFabOffsetX: Int? = null,
+    val browserFabOffsetY: Int? = null,
+    val skipAutoUpdate: Boolean? = null,
+    val skippedVersion: String? = null,
+    val proxiesJson: String? = null
 )
 
 /**
@@ -2710,8 +2845,8 @@ private fun CalculateGrowingFlowDialog(
     var contributionText by remember { mutableStateOf("") }
     var percentText by remember { mutableStateOf(savedStartPercent.toString()) }
     var walletText by remember { mutableStateOf("") }
-    var startDateMillis by remember { mutableStateOf(System.currentTimeMillis()) }
-    var targetDateMillis by remember { mutableStateOf(System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000) }
+    var startDateMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var targetDateMillis by remember { mutableLongStateOf(System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000) }
     var showStartDatePicker by remember { mutableStateOf(false) }
     var showTargetDatePicker by remember { mutableStateOf(false) }
 
@@ -2895,7 +3030,7 @@ private fun CalculateExistingGrowingFlowDialog(
     var inFlowText by remember { mutableStateOf("") }
     var accrualText by remember { mutableStateOf("") }
     var walletText by remember { mutableStateOf("") }
-    var targetDateMillis by remember { mutableStateOf(System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000) }
+    var targetDateMillis by remember { mutableLongStateOf(System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000) }
     var showTargetDatePicker by remember { mutableStateOf(false) }
 
     var forecastResults by remember { mutableStateOf<List<GrowingFlowEntity>>(emptyList()) }
@@ -3147,8 +3282,8 @@ private fun CalculateNoviceFlowDialog(
 
     var contributionText by remember { mutableStateOf("") }
     var walletText by remember { mutableStateOf("") }
-    var startDateMillis by remember { mutableStateOf(System.currentTimeMillis()) }
-    var targetDateMillis by remember { mutableStateOf(System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000) }
+    var startDateMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var targetDateMillis by remember { mutableLongStateOf(System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000) }
     var showStartDatePicker by remember { mutableStateOf(false) }
     var showTargetDatePicker by remember { mutableStateOf(false) }
 
@@ -3338,7 +3473,7 @@ private fun CalculateExistingNoviceFlowDialog(
 
     var inFlowText by remember { mutableStateOf("") }
     var walletText by remember { mutableStateOf("") }
-    var targetDateMillis by remember { mutableStateOf(System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000) }
+    var targetDateMillis by remember { mutableLongStateOf(System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000) }
     var showTargetDatePicker by remember { mutableStateOf(false) }
 
     var forecastResults by remember { mutableStateOf<List<NoviceFlowEntity>>(emptyList()) }
@@ -3605,7 +3740,7 @@ private fun CalculatePspDialog(
     val savedPspCoeffs by settingsManager.pspCoefficientsFlow.collectAsState(initial = null)
 
     var nominalText by remember { mutableStateOf("") }
-    var startDateMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+    var startDateMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var showDatePicker by remember { mutableStateOf(false) }
 
     var forecastResults by remember { mutableStateOf<List<PspForecastResult>>(emptyList()) }

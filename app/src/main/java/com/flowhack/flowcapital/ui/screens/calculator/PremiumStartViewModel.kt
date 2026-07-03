@@ -199,7 +199,7 @@ class PremiumStartViewModel(
 
     /**
      * Взнос номинала за текущий период.
-     * @param toPiggyBankAmount Сумма в копилку (Всего получено)
+     * @param toPiggyBankAmount Сумма в кошелёк (Всего получено)
      */
     fun makeContribution(toPiggyBankAmount: Double) {
         viewModelScope.launch {

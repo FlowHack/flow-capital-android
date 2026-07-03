@@ -2,9 +2,13 @@
 
 package com.flowhack.flowcapital
 
+import android.Manifest
+import android.content.Context
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -49,6 +53,7 @@ import androidx.navigation.compose.rememberNavController
 import com.flowhack.flowcapital.data.logging.AppLogger
 import com.flowhack.flowcapital.data.settings.SettingsManager
 import com.flowhack.flowcapital.data.update.UpdateChecker
+import com.flowhack.flowcapital.notifications.rescheduleSavedReminders
 import com.flowhack.flowcapital.ui.screens.browser.BrowserScreen
 import com.flowhack.flowcapital.ui.screens.calculator.CalculatorScreen
 import com.flowhack.flowcapital.ui.screens.settings.SettingsScreen
@@ -65,6 +70,26 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     private lateinit var settingsManager: SettingsManager
 
+    /**
+     * Лаунчер пакетного запроса runtime-разрешений при первом запуске.
+     * - POST_NOTIFICATIONS (Android 13+) — для push-уведомлений
+     * - SCHEDULE_EXACT_ALARM (Android 13+) — для точных будильников
+     * Если SCHEDULE_EXACT_ALARM не дано — AlarmManager использует inexact fallback
+     * (setAndAllowWhileIdle), кнопка разрешения остаётся в Настройках.
+     */
+    private val permissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val notificationsGranted = permissions[Manifest.permission.POST_NOTIFICATIONS] ?: false
+        val exactAlarmGranted = permissions[Manifest.permission.SCHEDULE_EXACT_ALARM] ?: false
+        if (!notificationsGranted) {
+            AppLogger.d("MainActivity", "POST_NOTIFICATIONS — отказано")
+        }
+        if (!exactAlarmGranted) {
+            AppLogger.d("MainActivity", "SCHEDULE_EXACT_ALARM — отказано (будет fallback на inexact)")
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -79,7 +104,10 @@ class MainActivity : ComponentActivity() {
         scope.launch {
             settingsManager.initializeDefaults()
             settingsManager.setSkippedVersion(null)
+            rescheduleSavedReminders(this@MainActivity, settingsManager)
         }
+
+        requestPermissionsOnFirstLaunch()
 
         setContent {
             val darkTheme by settingsManager.darkThemeFlow.collectAsState(initial = true)
@@ -87,7 +115,7 @@ class MainActivity : ComponentActivity() {
                 val defaultEntryTab by settingsManager.defaultEntryTabFlow.collectAsState(initial = 1)
                 var showSplash by remember { mutableStateOf(true) }
                 LaunchedEffect(Unit) {
-                    delay(2000)
+                    delay(500)
                     showSplash = false
                 }
 
@@ -112,9 +140,22 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 101)
+    }
+
+    /**
+     * Запросить runtime-разрешения при запуске (Android 13+).
+     * POST_NOTIFICATIONS запрашивается всегда; SCHEDULE_EXACT_ALARM — только если
+     * ещё не дано (canScheduleExactAlarms() == false).
+     */
+    private fun requestPermissionsOnFirstLaunch() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val permissionsToRequest = mutableListOf<String>()
+        permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+        if (!alarmManager.canScheduleExactAlarms()) {
+            permissionsToRequest.add(Manifest.permission.SCHEDULE_EXACT_ALARM)
         }
+        permissionLauncher.launch(permissionsToRequest.toTypedArray())
     }
 }
 

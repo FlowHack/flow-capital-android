@@ -2,12 +2,15 @@ package com.flowhack.flowcapital.notifications
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.flowhack.flowcapital.data.db.AppDatabase
 import com.flowhack.flowcapital.data.logging.AppLogger
+import com.flowhack.flowcapital.data.settings.SettingsManager
 import kotlinx.coroutines.flow.first
 import java.util.Calendar
 
@@ -24,6 +27,18 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
 
     override suspend fun doWork(): Result {
         AppLogger.d("ReminderWorker", "Запуск проверки напоминаний")
+
+        // Если напоминание в режиме будильника (AlarmManager) — WorkManager не должен дублировать
+        val timeTag = inputData.getString("timeTag")
+        if (timeTag != null) {
+            val settingsManager = SettingsManager(applicationContext)
+            val alarmSet = settingsManager.alarmRemindersFlow.first()
+            if (timeTag in alarmSet) {
+                AppLogger.d("ReminderWorker", "Напоминание $timeTag в режиме будильника — пропуск")
+                return Result.success()
+            }
+        }
+
         val db = AppDatabase.getDatabase(applicationContext)
         val calendar = Calendar.getInstance()
         val isSunday = calendar.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
@@ -66,7 +81,7 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
 
             // Воскресенье - пропускаем для РП/ПН
             if (!isPressedToday && !isSunday) {
-                messages.add("Растущий Поток - нажмите кнопку")
+                messages.add("РП - нажмите кнопку")
                 hasAnyAction = true
             }
         }
@@ -81,7 +96,7 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
 
             // Воскресенье - пропускаем для ПН
             if (!isPressedToday && !isSunday) {
-                messages.add("Поток Новичка - нажмите кнопку")
+                messages.add("ПН - нажмите кнопку")
                 hasAnyAction = true
             }
         }
@@ -109,10 +124,19 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
         val title = "Требуется действие!"
         val text = messages.joinToString("\n• ")
 
+        val launchIntent = Intent(applicationContext, com.flowhack.flowcapital.MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            applicationContext, 0, launchIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val notification = NotificationCompat.Builder(applicationContext, channelId)
             .setContentTitle(title)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
             .setStyle(NotificationCompat.BigTextStyle().bigText("• $text"))
             .build()
 

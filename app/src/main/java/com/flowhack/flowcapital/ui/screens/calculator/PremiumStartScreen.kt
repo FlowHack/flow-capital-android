@@ -512,8 +512,8 @@ fun PSPContributionHistory(history: List<PremiumStartPeriodEntity>) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
-                    .padding(8.dp),
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+                    .padding(6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text("Пер.", modifier = Modifier.weight(0.5f), fontSize = 10.sp, textAlign = TextAlign.Center)
@@ -853,7 +853,7 @@ fun CorrectionPSPDialog(
     var totalAccruedText by remember { mutableStateOf(currentTotalAccrued.toString()) }
     var showDatePicker by remember { mutableStateOf(false) }
     val initialEndDate: Long = currentPeriod?.endDate ?: 0L
-    var newEndDate by remember { mutableStateOf(initialEndDate) }
+    var newEndDate by remember { mutableLongStateOf(initialEndDate) }
 
     val dateFormat = SimpleDateFormat("dd.MM.yy", Locale.getDefault())
     val hasEndDate = initialEndDate > 0
@@ -937,14 +937,14 @@ fun CorrectionPSPDialog(
     }
 }
 
-/** Взнос номинала ПСП: toWalletAll или сумма в копилку */
+/** Взнос номинала ПСП: toWalletAll или сумма в кошелёк */
 @Composable
 fun ContributionDialog(
     /** Начисление за период */
     accrualForPeriod: Double,
     /** Закрыть без сохранения */
     onDismiss: () -> Unit,
-    /** Подтвердить взнос (сумма в копилку) */
+    /** Подтвердить взнос (сумма в кошелёк) */
     onConfirm: (Double) -> Unit
 ) {
     AppLogger.d(TAG_PSP_SCREEN, "Открыт диалог взноса: начисление=$accrualForPeriod")
@@ -988,7 +988,7 @@ fun ContributionDialog(
                     OutlinedTextField(
                         value = piggyBankText,
                         onValueChange = { piggyBankText = it },
-                        label = { Text("Сумма в копилку") },
+                        label = { Text("Сумма в кошелёк") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
@@ -1007,7 +1007,7 @@ fun ContributionDialog(
                 ) {
                     TextButton(onClick = onDismiss) { Text("Отмена") }
                     Spacer(modifier = Modifier.width(8.dp))
-                    val amountToPass = if (toWalletAll) 0.0 else piggyBankAmount
+                    val amountToPass = if (toWalletAll) accrualForPeriod else piggyBankAmount
                     Button(
                         onClick = { onConfirm(amountToPass) },
                         enabled = !isPiggyBankError

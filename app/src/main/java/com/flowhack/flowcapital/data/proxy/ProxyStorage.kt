@@ -7,6 +7,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.flowhack.flowcapital.data.logging.AppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -143,6 +144,22 @@ class ProxyStorage(private val context: Context) {
             val currentList = parseProxiesFromJson(currentJson).toMutableList()
             currentList.removeAll { it.id == proxyId }
             preferences[PROXIES_KEY] = proxiesToJson(currentList)
+        }
+    }
+
+    /**
+     * Получить сырой JSON всех прокси (для экспорта).
+     */
+    suspend fun getProxiesJson(): String {
+        return dataStore.data.first()[PROXIES_KEY] ?: "[]"
+    }
+
+    /**
+     * Сохранить сырой JSON всех прокси (для импорта).
+     */
+    suspend fun saveProxiesJson(json: String) {
+        dataStore.edit { prefs ->
+            prefs[PROXIES_KEY] = json
         }
     }
 
