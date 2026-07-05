@@ -416,9 +416,7 @@ fun GrowingFlowSettings(
 
             if (showRpVipToggleDialog) {
                 AlertDialog(
-                    onDismissRequest = {
-                        showRpVipToggleDialog = false
-                    },
+                    onDismissRequest = {},
                     title = { Text(if (pendingRpVip) "Включить РП VIP?" else "Выключить РП VIP?") },
                     text = {
                         Text("История Растущего потока будет очищена, коэффициенты сброшены на дефолтные для выбранного режима. Продолжить?")
@@ -538,7 +536,7 @@ fun GrowingFlowSettings(
 
     if (showClearDialog) {
         AlertDialog(
-            onDismissRequest = { showClearDialog = false },
+            onDismissRequest = {},
             title = { Text("Очистить данные?") },
             text = { Text("Вся история Растущего потока будет удалена. Это действие нельзя отменить.") },
             confirmButton = {
@@ -771,7 +769,7 @@ fun NoviceFlowSettings(
 
     if (showClearDialog) {
         AlertDialog(
-            onDismissRequest = { showClearDialog = false },
+            onDismissRequest = {},
             title = { Text("Очистить данные?") },
             text = { Text("Вся история Потока Новичка будет удалена. Это действие нельзя отменить.") },
             confirmButton = {
@@ -966,7 +964,7 @@ fun PremiumStartSettings(settingsManager: SettingsManager, scope: kotlinx.corout
 
     if (showClearDialog) {
         AlertDialog(
-            onDismissRequest = { showClearDialog = false },
+            onDismissRequest = {},
             title = { Text("Очистить все ПСП?") },
             text = { Text("Все данные ПСП будут удалены. Это действие нельзя отменить.") },
             confirmButton = {
@@ -1015,7 +1013,7 @@ fun PspCoefficientsDialog(onDismiss: () -> Unit) {
     }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {},
         modifier = Modifier.fillMaxWidth().padding(16.dp),
         title = { Text("Коэффициенты периодов ПСП", fontSize = 18.sp) },
         text = {
@@ -1097,7 +1095,7 @@ fun ECurrencyCoefficientsDialog(onDismiss: () -> Unit) {
     }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {},
         modifier = Modifier.fillMaxWidth().padding(16.dp),
         title = { Text("Коэффициенты E-currency РП", fontSize = 18.sp) },
         text = {
@@ -1822,7 +1820,7 @@ fun ProxySettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
 
     showDeleteConfirmDialog?.let { proxyId ->
         AlertDialog(
-            onDismissRequest = { showDeleteConfirmDialog = null },
+            onDismissRequest = {},
             title = { Text("Удалить прокси?") },
             text = { Text("Вы уверены, что хотите удалить этот прокси?") },
             confirmButton = {
@@ -1917,7 +1915,7 @@ private fun ProxyAddEditDialog(
     onConfirm: () -> Unit
 ) {
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {},
         title = {
             Text(
                 title,
@@ -2875,7 +2873,7 @@ private fun CalculateGrowingFlowDialog(
     val dailyAccrual = if (inFlow > 0) inFlow * (percent / 100.0) else 0.0
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {},
         title = { Text("Рассчитать поток РП", fontSize = 18.sp) },
         text = {
             Column {
@@ -2968,7 +2966,7 @@ private fun CalculateGrowingFlowDialog(
     if (showStartDatePicker) {
         val startDatePickerState = rememberDatePickerState(initialSelectedDateMillis = startDateMillis)
         DatePickerDialog(
-            onDismissRequest = { showStartDatePicker = false },
+            onDismissRequest = {},
             confirmButton = {
                 Button(onClick = {
                     startDatePickerState.selectedDateMillis?.let { startDateMillis = it }
@@ -2986,7 +2984,7 @@ private fun CalculateGrowingFlowDialog(
     if (showTargetDatePicker) {
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = targetDateMillis)
         DatePickerDialog(
-            onDismissRequest = { showTargetDatePicker = false },
+            onDismissRequest = {},
             confirmButton = {
                 Button(onClick = {
                     datePickerState.selectedDateMillis?.let { targetDateMillis = it }
@@ -3057,7 +3055,7 @@ private fun CalculateExistingGrowingFlowDialog(
     val isFormValid = inFlow > 0 && accrual > 0 && calculatedPercent > 0
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {},
         title = { Text("Рассчитать действующий поток РП", fontSize = 18.sp) },
         text = {
             Column {
@@ -3145,7 +3143,7 @@ private fun CalculateExistingGrowingFlowDialog(
     if (showTargetDatePicker) {
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = targetDateMillis)
         DatePickerDialog(
-            onDismissRequest = { showTargetDatePicker = false },
+            onDismissRequest = {},
             confirmButton = {
                 Button(onClick = {
                     datePickerState.selectedDateMillis?.let { targetDateMillis = it }
@@ -3316,7 +3314,7 @@ private fun CalculateNoviceFlowDialog(
     val isReinvestAmountValid = !compoundInterest || (compoundInterest && reinvestAmount > 0)
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {},
         title = { Text("Рассчитать поток ПН", fontSize = 18.sp) },
         text = {
             Column {
@@ -3418,7 +3416,7 @@ private fun CalculateNoviceFlowDialog(
     if (showStartDatePicker) {
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = startDateMillis)
         DatePickerDialog(
-            onDismissRequest = { showStartDatePicker = false },
+            onDismissRequest = {},
             confirmButton = {
                 Button(onClick = {
                     datePickerState.selectedDateMillis?.let { startDateMillis = it }
@@ -3432,7 +3430,7 @@ private fun CalculateNoviceFlowDialog(
     if (showTargetDatePicker) {
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = targetDateMillis)
         DatePickerDialog(
-            onDismissRequest = { showTargetDatePicker = false },
+            onDismissRequest = {},
             confirmButton = {
                 Button(onClick = {
                     datePickerState.selectedDateMillis?.let { targetDateMillis = it }
@@ -3504,7 +3502,7 @@ private fun CalculateExistingNoviceFlowDialog(
     val isFormValid = inFlow > 0 && dailyPercent > 0 && isReinvestAmountValid
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {},
         title = { Text("Рассчитать действующий поток ПН", fontSize = 18.sp) },
         text = {
             Column {
@@ -3613,7 +3611,7 @@ private fun CalculateExistingNoviceFlowDialog(
     if (showTargetDatePicker) {
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = targetDateMillis)
         DatePickerDialog(
-            onDismissRequest = { showTargetDatePicker = false },
+            onDismissRequest = {},
             confirmButton = {
                 Button(onClick = {
                     datePickerState.selectedDateMillis?.let { targetDateMillis = it }
@@ -3765,7 +3763,7 @@ private fun CalculatePspDialog(
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {},
         title = { Text("Рассчитать поток ПСП", fontSize = 18.sp) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
@@ -3812,7 +3810,7 @@ private fun CalculatePspDialog(
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = startDateMillis)
         DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
+            onDismissRequest = {},
             confirmButton = {
                 Button(onClick = {
                     datePickerState.selectedDateMillis?.let { startDateMillis = it }
@@ -3892,10 +3890,10 @@ private fun PspForecastResultsDialog(
     val weightTotal = 1.2f
 
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {},
         properties = DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true,
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
             usePlatformDefaultWidth = false
         )
     ) {
