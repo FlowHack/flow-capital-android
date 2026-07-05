@@ -76,7 +76,7 @@ fun ReinvestDialog(
     onAmountChanged: (String) -> Unit = {}
 ) {
     var amountText by remember { mutableStateOf("") }
-    var percentText by remember { mutableStateOf(if (isNewFlow) defaultPercent.toString() else "") }
+    var percentText by remember(defaultPercent) { mutableStateOf(if (isNewFlow) defaultPercent.toString() else "") }
     var walletText by remember { mutableStateOf("") }
     var walletExplicitlySet by remember { mutableStateOf(false) }
     var isExistingFlow by remember { mutableStateOf(false) }

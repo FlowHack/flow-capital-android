@@ -2841,7 +2841,7 @@ private fun CalculateGrowingFlowDialog(
     val savedECurrency by settingsManager.eCurrencyCoefficientsFlow.collectAsState(initial = emptyMap())
 
     var contributionText by remember { mutableStateOf("") }
-    var percentText by remember { mutableStateOf(savedStartPercent.toString()) }
+    var percentText by remember(savedStartPercent) { mutableStateOf(savedStartPercent.toString()) }
     var walletText by remember { mutableStateOf("") }
     var startDateMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var targetDateMillis by remember { mutableLongStateOf(System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000) }
