@@ -349,10 +349,10 @@ fun PremiumStartScreen() {
         val configuration = LocalConfiguration.current
         val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
         Dialog(
-            onDismissRequest = { showDeleteDialog = false },
+            onDismissRequest = {},
             properties = DialogProperties(
-                dismissOnBackPress = true,
-                dismissOnClickOutside = true,
+                dismissOnBackPress = false,
+                dismissOnClickOutside = false,
                 usePlatformDefaultWidth = false
             )
         ) {
@@ -589,7 +589,7 @@ fun CreatePSPDialog(
 
     if (showFirstDatePicker) {
         DatePickerDialog(
-            onDismissRequest = { showFirstDatePicker = false },
+            onDismissRequest = {},
             confirmButton = {
                 Button(onClick = {
                     datePickerState.selectedDateMillis?.let { firstPeriodStart = it }
@@ -606,7 +606,7 @@ fun CreatePSPDialog(
 
     if (showCurrentDatePicker) {
         DatePickerDialog(
-            onDismissRequest = { showCurrentDatePicker = false },
+            onDismissRequest = {},
             confirmButton = {
                 Button(onClick = {
                     datePickerState.selectedDateMillis?.let { currentPeriodStart = it }
@@ -626,10 +626,10 @@ fun CreatePSPDialog(
     val wideScreen = isWideScreen()
 
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {},
         properties = DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true,
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
             usePlatformDefaultWidth = false
         )
     ) {
@@ -863,10 +863,10 @@ fun CorrectionPSPDialog(
     AppLogger.d(TAG_PSP_SCREEN, "Открыт диалог корректировки: totalAccrued=$currentTotalAccrued")
 
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {},
         properties = DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true,
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
             usePlatformDefaultWidth = false
         )
     ) {
@@ -921,7 +921,7 @@ fun CorrectionPSPDialog(
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(initialSelectedDateMillis = newEndDate)
         DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
+            onDismissRequest = {},
             confirmButton = {
                 Button(onClick = {
                     datePickerState.selectedDateMillis?.let { newEndDate = it }
@@ -957,10 +957,10 @@ fun ContributionDialog(
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
 
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {},
         properties = DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true,
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
             usePlatformDefaultWidth = false
         )
     ) {
@@ -1047,10 +1047,10 @@ fun ForecastPSPDialog(
     }
 
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {},
         properties = DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true,
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
             usePlatformDefaultWidth = false
         )
     ) {
