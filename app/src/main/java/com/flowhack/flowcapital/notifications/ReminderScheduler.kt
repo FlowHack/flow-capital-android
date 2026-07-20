@@ -10,6 +10,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
+import com.flowhack.flowcapital.MainActivity
 import com.flowhack.flowcapital.data.logging.AppLogger
 import com.flowhack.flowcapital.data.settings.SettingsManager
 import kotlinx.coroutines.flow.first
@@ -71,8 +72,8 @@ fun scheduleDailyReminder(context: Context, hour: Int, min: Int, timeTag: String
 
 /**
  * Запланировать точное срабатывание будильника через AlarmManager.
- * Использует setExactAndAllowWhileIdle() для пробуждения устройства.
- * На Android 12+ проверяет canScheduleExactAlarms(), при отказе — inexact fallback.
+ * Использует setAlarmClock() — гарантирует срабатывание даже в Doze-режиме
+ * и не требует SCHEDULE_EXACT_ALARM на Android 12+.
  */
 fun scheduleAlarmReminder(context: Context, hour: Int, min: Int, timeTag: String) {
     AppLogger.d("ReminderScheduler", "Планирование будильника: $timeTag ($hour:$min)")
@@ -81,7 +82,7 @@ fun scheduleAlarmReminder(context: Context, hour: Int, min: Int, timeTag: String
     val intent = Intent(context, AlarmReceiver::class.java).apply {
         putExtra(AlarmReceiver.EXTRA_TIME_TAG, timeTag)
     }
-    val pendingIntent = PendingIntent.getBroadcast(
+    val operation = PendingIntent.getBroadcast(
         context,
         timeTag.hashCode(),
         intent,
@@ -96,16 +97,25 @@ fun scheduleAlarmReminder(context: Context, hour: Int, min: Int, timeTag: String
     }
     if (target.before(now)) target.add(Calendar.DAY_OF_YEAR, 1)
 
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        if (alarmManager.canScheduleExactAlarms()) {
-            AppLogger.d("ReminderScheduler", "Точное срабатывание разрешено")
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, pendingIntent)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+            AppLogger.d("ReminderScheduler", "Будильник $timeTag: нет SCHEDULE_EXACT_ALARM — setAndAllowWhileIdle")
+            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, operation)
         } else {
-            AppLogger.d("ReminderScheduler", "Точное срабатывание не разрешено — inexact fallback")
-            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, pendingIntent)
+            val showIntent = PendingIntent.getActivity(
+                context,
+                timeTag.hashCode() + 5000,
+                Intent(context, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val alarmClockInfo = AlarmManager.AlarmClockInfo(target.timeInMillis, showIntent)
+            alarmManager.setAlarmClock(alarmClockInfo, operation)
+            AppLogger.d("ReminderScheduler", "Будильник $timeTag: setAlarmClock на ${target.timeInMillis}")
         }
+    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+        alarmManager.setExact(AlarmManager.RTC_WAKEUP, target.timeInMillis, operation)
     } else {
-        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, pendingIntent)
+        alarmManager.set(AlarmManager.RTC_WAKEUP, target.timeInMillis, operation)
     }
 }
 
@@ -139,7 +149,7 @@ fun scheduleFinalReminder(context: Context) {
     val intent = Intent(context, AlarmReceiver::class.java).apply {
         putExtra(AlarmReceiver.EXTRA_TIME_TAG, AlarmReceiver.FINAL_2300_TAG)
     }
-    val pendingIntent = PendingIntent.getBroadcast(
+    val operation = PendingIntent.getBroadcast(
         context,
         AlarmReceiver.FINAL_2300_TAG.hashCode(),
         intent,
@@ -152,15 +162,24 @@ fun scheduleFinalReminder(context: Context) {
         set(Calendar.SECOND, 0)
     }
     if (target.before(now)) target.add(Calendar.DAY_OF_YEAR, 1)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        if (alarmManager.canScheduleExactAlarms()) {
-            AppLogger.d("ReminderScheduler", "Финальный будильник — точное срабатывание")
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, pendingIntent)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+            AppLogger.d("ReminderScheduler", "Финальный 23:00: нет SCHEDULE_EXACT_ALARM — setAndAllowWhileIdle")
+            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, operation)
         } else {
-            AppLogger.d("ReminderScheduler", "Финальный будильник — inexact fallback (нет SCHEDULE_EXACT_ALARM)")
-            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, pendingIntent)
+            val showIntent = PendingIntent.getActivity(
+                context,
+                AlarmReceiver.FINAL_2300_TAG.hashCode() + 5000,
+                Intent(context, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val alarmClockInfo = AlarmManager.AlarmClockInfo(target.timeInMillis, showIntent)
+            alarmManager.setAlarmClock(alarmClockInfo, operation)
+            AppLogger.d("ReminderScheduler", "Финальный будильник 23:00: setAlarmClock на ${target.timeInMillis}")
         }
+    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+        alarmManager.setExact(AlarmManager.RTC_WAKEUP, target.timeInMillis, operation)
     } else {
-        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, pendingIntent)
+        alarmManager.set(AlarmManager.RTC_WAKEUP, target.timeInMillis, operation)
     }
 }

@@ -76,7 +76,7 @@ fun ReinvestDialog(
     onAmountChanged: (String) -> Unit = {}
 ) {
     var amountText by remember { mutableStateOf("") }
-    var percentText by remember { mutableStateOf(if (isNewFlow) defaultPercent.toString() else "") }
+    var percentText by remember(defaultPercent) { mutableStateOf(if (isNewFlow) defaultPercent.toString() else "") }
     var walletText by remember { mutableStateOf("") }
     var walletExplicitlySet by remember { mutableStateOf(false) }
     var isExistingFlow by remember { mutableStateOf(false) }
@@ -95,10 +95,10 @@ fun ReinvestDialog(
     val isLandscape = isWideScreen()
 
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {},
         properties = DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true,
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
             usePlatformDefaultWidth = false
         )
     ) {
@@ -254,10 +254,10 @@ fun GrowingForecastResultsDialog(
     val tableFontSize = if (isLandscape) 12.sp else 11.sp
 
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {},
         properties = DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true,
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
             usePlatformDefaultWidth = false
         )
     ) {
@@ -403,10 +403,10 @@ fun NoviceForecastResultsDialog(
     val purpleBackground = Color(0xFF4A148C).copy(alpha = 0.3f)   // Фиолетовый для SUNDAY
 
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {},
         properties = DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true,
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
             usePlatformDefaultWidth = false
         )
     ) {
@@ -547,10 +547,10 @@ fun CorrectionDialog(
     val isLandscape = isWideScreen()
 
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {},
         properties = DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true,
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
             usePlatformDefaultWidth = false
         )
     ) {
@@ -637,7 +637,7 @@ fun ForecastDatePickerDialog(
         initialSelectedDateMillis = System.currentTimeMillis()
     )
     DatePickerDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {},
         confirmButton = {
             Button(onClick = {
                 datePickerState.selectedDateMillis?.let { onDateSelected(it) }
@@ -676,10 +676,10 @@ fun NoviceForecastConfigDialog(
     val isReinvestAmountValid = !compoundInterest || (compoundInterest && reinvestAmount > 0)
 
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {},
         properties = DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true,
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
             usePlatformDefaultWidth = false
         )
     ) {
@@ -789,10 +789,10 @@ fun NoviceReinvestDialog(
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
 
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {},
         properties = DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true,
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
             usePlatformDefaultWidth = false
         )
     ) {
@@ -957,10 +957,10 @@ fun NoviceCorrectionDialog(
     val isLandscape = isWideScreen()
 
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {},
         properties = DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true,
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
             usePlatformDefaultWidth = false
         )
     ) {

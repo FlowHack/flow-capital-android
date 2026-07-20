@@ -2,6 +2,8 @@
 
 package com.flowhack.flowcapital
 
+import android.app.NotificationManager
+import android.content.Intent
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.os.Bundle
@@ -31,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.flowhack.flowcapital.data.logging.AppLogger
 import com.flowhack.flowcapital.data.settings.SettingsManager
+import com.flowhack.flowcapital.notifications.AlarmReceiver
 import com.flowhack.flowcapital.ui.theme.FlowCapitalTheme
 
 /**
@@ -84,6 +87,30 @@ class AlarmActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        AppLogger.d("AlarmActivity", "Получен новый Intent будильника")
+        val alarmText = intent.getStringExtra(EXTRA_ALARM_TEXT) ?: return
+        if (mediaPlayer?.isPlaying != true) {
+            mediaPlayer?.apply {
+                if (isPlaying) stop()
+                release()
+            }
+            mediaPlayer = MediaPlayer().apply {
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                setDataSource(applicationContext, android.net.Uri.parse("android.resource://${packageName}/${R.raw.flow_alarm}"))
+                isLooping = true
+                prepareAsync()
+                setOnPreparedListener { it.start() }
+            }
+        }
+    }
+
     override fun onDestroy() {
         AppLogger.d("AlarmActivity", "AlarmActivity уничтожена")
         releasePlayer()
@@ -92,8 +119,16 @@ class AlarmActivity : ComponentActivity() {
 
     private fun dismissAlarm() {
         AppLogger.d("AlarmActivity", "Пользователь нажал ВЫКЛЮЧИТЬ")
+        cancelNotification()
         releasePlayer()
         finish()
+    }
+
+    private fun cancelNotification() {
+        try {
+            val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            manager.cancel(AlarmReceiver.ALARM_NOTIFICATION_ID)
+        } catch (_: Exception) { }
     }
 
     private fun releasePlayer() {
