@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import com.flowhack.flowcapital.AlarmActivity
 import com.flowhack.flowcapital.data.db.AppDatabase
@@ -27,6 +28,20 @@ import java.util.Calendar
 class AlarmReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        val wakeLock = powerManager.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "AlarmReceiver:alarm"
+        )
+        wakeLock.acquire(30_000L)
+        try {
+            _onReceive(context, intent)
+        } finally {
+            if (wakeLock.isHeld) wakeLock.release()
+        }
+    }
+
+    private fun _onReceive(context: Context, intent: Intent) {
         val timeTag = intent.getStringExtra(EXTRA_TIME_TAG) ?: run {
             AppLogger.e("AlarmReceiver", "Получен Intent без timeTag")
             return
@@ -103,7 +118,7 @@ class AlarmReceiver : BroadcastReceiver() {
     companion object {
         const val EXTRA_TIME_TAG = "timeTag"
         const val FINAL_2300_TAG = "final_2300"
-        private const val ALARM_NOTIFICATION_ID = 1001
+        const val ALARM_NOTIFICATION_ID = 1001
     }
 }
 
