@@ -1368,60 +1368,6 @@ fun NotificationsSettings(context: Context, settingsManager: SettingsManager, sc
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Напоминания", fontWeight = FontWeight.Bold, fontSize = 16.sp)
 
-            // Переключатель умных уведомлений (учёт времени клика по кнопке)
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Умные уведомления", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            "Учитывают время последнего клика по кнопке",
-                            fontSize = 11.sp, color = Color.Gray
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(4.dp))
-                    IconButton(onClick = { showSmartInfoDialog = true }) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.HelpOutline,
-                            contentDescription = "Что такое умные уведомления",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-                Switch(
-                    checked = smartNotifications,
-                    onCheckedChange = { enabled ->
-                        scope.launch { settingsManager.setSmartNotifications(enabled) }
-                    }
-                )
-            }
-
-            if (showSmartInfoDialog) {
-                AlertDialog(
-                    onDismissRequest = { showSmartInfoDialog = false },
-                    title = { Text("Умные уведомления") },
-                    text = {
-                        Text(
-                            "Умные уведомления учитывают время вашего последнего " +
-                                "клика по кнопке. Напоминания и будильники не будут " +
-                                "беспокоить вас раньше, чем кнопка станет активной " +
-                                "на проекте (через 24 часа после прошлого клика)."
-                        )
-                    },
-                    confirmButton = {
-                        TextButton(onClick = { showSmartInfoDialog = false }) { Text("Понятно") }
-                    }
-                )
-            }
-
             Spacer(modifier = Modifier.height(8.dp))
             Text("Для своевременной доставки напоминаний и будильников отключите оптимизацию батареи. Для точного срабатывания будильников и показа экрана на заблокированном устройстве необходимы дополнительные разрешения.", fontSize = 12.sp, lineHeight = 16.sp)
             Spacer(modifier = Modifier.height(12.dp))
@@ -1542,6 +1488,62 @@ fun NotificationsSettings(context: Context, settingsManager: SettingsManager, sc
             HorizontalDivider()
             Spacer(modifier = Modifier.height(12.dp))
             Text("В 23:00 сработает будильник, если по одному из потоков требуется действие, независимо от установленных напоминаний или будильников", fontSize = 12.sp, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Medium)
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Переключатель умных уведомлений (учёт времени клика по кнопке)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Умные уведомления", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "Учитывают время последнего клика по кнопке",
+                            fontSize = 11.sp, color = Color.Gray
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    IconButton(onClick = { showSmartInfoDialog = true }) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.HelpOutline,
+                            contentDescription = "Что такое умные уведомления",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+                Switch(
+                    checked = smartNotifications,
+                    onCheckedChange = { enabled ->
+                        scope.launch { settingsManager.setSmartNotifications(enabled) }
+                    }
+                )
+            }
+
+            if (showSmartInfoDialog) {
+                AlertDialog(
+                    onDismissRequest = { showSmartInfoDialog = false },
+                    title = { Text("Умные уведомления") },
+                    text = {
+                        Text(
+                            "Умные уведомления учитывают время вашего последнего " +
+                                "клика по кнопке. Напоминания и будильники не будут " +
+                                "беспокоить вас раньше, чем кнопка станет активной " +
+                                "на проекте (через 24 часа после прошлого клика)."
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showSmartInfoDialog = false }) { Text("Понятно") }
+                    }
+                )
+            }
         }
     }
 }
