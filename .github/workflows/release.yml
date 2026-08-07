@@ -50,6 +50,9 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
         run: echo "$KEYSTORE_BASE64" | base64 -d > release-keystore.jks
 
+      - name: Установка прав на gradlew
+        run: chmod +x gradlew
+
       - name: Запуск линтера
         run: ./gradlew :app:lint
 

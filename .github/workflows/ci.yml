@@ -38,6 +38,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
+      - name: Установка прав на gradlew
+        run: chmod +x gradlew
+
       - name: Запуск линтера
         run: ./gradlew :app:lint
 
@@ -67,6 +70,9 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
+
+      - name: Установка прав на gradlew
+        run: chmod +x gradlew
 
       - name: Запуск unit-тестов
         run: ./gradlew :app:testDebugUnitTest
