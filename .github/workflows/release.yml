@@ -19,6 +19,10 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    env:
+      # Увеличиваем память Gradle (heap и metaspace), чтобы избежать ошибки
+      # Metaspace при lint-анализе больших Compose-проектов.
+      GRADLE_OPTS: "-Xmx4096m -XX:MaxMetaspaceSize=1024m"
     outputs:
       version_name: ${{ steps.extract_version.outputs.version_name }}
       apk_path: ${{ steps.rename_apk.outputs.apk_path }}

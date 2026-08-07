@@ -15,6 +15,10 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    env:
+      # Увеличиваем память Gradle (heap и metaspace), чтобы избежать ошибки
+      # Metaspace при lint-анализе больших Compose-проектов.
+      GRADLE_OPTS: "-Xmx4096m -XX:MaxMetaspaceSize=1024m"
     steps:
       - name: Checkout репозитория
         uses: actions/checkout@v4

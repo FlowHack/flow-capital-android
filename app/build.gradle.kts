@@ -47,6 +47,12 @@ android {
         compose = true
         buildConfig = true
     }
+    lint {
+        // Увеличиваем память воркера lint, чтобы избежать ошибки Metaspace
+        // при анализе больших Compose-проектов в CI (GitHub Actions).
+        checkReleaseBuilds = false
+        abortOnError = true
+    }
 }
 
 dependencies {
