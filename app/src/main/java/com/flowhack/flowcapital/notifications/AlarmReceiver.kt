@@ -11,6 +11,7 @@ import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import com.flowhack.flowcapital.AlarmActivity
 import com.flowhack.flowcapital.data.logging.AppLogger
+import com.flowhack.flowcapital.data.settings.SettingsManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -70,7 +71,9 @@ class AlarmReceiver : BroadcastReceiver() {
             }
         }
 
-        val messages = ReminderMessageBuilder.buildReminderMessages(context)
+        val settingsManager = SettingsManager(context)
+        val smartNotifications = settingsManager.getSmartNotifications()
+        val messages = ReminderMessageBuilder.buildReminderMessages(context, smartNotifications)
 
         if (messages.isEmpty()) {
             AppLogger.d("AlarmReceiver", "Действия не требуются — тихий выход")

@@ -66,6 +66,9 @@ class SettingsManager(context: Context) {
 /** Ключ для проверки обновлений при входе */
 val CHECK_UPDATE_ON_START = booleanPreferencesKey("check_update_on_start")
 
+/** Ключ для умных уведомлений (учёт времени клика по кнопке) */
+val SMART_NOTIFICATIONS = booleanPreferencesKey("smart_notifications")
+
 /** Ключ для темной темы (true = тёмная, false = светлая) */
 val DARK_THEME = booleanPreferencesKey("dark_theme")
 
@@ -452,6 +455,11 @@ val BROWSER_FAB_OFFSET_Y = intPreferencesKey("browser_fab_offset_y")
 val checkUpdateOnStartFlow: Flow<Boolean> = dataStore.data.map { it[CHECK_UPDATE_ON_START] ?: true }
 
 /**
+ * Поток для умных уведомлений (учёт времени клика по кнопке).
+ */
+val smartNotificationsFlow: Flow<Boolean> = dataStore.data.map { it[SMART_NOTIFICATIONS] ?: false }
+
+/**
  * Поток флага пропуска автопроверки обновлений.
  */
 val skipAutoUpdateFlow: Flow<Boolean> = dataStore.data.map { it[SKIP_AUTO_UPDATE] ?: false }
@@ -481,6 +489,21 @@ val browserFabOffsetYFlow: Flow<Int> = dataStore.data.map { it[BROWSER_FAB_OFFSE
 suspend fun setCheckUpdateOnStart(check: Boolean) {
     dataStore.edit { prefs ->
         prefs[CHECK_UPDATE_ON_START] = check
+    }
+}
+
+/**
+ * Получить состояние умных уведомлений.
+ */
+suspend fun getSmartNotifications(): Boolean = smartNotificationsFlow.first()
+
+/**
+ * Установить состояние умных уведомлений.
+ * @param enabled true - включено
+ */
+suspend fun setSmartNotifications(enabled: Boolean) {
+    dataStore.edit { prefs ->
+        prefs[SMART_NOTIFICATIONS] = enabled
     }
 }
 

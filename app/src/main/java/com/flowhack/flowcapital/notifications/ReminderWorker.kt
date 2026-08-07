@@ -26,10 +26,11 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
     override suspend fun doWork(): Result {
         AppLogger.d("ReminderWorker", "Запуск проверки напоминаний")
 
+        val settingsManager = SettingsManager(applicationContext)
+
         // Если напоминание в режиме будильника (AlarmManager) — WorkManager не должен дублировать
         val timeTag = inputData.getString("timeTag")
         if (timeTag != null) {
-            val settingsManager = SettingsManager(applicationContext)
             val alarmSet = settingsManager.alarmRemindersFlow.first()
             if (timeTag in alarmSet) {
                 AppLogger.d("ReminderWorker", "Напоминание $timeTag в режиме будильника — пропуск")
@@ -37,7 +38,11 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
             }
         }
 
-        val messages = ReminderMessageBuilder.buildReminderMessages(applicationContext)
+        // Учитываем режим умных уведомлений при построении сообщений
+        val smartNotifications = settingsManager.getSmartNotifications()
+        val messages = ReminderMessageBuilder.buildReminderMessages(
+            applicationContext, smartNotifications
+        )
 
         // Отправляем уведомление только если есть что напомнить
         if (messages.isNotEmpty()) {

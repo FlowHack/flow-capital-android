@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Settings
@@ -1343,6 +1344,9 @@ fun NotificationsSettings(context: Context, settingsManager: SettingsManager, sc
     val savedReminders by settingsManager.remindersFlow.collectAsState(initial = emptySet())
     val alarmSet by settingsManager.alarmRemindersFlow.collectAsState(initial = emptySet())
     val sortedReminders = savedReminders.toList().sorted()
+    val smartNotifications by settingsManager.smartNotificationsFlow
+        .collectAsState(initial = false)
+    var showSmartInfoDialog by remember { mutableStateOf(false) }
 
     val timePickerDialog = TimePickerDialog(context, { _, hour, min ->
         val timeString = String.format(java.util.Locale.US, "%02d:%02d", hour, min)
@@ -1363,6 +1367,61 @@ fun NotificationsSettings(context: Context, settingsManager: SettingsManager, sc
     Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Напоминания", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+
+            // Переключатель умных уведомлений (учёт времени клика по кнопке)
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Умные уведомления", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "Учитывают время последнего клика по кнопке",
+                            fontSize = 11.sp, color = Color.Gray
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    IconButton(onClick = { showSmartInfoDialog = true }) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.HelpOutline,
+                            contentDescription = "Что такое умные уведомления",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+                Switch(
+                    checked = smartNotifications,
+                    onCheckedChange = { enabled ->
+                        scope.launch { settingsManager.setSmartNotifications(enabled) }
+                    }
+                )
+            }
+
+            if (showSmartInfoDialog) {
+                AlertDialog(
+                    onDismissRequest = { showSmartInfoDialog = false },
+                    title = { Text("Умные уведомления") },
+                    text = {
+                        Text(
+                            "Умные уведомления учитывают время вашего последнего " +
+                                "клика по кнопке. Напоминания и будильники не будут " +
+                                "беспокоить вас раньше, чем кнопка станет активной " +
+                                "на проекте (через 24 часа после прошлого клика)."
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showSmartInfoDialog = false }) { Text("Понятно") }
+                    }
+                )
+            }
+
             Spacer(modifier = Modifier.height(8.dp))
             Text("Для своевременной доставки напоминаний и будильников отключите оптимизацию батареи. Для точного срабатывания будильников и показа экрана на заблокированном устройстве необходимы дополнительные разрешения.", fontSize = 12.sp, lineHeight = 16.sp)
             Spacer(modifier = Modifier.height(12.dp))

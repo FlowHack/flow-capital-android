@@ -12,6 +12,9 @@ import java.util.Calendar
  */
 object ReminderMessageBuilder {
 
+    /** Окно активности кнопки: 24 часа после последнего клика */
+    private const val DAY_MILLIS = 24 * 60 * 60 * 1000L
+
     /**
      * Проверить все потоки и собрать список сообщений о требуемых действиях.
      * Логика:
@@ -19,11 +22,14 @@ object ReminderMessageBuilder {
      * - РП/ПН не работают в воскресенье
      * - Для РП/ПН проверяется, была ли нажата кнопка сегодня
      * - Для ПСП проверяется, не пора ли сделать взнос номинала
+     * - При smartNotifications=true для РП/ПН напоминание срабатывает только через 24 часа
+     *   после последнего клика по кнопке
      *
+     * @param smartNotifications Включён ли режим умных уведомлений
      * @return Список строк с описанием требуемых действий, или пустой список если действий нет
      */
-    suspend fun buildReminderMessages(context: Context): List<String> {
-        AppLogger.d("ReminderMessageBuilder", "Проверка потоков на требуемые действия")
+    suspend fun buildReminderMessages(context: Context, smartNotifications: Boolean = false): List<String> {
+        AppLogger.d("ReminderMessageBuilder", "Проверка потоков на требуемые действия (smart=$smartNotifications)")
         val db = AppDatabase.getDatabase(context)
         val calendar = Calendar.getInstance()
         val isSunday = calendar.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
@@ -60,8 +66,18 @@ object ReminderMessageBuilder {
             val isPressedToday = lastGrowingEntry.isButtonPressed &&
                 today == lastCal.get(Calendar.DAY_OF_YEAR) &&
                 year == lastCal.get(Calendar.YEAR)
-            if (!isPressedToday && !isSunday) {
-                messages.add("РП - нажмите кнопку")
+            if (smartNotifications) {
+                // Умный режим: напоминаем, только когда кнопка снова активна и ещё не нажата сегодня
+                val lastPress = db.growingFlowDao().getLastPressEntry()
+                val now = Calendar.getInstance().timeInMillis
+                val isReadyForPress = lastPress == null || now >= lastPress.date + DAY_MILLIS
+                if (isReadyForPress && !isPressedToday && !isSunday) {
+                    messages.add("РП - нажмите кнопку")
+                }
+            } else {
+                if (!isPressedToday && !isSunday) {
+                    messages.add("РП - нажмите кнопку")
+                }
             }
         }
 
@@ -72,8 +88,18 @@ object ReminderMessageBuilder {
             val isPressedToday = lastNoviceEntry.isButtonPressed &&
                 today == lastCal.get(Calendar.DAY_OF_YEAR) &&
                 year == lastCal.get(Calendar.YEAR)
-            if (!isPressedToday && !isSunday) {
-                messages.add("ПН - нажмите кнопку")
+            if (smartNotifications) {
+                // Умный режим: напоминаем, только когда кнопка снова активна и ещё не нажата сегодня
+                val lastPress = db.noviceFlowDao().getLastPressEntry()
+                val now = Calendar.getInstance().timeInMillis
+                val isReadyForPress = lastPress == null || now >= lastPress.date + DAY_MILLIS
+                if (isReadyForPress && !isPressedToday && !isSunday) {
+                    messages.add("ПН - нажмите кнопку")
+                }
+            } else {
+                if (!isPressedToday && !isSunday) {
+                    messages.add("ПН - нажмите кнопку")
+                }
             }
         }
 
