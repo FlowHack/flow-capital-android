@@ -71,8 +71,8 @@ fun scheduleDailyReminder(context: Context, hour: Int, min: Int, timeTag: String
 
 /**
  * Запланировать точное срабатывание будильника через AlarmManager.
- * Использует setAlarmClock() — гарантирует срабатывание даже в Doze-режиме
- * и не требует SCHEDULE_EXACT_ALARM на Android 12+.
+ * Использует setAlarmClock() — гарантирует срабатывание даже в Doze-режиме,
+ * но требует SCHEDULE_EXACT_ALARM на Android 12+; при отсутствии разрешения используется inexact fallback.
  */
 fun scheduleAlarmReminder(context: Context, hour: Int, min: Int, timeTag: String) {
     AppLogger.d("ReminderScheduler", "Планирование будильника: $timeTag ($hour:$min)")
@@ -102,9 +102,15 @@ fun scheduleAlarmReminder(context: Context, hour: Int, min: Int, timeTag: String
         Intent(context, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK },
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
-    val alarmClockInfo = AlarmManager.AlarmClockInfo(target.timeInMillis, showIntent)
-    alarmManager.setAlarmClock(alarmClockInfo, operation)
-    AppLogger.d("ReminderScheduler", "Будильник $timeTag: setAlarmClock на ${target.timeInMillis}")
+    
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, operation)
+        AppLogger.d("ReminderScheduler", "Будильник $timeTag: нет SCHEDULE_EXACT_ALARM, fallback на inexact")
+    } else {
+        val alarmClockInfo = AlarmManager.AlarmClockInfo(target.timeInMillis, showIntent)
+        alarmManager.setAlarmClock(alarmClockInfo, operation)
+        AppLogger.d("ReminderScheduler", "Будильник $timeTag: setAlarmClock на ${target.timeInMillis}")
+    }
 }
 
 /**
@@ -156,7 +162,13 @@ fun scheduleFinalReminder(context: Context) {
         Intent(context, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK },
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
-    val alarmClockInfo = AlarmManager.AlarmClockInfo(target.timeInMillis, showIntent)
-    alarmManager.setAlarmClock(alarmClockInfo, operation)
-    AppLogger.d("ReminderScheduler", "Финальный будильник 23:00: setAlarmClock на ${target.timeInMillis}")
+    
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, operation)
+        AppLogger.d("ReminderScheduler", "Финальный будильник 23:00: нет SCHEDULE_EXACT_ALARM, fallback на inexact")
+    } else {
+        val alarmClockInfo = AlarmManager.AlarmClockInfo(target.timeInMillis, showIntent)
+        alarmManager.setAlarmClock(alarmClockInfo, operation)
+        AppLogger.d("ReminderScheduler", "Финальный будильник 23:00: setAlarmClock на ${target.timeInMillis}")
+    }
 }
