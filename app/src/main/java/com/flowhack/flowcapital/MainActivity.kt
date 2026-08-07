@@ -80,13 +80,19 @@ class MainActivity : ComponentActivity() {
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        val notificationsGranted = permissions[Manifest.permission.POST_NOTIFICATIONS] ?: false
-        val exactAlarmGranted = permissions[Manifest.permission.SCHEDULE_EXACT_ALARM] ?: false
-        if (!notificationsGranted) {
-            AppLogger.d("MainActivity", "POST_NOTIFICATIONS — отказано")
+        // POST_NOTIFICATIONS доступна с API 33, SCHEDULE_EXACT_ALARM — с API 31.
+        // Гарды по версии SDK: на старых устройствах ключей в карте просто нет.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val notificationsGranted = permissions[Manifest.permission.POST_NOTIFICATIONS] ?: false
+            if (!notificationsGranted) {
+                AppLogger.d("MainActivity", "POST_NOTIFICATIONS — отказано")
+            }
         }
-        if (!exactAlarmGranted) {
-            AppLogger.d("MainActivity", "SCHEDULE_EXACT_ALARM — отказано (будет fallback на inexact)")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val exactAlarmGranted = permissions[Manifest.permission.SCHEDULE_EXACT_ALARM] ?: false
+            if (!exactAlarmGranted) {
+                AppLogger.d("MainActivity", "SCHEDULE_EXACT_ALARM — отказано (будет fallback на inexact)")
+            }
         }
     }
 
@@ -144,17 +150,15 @@ class MainActivity : ComponentActivity() {
 
     /**
      * Запросить runtime-разрешения при запуске (Android 13+).
-     * POST_NOTIFICATIONS запрашивается всегда; SCHEDULE_EXACT_ALARM — только если
-     * ещё не дано (canScheduleExactAlarms() == false).
+     * POST_NOTIFICATIONS запрашивается всегда.
+     * SCHEDULE_EXACT_ALARM не запрашивается здесь, так как это special app access,
+     * который не работает через requestPermissions. Пользователь должен выдать его
+     * вручную через системные настройки (кнопка в Настройках приложения).
      */
     private fun requestPermissionsOnFirstLaunch() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
         val permissionsToRequest = mutableListOf<String>()
         permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
-        val alarmManager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
-        if (!alarmManager.canScheduleExactAlarms()) {
-            permissionsToRequest.add(Manifest.permission.SCHEDULE_EXACT_ALARM)
-        }
         permissionLauncher.launch(permissionsToRequest.toTypedArray())
     }
 }
