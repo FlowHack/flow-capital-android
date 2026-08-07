@@ -20,9 +20,12 @@ android {
     signingConfigs {
         create("release") {
             storeFile = file("../release-keystore.jks")
-            storePassword = project.properties["KEYSTORE_PASSWORD"] as String
-            keyAlias = project.properties["KEY_ALIAS"] as String
-            keyPassword = project.properties["KEY_ALIAS_PASSWORD"] as String
+            // Пароли передаются через -PKEYSTORE_PASSWORD/-PKEY_ALIAS/-PKEY_ALIAS_PASSWORD
+            // при сборке release. Для lint/test они отсутствуют (null) — это допустимо,
+            // т.к. release-сборка в этих задачах не выполняется.
+            storePassword = project.properties["KEYSTORE_PASSWORD"] as String?
+            keyAlias = project.properties["KEY_ALIAS"] as String?
+            keyPassword = project.properties["KEY_ALIAS_PASSWORD"] as String?
         }
     }
 
