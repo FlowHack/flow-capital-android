@@ -45,7 +45,15 @@ object ReminderMessageBuilder {
                 val currentPeriod = db.premiumStartPeriodDao().getCurrentPeriod(flow.id)
                 if (currentPeriod != null && !currentPeriod.isContributionMade) {
                     val now = Calendar.getInstance().timeInMillis
-                    if (now >= currentPeriod.endDate) {
+                    // Нормализуем endDate к началу дня: кнопка ПСП активна с начала дня окончания периода
+                    val periodEndDayStart = Calendar.getInstance().apply {
+                        timeInMillis = currentPeriod.endDate
+                        set(Calendar.HOUR_OF_DAY, 0)
+                        set(Calendar.MINUTE, 0)
+                        set(Calendar.SECOND, 0)
+                        set(Calendar.MILLISECOND, 0)
+                    }.timeInMillis
+                    if (now >= periodEndDayStart) {
                         pspNeedsAction = true
                         messages.add("ПСП - взнос номинала")
                     }
