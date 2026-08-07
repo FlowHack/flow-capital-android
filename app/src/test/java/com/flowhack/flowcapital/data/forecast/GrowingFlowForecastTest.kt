@@ -232,6 +232,156 @@ class GrowingFlowForecastTest {
     }
 
     /**
+     * Проверка: В основном цикле воскресенье создаёт SUNDAY без начисления.
+     * SUNDAY сохраняет текущие значения (процент, поток, начисление), но кнопка не нажата.
+     */
+    @Test
+    fun sundayInMainLoop_createsSundayWithoutAccrual() {
+        // Arrange
+        val startDateMillis = createDateMillis(2026, Calendar.JANUARY, 15) // Четверг
+        val targetDateMillis = createDateMillis(2026, Calendar.JANUARY, 18) // Воскресенье
+        val dailyAddition = 0.003
+
+        // Act
+        val result = calculateFlowForecast(
+            inFlow = 10000.0,
+            percent = 0.1,
+            wallet = 0.0,
+            startDateMillis = startDateMillis,
+            targetDateMillis = targetDateMillis,
+            dailyAddition = dailyAddition,
+            isExistingFlow = false
+        )
+
+        // Assert
+        val sundayRecord = result.find { it.actionType == "SUNDAY" && it.date == targetDateMillis }
+        assertTrue("В воскресенье в основном цикле должна быть SUNDAY", sundayRecord != null)
+        assertTrue("Кнопка в воскресенье не должна быть нажата", !sundayRecord!!.isButtonPressed)
+        // Процент не должен расти в воскресенье (SUNDAY сохраняет текущий процент).
+        val lastDaily = result.filter { it.actionType == "DAILY" }.lastOrNull()
+        if (lastDaily != null) {
+            assertEquals("Процент не должен расти в воскресенье", lastDaily.percent, sundayRecord.percent, 0.0001)
+        }
+    }
+
+    /**
+     * Проверка: Ветка minOf(inFlow, accrual) - когда начисление больше остатка потока.
+     * Начисление ограничивается остатком inFlow.
+     */
+    @Test
+    fun accrualGreaterThanRemainingInFlow_limitsAccrualToInFlow() {
+        // Arrange
+        val startDateMillis = createDateMillis(2026, Calendar.JANUARY, 15) // Четверг
+        val targetDateMillis = createDateMillis(2026, Calendar.JANUARY, 15)
+        val dailyAddition = 0.0
+
+        // Act: inFlow=10, percent=100% -> начисление 10, остаток станет 0
+        val result = calculateFlowForecast(
+            inFlow = 10.0,
+            percent = 100.0,
+            wallet = 0.0,
+            startDateMillis = startDateMillis,
+            targetDateMillis = targetDateMillis,
+            dailyAddition = dailyAddition,
+            isExistingFlow = false
+        )
+
+        // Assert
+        val dailyRecord = result.find { it.actionType == "DAILY" }
+        assertTrue("Должна быть DAILY запись", dailyRecord != null)
+        // Начисление не может превысить остаток потока.
+        assertEquals("Начисление должно быть ограничено остатком", 10.0, dailyRecord!!.dailyAccrual, 0.01)
+        // После начисления inFlow становится 0.
+        assertEquals("inFlow после начисления должен быть 0", 0.0, dailyRecord.inFlowAmount, 0.01)
+    }
+
+    /**
+     * Проверка: Вход с inFlow=0 - создаётся START и DAILY с нулевым начислением.
+     * START создаётся всегда; на будний день при !isExistingFlow дополнительно создаётся DAILY.
+     */
+    @Test
+    fun zeroInFlow_createsStartAndDailyWithZeroAccrual() {
+        // Arrange
+        val startDateMillis = createDateMillis(2026, Calendar.JANUARY, 15)
+        val targetDateMillis = createDateMillis(2026, Calendar.JANUARY, 16)
+
+        // Act
+        val result = calculateFlowForecast(
+            inFlow = 0.0,
+            percent = 0.1,
+            wallet = 0.0,
+            startDateMillis = startDateMillis,
+            targetDateMillis = targetDateMillis,
+            dailyAddition = 0.003,
+            isExistingFlow = false
+        )
+
+        // Assert
+        assertEquals("Должны быть записи START и DAILY", 2, result.size)
+        assertEquals("Первая запись должна быть START", "START", result[0].actionType)
+        assertEquals("Начисление START должно быть 0", 0.0, result[0].dailyAccrual, 0.0001)
+        assertEquals("Вторая запись должна быть DAILY", "DAILY", result[1].actionType)
+        assertEquals("Начисление DAILY должно быть 0", 0.0, result[1].dailyAccrual, 0.0001)
+        assertEquals("Поток должен остаться 0", 0.0, result[1].inFlowAmount, 0.0001)
+    }
+
+    /**
+     * Проверка: Вход с percent=0 - первое начисление равно 0, но процент растёт.
+     * DAILY создаётся, но с нулевым начислением; процент увеличивается на dailyAddition.
+     */
+    @Test
+    fun zeroPercent_firstAccrualIsZeroButPercentGrows() {
+        // Arrange
+        val startDateMillis = createDateMillis(2026, Calendar.JANUARY, 15)
+        val targetDateMillis = createDateMillis(2026, Calendar.JANUARY, 16)
+
+        // Act
+        val result = calculateFlowForecast(
+            inFlow = 1000.0,
+            percent = 0.0,
+            wallet = 0.0,
+            startDateMillis = startDateMillis,
+            targetDateMillis = targetDateMillis,
+            dailyAddition = 0.003,
+            isExistingFlow = false
+        )
+
+        // Assert
+        val dailyRecords = result.filter { it.actionType == "DAILY" }
+        assertTrue("Должна быть DAILY запись", dailyRecords.isNotEmpty())
+        assertEquals("Первое начисление должно быть 0", 0.0, dailyRecords[0].dailyAccrual, 0.0001)
+        // Процент растёт на dailyAddition даже при стартовом percent=0.
+        assertEquals("Процент должен вырасти на dailyAddition", 0.003, dailyRecords[0].percent, 0.0001)
+    }
+
+    /**
+     * Проверка: Действующий поток (isExistingFlow=true) в воскресенье - только START и SUNDAY.
+     */
+    @Test
+    fun existingFlowOnSunday_createsStartAndSunday() {
+        // Arrange
+        val startDateMillis = createDateMillis(2026, Calendar.JANUARY, 18) // Воскресенье
+        val targetDateMillis = createDateMillis(2026, Calendar.JANUARY, 18)
+
+        // Act
+        val result = calculateFlowForecast(
+            inFlow = 1000.0,
+            percent = 0.5,
+            wallet = 100.0,
+            startDateMillis = startDateMillis,
+            targetDateMillis = targetDateMillis,
+            dailyAddition = 0.003,
+            isExistingFlow = true
+        )
+
+        // Assert
+        assertTrue("Должна быть START запись", result.any { it.actionType == "START" })
+        assertTrue("В воскресенье должна быть SUNDAY", result.any { it.actionType == "SUNDAY" })
+        assertTrue("Не должно быть DAILY для действующего потока в день старта",
+            result.none { it.actionType == "DAILY" })
+    }
+
+    /**
      * Вспомогательная функция для создания timestamp определенной даты.
      */
     private fun createDateMillis(year: Int, month: Int, day: Int): Long {

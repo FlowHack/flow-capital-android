@@ -1,6 +1,8 @@
 package com.flowhack.flowcapital.data.settings
 
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -28,9 +30,15 @@ val Context.dataStore by preferencesDataStore(name = "user_settings")
  *
  * @property context Контекст приложения
  */
-class SettingsManager(context: Context) {
-    private val dataStore = context.dataStore
+class SettingsManager internal constructor(private val dataStore: DataStore<Preferences>) {
     private var initialized = false
+
+    /**
+     * Создаёт менеджер настроек на основе контекста приложения.
+     *
+     * @param context Контекст приложения
+     */
+    constructor(context: Context) : this(context.dataStore)
 
     companion object {
         /** Ключ для стартового процента РП */

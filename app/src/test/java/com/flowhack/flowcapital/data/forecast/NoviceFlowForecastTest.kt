@@ -285,6 +285,167 @@ class NoviceFlowForecastTest {
     }
 
     /**
+     * Проверка: Точная арифметика реинвеста с бонусом.
+     * withBonus = wallet + wallet * (bonusPercent / 100); inFlow += withBonus; wallet = 0.
+     */
+    @Test
+    fun compoundInterest_reinvestAppliesBonusCorrectly() {
+        // Arrange
+        val startDateMillis = createDateMillis(2026, Calendar.JANUARY, 15) // Четверг
+        val targetDateMillis = createDateMillis(2026, Calendar.JANUARY, 20) // Вторник
+        val dailyPercent = 2.0
+        val reinvestAmount = 2000.0
+        val bonusPercent = 50.0
+        val inFlow = 100000.0
+
+        // Act
+        val result = calculateNoviceFlowForecast(
+            inFlow = inFlow,
+            dailyPercent = dailyPercent,
+            wallet = 0.0,
+            startDateMillis = startDateMillis,
+            targetDateMillis = targetDateMillis,
+            isExistingFlow = false,
+            compoundInterest = true,
+            reinvestAmount = reinvestAmount,
+            bonusPercent = bonusPercent
+        )
+
+        // Assert
+        val reinvestRecords = result.filter { it.actionType == "PN_REINVEST" }
+        assertTrue("Должны быть записи PN_REINVEST", reinvestRecords.isNotEmpty())
+
+        // Проверяем точную арифметику бонуса.
+        // Реинвест происходит в тот же день, что и PN_DAILY.
+        // withBonus = wallet + wallet * (bonusPercent / 100).
+        val firstReinvest = reinvestRecords.first()
+        // Кошелёк после реинвеста должен быть 0.
+        assertEquals("Кошелёк после реинвеста должен быть 0", 0.0, firstReinvest.walletAmount, 0.01)
+        // inFlow после реинвеста должен быть больше исходного (вырос на бонус).
+        assertTrue("inFlow после реинвеста должен вырасти", firstReinvest.inFlowAmount > inFlow)
+        // Реинвест должен быть в тот же день, что и предшествующий PN_DAILY.
+        val dailySameDay = result.filter {
+            it.actionType == "PN_DAILY" && it.date == firstReinvest.date
+        }
+        assertTrue("Реинвест должен быть в тот же день, что и PN_DAILY", dailySameDay.isNotEmpty())
+    }
+
+    /**
+     * Проверка: При compoundInterest=false реинвест не происходит.
+     */
+    @Test
+    fun compoundInterestDisabled_noReinvestRecords() {
+        // Arrange
+        val startDateMillis = createDateMillis(2026, Calendar.JANUARY, 15) // Четверг
+        val targetDateMillis = createDateMillis(2026, Calendar.JANUARY, 20) // Вторник
+        val dailyPercent = 2.0
+        val inFlow = 100000.0
+
+        // Act
+        val result = calculateNoviceFlowForecast(
+            inFlow = inFlow,
+            dailyPercent = dailyPercent,
+            wallet = 0.0,
+            startDateMillis = startDateMillis,
+            targetDateMillis = targetDateMillis,
+            isExistingFlow = false,
+            compoundInterest = false,
+            reinvestAmount = 2000.0,
+            bonusPercent = 50.0
+        )
+
+        // Assert
+        val reinvestRecords = result.filter { it.actionType == "PN_REINVEST" }
+        assertTrue("При compoundInterest=false не должно быть PN_REINVEST", reinvestRecords.isEmpty())
+    }
+
+    /**
+     * Проверка: В основном цикле воскресенье создаёт SUNDAY без нажатия кнопки.
+     * SUNDAY сохраняет текущие значения, кнопка не нажата.
+     */
+    @Test
+    fun sundayInMainLoop_createsSundayWithoutAccrual() {
+        // Arrange
+        val startDateMillis = createDateMillis(2026, Calendar.JANUARY, 15) // Четверг
+        val targetDateMillis = createDateMillis(2026, Calendar.JANUARY, 18) // Воскресенье
+        val dailyPercent = 2.0
+
+        // Act
+        val result = calculateNoviceFlowForecast(
+            inFlow = 10000.0,
+            dailyPercent = dailyPercent,
+            wallet = 0.0,
+            startDateMillis = startDateMillis,
+            targetDateMillis = targetDateMillis,
+            isExistingFlow = false
+        )
+
+        // Assert
+        val sundayRecord = result.find { it.actionType == "SUNDAY" && it.date == targetDateMillis }
+        assertTrue("В воскресенье в основном цикле должна быть SUNDAY", sundayRecord != null)
+        assertTrue("Кнопка в воскресенье не должна быть нажата", !sundayRecord!!.isButtonPressed)
+        // Процент фиксированный для ПН.
+        assertEquals("Процент должен быть фиксированным", dailyPercent, sundayRecord.percent, 0.0001)
+    }
+
+    /**
+     * Проверка: Вход с inFlow=0 - создаётся PN_START и PN_DAILY с нулевым начислением.
+     * PN_START создаётся всегда; на будний день при !isExistingFlow дополнительно создаётся PN_DAILY.
+     */
+    @Test
+    fun zeroInFlow_createsStartAndDailyWithZeroAccrual() {
+        // Arrange
+        val startDateMillis = createDateMillis(2026, Calendar.JANUARY, 15)
+        val targetDateMillis = createDateMillis(2026, Calendar.JANUARY, 16)
+
+        // Act
+        val result = calculateNoviceFlowForecast(
+            inFlow = 0.0,
+            dailyPercent = 2.0,
+            wallet = 0.0,
+            startDateMillis = startDateMillis,
+            targetDateMillis = targetDateMillis,
+            isExistingFlow = false
+        )
+
+        // Assert
+        assertEquals("Должны быть записи PN_START и PN_DAILY", 2, result.size)
+        assertEquals("Первая запись должна быть PN_START", "PN_START", result[0].actionType)
+        assertEquals("Начисление PN_START должно быть 0", 0.0, result[0].dailyAccrual, 0.0001)
+        assertEquals("Вторая запись должна быть PN_DAILY", "PN_DAILY", result[1].actionType)
+        assertEquals("Начисление PN_DAILY должно быть 0", 0.0, result[1].dailyAccrual, 0.0001)
+        assertEquals("Поток должен остаться 0", 0.0, result[1].inFlowAmount, 0.0001)
+    }
+
+    /**
+     * Проверка: Вход с dailyPercent=0 - начисление равно 0, поток не исчерпывается.
+     * PN_DAILY создаётся с нулевым начислением; поток остаётся неизменным.
+     */
+    @Test
+    fun zeroPercent_createsZeroAccrual() {
+        // Arrange
+        val startDateMillis = createDateMillis(2026, Calendar.JANUARY, 15)
+        val targetDateMillis = createDateMillis(2026, Calendar.JANUARY, 16)
+
+        // Act
+        val result = calculateNoviceFlowForecast(
+            inFlow = 1000.0,
+            dailyPercent = 0.0,
+            wallet = 0.0,
+            startDateMillis = startDateMillis,
+            targetDateMillis = targetDateMillis,
+            isExistingFlow = false
+        )
+
+        // Assert
+        val dailyRecords = result.filter { it.actionType == "PN_DAILY" }
+        assertTrue("Должна быть PN_DAILY запись", dailyRecords.isNotEmpty())
+        assertEquals("Начисление должно быть 0", 0.0, dailyRecords[0].dailyAccrual, 0.0001)
+        // Поток не исчерпывается при нулевом проценте.
+        assertEquals("Поток должен остаться 1000", 1000.0, dailyRecords[0].inFlowAmount, 0.0001)
+    }
+
+    /**
      * Вспомогательная функция для создания timestamp определенной даты.
      */
     private fun createDateMillis(year: Int, month: Int, day: Int): Long {
