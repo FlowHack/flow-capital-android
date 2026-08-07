@@ -78,10 +78,12 @@ crashlytics.properties
 
 # AI agents configuration files
 AGENTS.md
-GEMINI.md
 AI_DEV_LOG.md
 myAgents/
 myAgents/*
+.aider*
+aider*
+opencode*
 
 # Node.js
 node_modules/

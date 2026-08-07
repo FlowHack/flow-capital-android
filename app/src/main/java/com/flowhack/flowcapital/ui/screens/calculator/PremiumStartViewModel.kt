@@ -249,8 +249,9 @@ class PremiumStartViewModel(
                     contributionDate = null,
                     isCompleted = false
                 )
-                // Обновляем существующий или создаём новый период
-                val existingPeriod = _periods.value.find { it.periodNumber == newCurrentPeriodNum }
+                // Перечитываем следующий период из БД (не из снимка _periods.value),
+                // чтобы гарантировать корректный id и исключить тихий no-op @Update
+                val existingPeriod = flowRepository.getPeriodByNumber(flow.id, newCurrentPeriodNum)
                 if (existingPeriod != null) {
                     flowRepository.updatePeriod(nextPeriod.copy(id = existingPeriod.id))
                     _currentPeriod.value = nextPeriod.copy(id = existingPeriod.id)
@@ -266,6 +267,9 @@ class PremiumStartViewModel(
                 )
                 flowRepository.updateFlow(updatedFlow)
                 _currentFlow.value = updatedFlow
+
+                // Перезагружаем периоды из БД для консистентности снимка
+                _periods.value = flowRepository.getPeriodsByFlowId(flow.id).first()
             }
         }
     }

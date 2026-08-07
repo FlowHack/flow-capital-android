@@ -81,6 +81,9 @@ class PremiumStartFlowRepository(
     suspend fun getCurrentPeriod(flowId: Int): PremiumStartPeriodEntity? =
         periodDao.getCurrentPeriod(flowId)
 
+    suspend fun getPeriodByNumber(flowId: Int, periodNumber: Int): PremiumStartPeriodEntity? =
+        periodDao.getPeriodByNumber(flowId, periodNumber)
+
     suspend fun insertPeriod(period: PremiumStartPeriodEntity): Long =
         periodDao.insert(period)
 
