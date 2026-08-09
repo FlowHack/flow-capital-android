@@ -161,6 +161,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Конвертируем LF в CRLF (GitHub рендерит Markdown с CRLF корректно)
+          sed -i 's/$/\r/' release_notes.md
+
           # Формируем JSON с телом релиза (Markdown рендерится автоматически)
           jq -n \
             --arg tag "${{ github.ref_name }}" \
