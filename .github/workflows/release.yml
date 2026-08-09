@@ -151,8 +151,8 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "${{ github.event.inputs.release_notes }}" > release_notes.md
           else
-            # Тег уже на remote (релиз создан в предыдущей job), загружаем его
-            git fetch origin --tags --force
+            # Тег уже на remote (релиз создан в предыдущей job), загружаем его объект
+            git fetch origin "refs/tags/${{ github.ref_name }}:refs/tags/${{ github.ref_name }}" --force
             # Извлекаем текст тега (после заголовка tagger)
             git cat-file tag "${{ github.ref_name }}" | sed -n '/^$/,$p' | sed '1d' > release_notes.md
           fi
