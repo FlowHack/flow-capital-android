@@ -75,13 +75,13 @@ jobs:
 
       - name: Извлечение versionName
         id: extract_version
-        run: >-
+        run: |
           VERSION=$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts)
           echo "version_name=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Переименование APK
         id: rename_apk
-        run: >-
+        run: |
           APK_PATH="app/build/outputs/apk/release/app-release.apk"
           NEW_APK_NAME="FlowCapital_${{ steps.extract_version.outputs.version_name }}.apk"
           mv "$APK_PATH" "$NEW_APK_NAME"
@@ -114,7 +114,7 @@ jobs:
 
       - name: Получение release notes
         id: get_release_notes
-        run: >-
+        run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "${{ github.event.inputs.release_notes }}" > release_notes.md
           else
