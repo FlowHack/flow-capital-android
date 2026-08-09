@@ -115,15 +115,35 @@ jobs:
           else
             git cat-file tag "${{ github.ref_name }}" | sed -n '/^$/,$p' | sed '1d' > release_notes.md
           fi
-          echo "release_notes<<EOF" >> $GITHUB_OUTPUT
-          cat release_notes.md >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Создание GitHub Release
-        uses: softprops/action-gh-release@v3
-        with:
-          name: FlowCapital v${{ needs.build.outputs.version_name }}
-          body: ${{ steps.get_release_notes.outputs.release_notes }}
-          files: ${{ needs.build.outputs.apk_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_NAME: FlowCapital v${{ needs.build.outputs.version_name }}
+          APK_PATH: ${{ needs.build.outputs.apk_path }}
+        run: |
+          # Формируем JSON с телом релиза (Markdown рендерится автоматически)
+          jq -n \
+            --arg name "$RELEASE_NAME" \
+            --arg tag "${{ github.ref_name }}" \
+            --rawfile body release_notes.md \
+            '{name: $name, tag_name: $tag, body: $body, draft: false, prerelease: false}' > release_payload.json
+
+          # Создаём или обновляем релиз
+          RESPONSE=$(curl -s -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "Content-Type: application/json" \
+            -d @release_payload.json \
+            "https://api.github.com/repos/${{ github.repository }}/releases")
+
+          # Извлекаем upload_url
+          UPLOAD_URL=$(echo "$RESPONSE" | jq -r '.upload_url' | sed 's/{?name,label}//')
+          echo "Upload URL: $UPLOAD_URL"
+
+          # Загружаем APK
+          curl -s -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Content-Type: application/vnd.android.package-archive" \
+            --data-binary @"$APK_PATH" \
+            "$UPLOAD_URL?name=$(basename "$APK_PATH")"
