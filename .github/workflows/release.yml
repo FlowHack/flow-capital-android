@@ -15,7 +15,7 @@ on:
         type: string
 
 jobs:
-  # Job для сборки и проверки
+  # Job для сборки APK
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -87,7 +87,7 @@ jobs:
           name: release-apk
           path: ${{ steps.rename_apk.outputs.apk_path }}
 
-  # Job для создания релиза
+  # Job для создания релиза (с пустым текстом)
   release:
     name: Release
     needs: build
@@ -95,28 +95,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Checkout репозитория
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-          fetch-tags: true
-          ref: ${{ github.ref }}
-
       - name: Скачивание APK артефакта
         uses: actions/download-artifact@v5
         with:
           name: release-apk
           path: .
-
-      - name: Получение release notes
-        id: get_release_notes
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "${{ github.event.inputs.release_notes }}" > release_notes.md
-          else
-            # Извлекаем текст тега (после заголовка tagger)
-            git show "${{ github.ref_name }}" | sed -n '/^$/,$p' | sed '1d' > release_notes.md
-          fi
 
       - name: Создание GitHub Release
         env:
@@ -124,14 +107,13 @@ jobs:
           RELEASE_NAME: FlowCapital v${{ needs.build.outputs.version_name }}
           APK_PATH: ${{ needs.build.outputs.apk_path }}
         run: |
-          # Формируем JSON с телом релиза (Markdown рендерится автоматически)
+          # Формируем JSON с пустым телом релиза
           jq -n \
             --arg name "$RELEASE_NAME" \
             --arg tag "${{ github.ref_name }}" \
-            --rawfile body release_notes.md \
-            '{name: $name, tag_name: $tag, body: $body, draft: false, prerelease: false}' > release_payload.json
+            '{name: $name, tag_name: $tag, body: "", draft: false, prerelease: false}' > release_payload.json
 
-          # Создаём или обновляем релиз
+          # Создаём релиз
           RESPONSE=$(curl -s -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
@@ -149,3 +131,54 @@ jobs:
             -H "Content-Type: application/vnd.android.package-archive" \
             --data-binary @"$APK_PATH" \
             "$UPLOAD_URL?name=$(basename "$APK_PATH")"
+
+  # Job для обновления текста релиза
+  update_release:
+    name: Update Release Notes
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout репозитория
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Получение release notes из тега
+        id: get_release_notes
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "${{ github.event.inputs.release_notes }}" > release_notes.md
+          else
+            # Тег уже на remote (релиз создан в предыдущей job), загружаем его
+            git fetch origin tag "${{ github.ref_name }}" --force
+            # Извлекаем текст тега (после заголовка tagger)
+            git show "${{ github.ref_name }}" | sed -n '/^$/,$p' | sed '1d' > release_notes.md
+          fi
+
+      - name: Обновление текста релиза
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Формируем JSON с телом релиза (Markdown рендерится автоматически)
+          jq -n \
+            --arg tag "${{ github.ref_name }}" \
+            --rawfile body release_notes.md \
+            '{body: $body}' > update_payload.json
+
+          # Получаем ID релиза по тегу
+          RELEASE_ID=$(curl -s \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ github.ref_name }}" | jq -r '.id')
+
+          echo "Release ID: $RELEASE_ID"
+
+          # Обновляем текст релиза
+          curl -s -X PATCH \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "Content-Type: application/json" \
+            -d @update_payload.json \
+            "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID"
