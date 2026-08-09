@@ -7,6 +7,9 @@
 ![Compose](https://img.shields.io/badge/Compose-02569B?style=for-the-badge&logo=jetpackcompose&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
 
+[![CI develop](https://github.com/FlowHack/flow-capital-android/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/FlowHack/flow-capital-android/actions/workflows/ci.yml)
+[![CI master](https://github.com/FlowHack/flow-capital-android/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/FlowHack/flow-capital-android/actions/workflows/ci.yml)
+
 **Android-приложение для учёта финансовых потоков**
 
 [Описание](#описание) • [Функции](#функции) • [Технологии](#технологии) • [Сборка](#сборка) • [Структура](#структура-проекта)
@@ -17,7 +20,16 @@
 
 ## 🤖 AI-Assisted Development
 
-Проект спроектирован и написан с помощью ИИ в окружении OpenCode моделью Big Pickle
+Проект спроектирован и написан с помощью ИИ в окружении **AiderDesk** — мультиагентной системы разработки. Работу координирует **Architect Manager**, который распределяет задачи между специализированными субагентами.
+
+### Используемые модели
+
+| Агент | Модель | Роль |
+|-------|--------|------|
+| **Architect Manager** | DeepSeek (`deepseek-v4-flash`) | Главный координатор: планирование, архитектура, распределение задач, контроль качества |
+| **SubAgent Big Pickle** | OpenCode Zen (`big-pickle`) | Чтение файлов, рутина, написание тестов, ревью кода, QA (lint + unit-тесты) |
+| **SubAgent Mistral** | Mistral (`devstral-latest`) | Генерация кода (первичный генератор): новые функции, модули, рефакторинг |
+| **SubAgent Gemini** | Google Gemini (`gemini-3-flash-preview`) | Генерация кода (резервный генератор): дублирует роль Mistral при его недоступности |
 
 ## Описание
 

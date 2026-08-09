@@ -2,10 +2,10 @@
 
 ## Описание
 
-Данная папка содержит интеграционные тесты для приложения FlowCapital. В отличие от юнит-тестов (`src/test/`), которые тестируют изолированную бизнес-логику, интеграционные тесты проверяют реальную работу компонентов системы:
+Данная папка содержит интеграционные тесты для приложения FlowCapital. В отличие от юнит-тестов (`src/test/`), которые тестируют изолированную бизнес-логику, интеграционные тесты проверяют реальную связку компонентов системы:
 
 - **Room Database (DAO)** — реальная работа с базой данных (in-memory)
-- **DataStore (SettingsManager)** — сохранение и чтение настроек
+- **Репозитории** — связка forecast-функция -> репозиторий -> БД
 - **Взаимодействие слоев** — Repository, DAO, Entity
 
 ## Структура тестов
@@ -13,62 +13,64 @@
 ### 1. BaseIntegrationTest.kt
 Базовый класс для всех интеграционных тестов.
 - Создает in-memory базу Room для изоляции тестов
-- Инициализирует все DAO: `GrowingFlowDao`, `NoviceFlowDao`, `PremiumStartFlowDao`, `PremiumStartPeriodDao`
+- Инициализирует все DAO: `GrowingFlowDao`, `NoviceFlowDao`, `NoviceFlowsDao`, `PremiumStartFlowDao`, `PremiumStartPeriodDao`
 - Очищает базу после каждого теста
 
 ### 2. GrowingFlowIntegrationTest.kt (РП - Растущий Поток)
-Тесты согласно ТЗ для Растущего Потока:
+Проверяет связку `calculateFlowForecast` -> `GrowingFlowRepository` -> БД:
 
-| Тест | Описание | ТЗ |
-|------|----------|-----|
-| Т3.1 | Старт РП — создание записи START в БД | Старт: запись с процентом, в потоке, начислением |
-| Т3.2 | Нажатие кнопки — создание DAILY записи | При нажатии: В потоке ↓, Кошелек ↑ |
-| Т3.3 | Генерация пропущенных дней — MISSED | Если не нажата кнопка — MISSED |
-| Т3.4 | Воскресенье — создание SUNDAY записи | Воскресенье — неактивный день |
-| Т3.5 | Реинвест — увеличение потока с бонусом | Взнос + бонус к В потоке |
-| Т3.6 | Коррекция — изменение только кошелька | Если меняется Кошелек: только он |
-| Т3.7 | Генерация нескольких MISSED подряд | АВТОМАТИЧЕСКИ сгенерировать за ВСЕ дни |
-| Т3.8 | Нулевой поток — кнопка блокируется | При балансе 0.00 — блокировка |
+| Тест | Описание |
+|------|----------|
+| forecast_savesAllRecordsToDb | Прогноз РП сохраняется в БД через репозиторий |
+| getLastEntry_returnsMostRecentRecord | getLastEntry возвращает последнюю запись |
+| getEntriesForDateRange_returnsRecordsInRange | getEntriesForDateRange возвращает записи за диапазон |
+| getLastEntryBeforeDate_returnsRecordBeforeDate | getLastEntryBeforeDate возвращает запись до даты |
+| getFirstStartEntry_returnsFirstStartRecord | getFirstStartEntry возвращает первую START |
+| getLastPressEntry_returnsLastPressedRecord | getLastPressEntry возвращает запись с нажатой кнопкой |
+| clearHistory_removesAllRecords | clearHistory очищает все записи |
+| updateEntry_updatesExistingRecord | updateEntry обновляет запись |
 
 ### 3. NoviceFlowIntegrationTest.kt (ПН - Поток Новичка)
-Тесты согласно ТЗ для Потока Новичка:
+Проверяет связку `calculateNoviceFlowForecast` -> `NoviceFlowRepository` -> БД:
 
-| Тест | Описание | ТЗ |
-|------|----------|-----|
-| Т3.9 | Старт ПН — запись PN_START | В потоке = Взнос + (Взнос * Бонус%) |
-| Т3.10 | Нажатие кнопки — PN_DAILY | Начисление: В потоке ↓, Кошелек ↑ |
-| Т3.11 | Пропуск дня — PN_MISSED | Если не нажата — PN_MISSED |
-| Т3.12 | Воскресенье — PN_SUNDAY | Воскресенье — неактивный день |
-| Т3.13 | Реинвест ПН — увеличение с бонусом | Взнос + бонус к В потоке |
-| Т3.14 | Коррекция ПН — только кошелек | Если меняется Кошелек: только он |
-| Т3.15 | Сложный процент — реинвест при пороге | Когда в кошельке >= суммы реинвеста |
-| Т3.16 | Лимит — только 1 поток ПН | Только 1 поток для ПН |
+| Тест | Описание |
+|------|----------|
+| forecast_savesAllRecordsToDb | Прогноз ПН сохраняется в БД через репозиторий |
+| getLastEntry_returnsMostRecentRecord | getLastEntry возвращает последнюю запись |
+| getAllEntries_returnsAllRecords | getAllEntries возвращает все записи |
+| getEntriesForDateRange_returnsRecordsInRange | getEntriesForDateRange возвращает записи за диапазон |
+| getLastEntryBeforeDate_returnsRecordBeforeDate | getLastEntryBeforeDate возвращает запись до даты |
+| getFirstStartEntry_returnsFirstStartRecord | getFirstStartEntry возвращает первую PN_START |
+| getLastPressEntry_returnsLastPressedRecord | getLastPressEntry возвращает запись с нажатой кнопкой |
+| clearHistory_removesAllRecords | clearHistory очищает все записи |
+| updateEntry_updatesExistingRecord | updateEntry обновляет запись |
 
 ### 4. PremiumStartIntegrationTest.kt (ПСП - Премиум Старт)
-Тесты согласно ТЗ для Премиум Стартового Потока:
+Проверяет связку `PremiumStartFlowRepository` -> БД с якорным алгоритмом дат (`calculatePspPeriodEndDate`):
 
-| Тест | Описание | ТЗ |
-|------|----------|-----|
-| Т3.17 | Создание ПСП — запись потока | Старт: Номинал, Дата начала, Период |
-| Т3.18 | Создание периодов — генерация истории | Жизненный цикл: 20 периодов по 14 дней |
-| Т3.19 | Взнос номинала — переход к след. периоду | После взноса: новый период + 14 дней |
-| Т3.20 | Старт с середины (не 1-й период) | Номинал, Текущий период, Дата начала 1-го |
-| Т3.21 | Закрытие 20-го периода — завершение | В день закрытия: ЗАКРЫТЬ ПОТОК |
-| Т3.22 | Удаление потока ПСП | Удаляет из БД и вычитает из Всего накапало |
-| Т3.23 | Дата закрытия после взноса | Дата закрытия = Дата взноса + 14 дней |
-| Т3.24 | Длинный пропуск (5 лет) | Дата закрытия = ровно 2 недели от взноса |
+| Тест | Описание |
+|------|----------|
+| createPspFlow_createsFlowInDb | Создание потока ПСП сохраняется в БД |
+| getFlowsCount_returnsNumberOfFlows | getFlowsCount возвращает количество потоков |
+| createPspPeriods_usesAnchorAlgorithm | Создание периодов с якорным алгоритмом дат |
+| getCurrentPeriod_returnsIncompletePeriod | getCurrentPeriod возвращает незавершённый период |
+| getPeriodByNumber_returnsCorrectPeriod | getPeriodByNumber возвращает период по номеру |
+| updatePeriod_updatesExistingPeriod | updatePeriod обновляет период |
+| deleteFlow_removesFlowAndPeriods | deleteFlow удаляет поток и его периоды |
+| clearAll_removesAllFlowsAndPeriods | clearAll очищает все потоки и периоды |
+| updateFlow_updatesExistingFlow | updateFlow обновляет поток |
 
-### 5. SettingsIntegrationTest.kt (Настройки)
-Тесты для SettingsManager (DataStore):
+### 5. SettingsIntegrationTest.kt (NoviceFlowsDao v2)
+Проверяет работу `NoviceFlowsDao` (таблица novice_flows, Entity v2):
 
-| Тест | Описание | ТЗ |
-|------|----------|-----|
-| Т3.25 | Сохранение и чтение процентов РП | НАСТРОЙКИ ПОТОКОВ: поля редактирования % |
-| Т3.26 | Сохранение и чтение процентов ПН | Бонус ко взносу: {X}%, Ежедневный процент: {Y}% |
-| Т3.27 | Сохранение коэффициентов ПСП | Процентов периодов ПСП (сериализованная строка) |
-| Т3.28 | Переключатель темы приложения | Переключатель светлой и темной темы |
-| Т3.29 | Напоминания — добавление и удаление | Строка Напоминания х/5, Максимум 5 в день |
-| Т3.30 | Проверка обновлений при входе | Чекбокс Проверять обновления при входе |
+| Тест | Описание |
+|------|----------|
+| insertNoviceFlow_savesToDb | Вставка потока новичка v2 сохраняется в БД |
+| getAllFlows_returnsAllFlows | getAllFlows возвращает все потоки |
+| getFlowsCount_returnsNumberOfFlows | getFlowsCount возвращает количество потоков |
+| update_updatesExistingFlow | update обновляет поток |
+| deleteById_removesFlow | deleteById удаляет поток |
+| clearAll_removesAllFlows | clearAll очищает все потоки |
 
 ## Запуск тестов
 
@@ -93,15 +95,15 @@
 - **Эмулятор или устройство** — тесты запускаются на реальном Android (не JVM)
 - **Room Testing** — `androidx.room:room-testing` (добавлено в build.gradle.kts)
 
-## Покрытие (согласно ТЗ)
+## Покрытие
 
 ### Что покрыто:
-✅ РП (Растущий Поток) — 8 тестов  
-✅ ПН (Поток Новичка) — 8 тестов  
-✅ ПСП (Премиум Старт) — 8 тестов  
-✅ Настройки (DataStore) — 6 тестов  
+✅ РП (Растущий Поток) — репозиторий + forecast (8 тестов)  
+✅ ПН (Поток Новичка) — репозиторий + forecast (9 тестов)  
+✅ ПСП (Премиум Старт) — репозиторий + якорный алгоритм (9 тестов)  
+✅ NoviceFlowsDao v2 — таблица novice_flows (6 тестов)  
 
-**Всего: 30 интеграционных тестов**
+**Всего: 32 интеграционных теста**
 
 ### Что НЕ покрыто (трудно тестируемые компоненты):
 ❌ Браузер (WebView) — требует эмуляцию браузера  
@@ -115,11 +117,11 @@
 1. **In-memory база** — тесты используют in-memory Room, данные не сохраняются между тестами
 2. **Изоляция** — каждый тест начинается с чистой базы данных
 3. **runBlocking** — тесты используют `runBlocking` для синхронного выполнения корутин
-4. **ТЗ ориентированность** — тесты проверяют реальные сценарии из ТЗ, а не код
+4. **Якорный алгоритм ПСП** — даты периодов рассчитываются через `calculatePspPeriodEndDate` (2 периода в месяц, clamp дня к 28)
 
 ## Добавление новых тестов
 
 1. Создайте новый файл в папке `integration/`
 2. Наследуйтесь от `BaseIntegrationTest` (для доступа к DAO)
 3. Используйте `@Test` аннотации
-4. Для тестов Settings наследуйтесь от `SettingsIntegrationTest` или создавайте свой DataStore
+4. Для тестов репозиториев создавайте репозиторий в `setUp()` из DAO

@@ -37,6 +37,9 @@ interface GrowingFlowDao {
 
     @Query("SELECT * FROM growing_flow_history WHERE actionType = 'START' ORDER BY date ASC LIMIT 1")
     suspend fun getFirstStartEntry(): GrowingFlowEntity?
+
+    @Query("SELECT * FROM growing_flow_history WHERE actionType = 'DAILY' AND isButtonPressed = 1 ORDER BY date DESC LIMIT 1")
+    suspend fun getLastPressEntry(): GrowingFlowEntity?
 }
 
 /**
@@ -67,6 +70,9 @@ interface NoviceFlowDao {
 
     @Query("SELECT * FROM novice_flow_history WHERE actionType = 'PN_START' ORDER BY date ASC LIMIT 1")
     suspend fun getFirstStartEntry(): NoviceFlowEntity?
+
+    @Query("SELECT * FROM novice_flow_history WHERE actionType = 'PN_DAILY' AND isButtonPressed = 1 ORDER BY date DESC LIMIT 1")
+    suspend fun getLastPressEntry(): NoviceFlowEntity?
 
     @Update
     suspend fun update(flowEntity: NoviceFlowEntity)

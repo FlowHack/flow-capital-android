@@ -10,12 +10,11 @@ import android.os.Build
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import com.flowhack.flowcapital.AlarmActivity
-import com.flowhack.flowcapital.data.db.AppDatabase
 import com.flowhack.flowcapital.data.logging.AppLogger
+import com.flowhack.flowcapital.data.settings.SettingsManager
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
-import java.util.Calendar
+import kotlinx.coroutines.launch
 
 /**
  * BroadcastReceiver для обработки срабатывания будильников (AlarmManager).
@@ -28,20 +27,26 @@ import java.util.Calendar
 class AlarmReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
+        val pendingResult = goAsync()
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         val wakeLock = powerManager.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK,
             "AlarmReceiver:alarm"
         )
-        wakeLock.acquire(30_000L)
-        try {
-            _onReceive(context, intent)
-        } finally {
-            if (wakeLock.isHeld) wakeLock.release()
+        wakeLock.acquire(10_000L)
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                _onReceive(context, intent)
+            } catch (e: Exception) {
+                AppLogger.e("AlarmReceiver", "Ошибка обработки будильника", e)
+            } finally {
+                if (wakeLock.isHeld) wakeLock.release()
+                pendingResult.finish()
+            }
         }
     }
 
-    private fun _onReceive(context: Context, intent: Intent) {
+    private suspend fun _onReceive(context: Context, intent: Intent) {
         val timeTag = intent.getStringExtra(EXTRA_TIME_TAG) ?: run {
             AppLogger.e("AlarmReceiver", "Получен Intent без timeTag")
             return
@@ -49,18 +54,12 @@ class AlarmReceiver : BroadcastReceiver() {
 
         AppLogger.d("AlarmReceiver", "Сработал будильник для timeTag=$timeTag")
 
-        val messages = runBlocking(Dispatchers.IO) {
-            buildReminderMessages(context)
-        }
-
+        // Перепланирование будильника в начале, до тяжёлых запросов
         val isFinal = timeTag == FINAL_2300_TAG
-
-        // FINAL_2300_TAG всегда перепланируется на завтра, даже если действий нет
         if (isFinal) {
             AppLogger.d("AlarmReceiver", "Финальный будильник 23:00 — перепланирование на завтра")
             scheduleFinalReminder(context)
         } else {
-            // Обычный будильник — перепланировать на следующий день
             val parts = timeTag.split(":")
             if (parts.size == 2) {
                 val hour = parts[0].toIntOrNull()
@@ -71,6 +70,10 @@ class AlarmReceiver : BroadcastReceiver() {
                 }
             }
         }
+
+        val settingsManager = SettingsManager(context)
+        val smartNotifications = settingsManager.getSmartNotifications()
+        val messages = ReminderMessageBuilder.buildReminderMessages(context, smartNotifications)
 
         if (messages.isEmpty()) {
             AppLogger.d("AlarmReceiver", "Действия не требуются — тихий выход")
@@ -122,76 +125,4 @@ class AlarmReceiver : BroadcastReceiver() {
     }
 }
 
-/**
- * Проверить все потоки и собрать список сообщений о требуемых действиях.
- * Логика идентична ReminderWorker.doWork().
- *
- * @return Список строк с описанием требуемых действий, или пустой список если действий нет
- */
-private suspend fun buildReminderMessages(context: Context): List<String> {
-    AppLogger.d("buildReminderMessages", "Проверка потоков на требуемые действия")
-    val db = AppDatabase.getDatabase(context)
-    val calendar = Calendar.getInstance()
-    val isSunday = calendar.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
-    val today = calendar.get(Calendar.DAY_OF_YEAR)
-    val year = calendar.get(Calendar.YEAR)
-    val messages = mutableListOf<String>()
-    var hasAnyAction = false
 
-    // Проверка ПСП — работает даже в воскресенье
-    var pspNeedsAction = false
-    val allPspFlows = db.premiumStartFlowDao().getAllFlows().first()
-    for (flow in allPspFlows) {
-        if (flow.isActive) {
-            val currentPeriod = db.premiumStartPeriodDao().getCurrentPeriod(flow.id)
-            if (currentPeriod != null && !currentPeriod.isContributionMade) {
-                val now = Calendar.getInstance().timeInMillis
-                if (now >= currentPeriod.endDate) {
-                    pspNeedsAction = true
-                    messages.add("ПСП - взнос номинала")
-                    hasAnyAction = true
-                }
-            }
-        }
-    }
-
-    // Воскресенье без ПСП — выходной для РП/ПН
-    if (isSunday && !pspNeedsAction) {
-        AppLogger.d("buildReminderMessages", "Воскресенье, действий нет")
-        return emptyList()
-    }
-
-    // Проверка Растущего Потока
-    val lastGrowingEntry = db.growingFlowDao().getLastEntry()
-    if (lastGrowingEntry != null) {
-        val lastCal = Calendar.getInstance().apply { timeInMillis = lastGrowingEntry.date }
-        val isPressedToday = lastGrowingEntry.isButtonPressed &&
-            today == lastCal.get(Calendar.DAY_OF_YEAR) &&
-            year == lastCal.get(Calendar.YEAR)
-        if (!isPressedToday && !isSunday) {
-                    messages.add("РП - нажмите кнопку")
-            hasAnyAction = true
-        }
-    }
-
-    // Проверка Потока Новичка
-    val lastNoviceEntry = db.noviceFlowDao().getLastEntry()
-    if (lastNoviceEntry != null) {
-        val lastCal = Calendar.getInstance().apply { timeInMillis = lastNoviceEntry.date }
-        val isPressedToday = lastNoviceEntry.isButtonPressed &&
-            today == lastCal.get(Calendar.DAY_OF_YEAR) &&
-            year == lastCal.get(Calendar.YEAR)
-        if (!isPressedToday && !isSunday) {
-                    messages.add("ПН - нажмите кнопку")
-            hasAnyAction = true
-        }
-    }
-
-    if (!hasAnyAction) {
-        AppLogger.d("buildReminderMessages", "Все действия выполнены")
-        return emptyList()
-    }
-
-    AppLogger.d("buildReminderMessages", "Требуются действия: ${messages.size}")
-    return messages
-}

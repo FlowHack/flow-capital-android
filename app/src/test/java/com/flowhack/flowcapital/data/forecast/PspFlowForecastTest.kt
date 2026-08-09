@@ -283,6 +283,56 @@ class PspFlowForecastTest {
         assertEquals("Период 2 (day=30) должен быть 28.02", createDateMillis(2026, Calendar.FEBRUARY, 28), period2End)
     }
 
+    @Test
+    fun forecast_startDateOfPeriods_isPreviousEndDate() {
+        val startDateMillis = createDateMillis(2026, Calendar.MAY, 1)
+        val nominal = 5000.0
+        val coefficients = createDefaultCoefficients()
+
+        val result = calculatePspForecast(
+            nominal = nominal,
+            startDateMillis = startDateMillis,
+            coefficients = coefficients
+        )
+
+        // Период 1: startDate = исходная дата старта.
+        assertEquals("Период 1 должен начинаться с даты старта", startDateMillis, result[0].startDate)
+        // Период 2: startDate = endDate периода 1.
+        assertEquals("Период 2 должен начинаться с endDate периода 1",
+            result[0].endDate, result[1].startDate)
+        // Период 3: startDate = endDate периода 2.
+        assertEquals("Период 3 должен начинаться с endDate периода 2",
+            result[1].endDate, result[2].startDate)
+    }
+
+    @Test
+    fun periodEndDate_startDay14_boundary_usesDay2() {
+        // startDay = 14 <= 14 -> day1 = 14, day2 = 28.
+        val startDateMillis = createDateMillis(2026, Calendar.MAY, 14)
+
+        // Период 1 (odd): day2 = 28 -> 28.05.2026.
+        val period1End = calculatePspPeriodEndDate(startDateMillis, 1)
+        assertEquals("Период 1 (startDay=14) должен быть 28.05", createDateMillis(2026, Calendar.MAY, 28), period1End)
+
+        // Период 2 (even): day1 = 14 -> 14.06.2026.
+        val period2End = calculatePspPeriodEndDate(startDateMillis, 2)
+        assertEquals("Период 2 (startDay=14) должен быть 14.06", createDateMillis(2026, Calendar.JUNE, 14), period2End)
+    }
+
+    @Test
+    fun periodEndDate_startDay15_boundary_usesDay1() {
+        // startDay = 15 > 14 -> day1 = 15-14 = 1, day2 = 15.
+        val startDateMillis = createDateMillis(2026, Calendar.MAY, 15)
+
+        // Период 1 (odd, startDay>14): monthsToAdd=(1+1)/2=1, day=day1=1 -> 01.06.2026.
+        val period1End = calculatePspPeriodEndDate(startDateMillis, 1)
+        assertEquals("Период 1 (startDay=15) должен быть 01.06", createDateMillis(2026, Calendar.JUNE, 1), period1End)
+
+        // Период 2 (even): monthsToAdd=1, day=day2=15 -> 15.06.2026.
+        val period2End = calculatePspPeriodEndDate(startDateMillis, 2)
+        assertEquals("Период 2 (startDay=15) должен быть 15.06", createDateMillis(2026, Calendar.JUNE, 15), period2End)
+    }
+
     private fun createDateMillis(year: Int, month: Int, day: Int): Long {
         val cal = Calendar.getInstance().apply {
             set(Calendar.YEAR, year)

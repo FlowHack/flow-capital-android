@@ -8,11 +8,9 @@ import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.flowhack.flowcapital.data.db.AppDatabase
 import com.flowhack.flowcapital.data.logging.AppLogger
 import com.flowhack.flowcapital.data.settings.SettingsManager
 import kotlinx.coroutines.flow.first
-import java.util.Calendar
 
 /**
  * Worker для отправки напоминаний о требуемых действиях.
@@ -28,10 +26,11 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
     override suspend fun doWork(): Result {
         AppLogger.d("ReminderWorker", "Запуск проверки напоминаний")
 
+        val settingsManager = SettingsManager(applicationContext)
+
         // Если напоминание в режиме будильника (AlarmManager) — WorkManager не должен дублировать
         val timeTag = inputData.getString("timeTag")
         if (timeTag != null) {
-            val settingsManager = SettingsManager(applicationContext)
             val alarmSet = settingsManager.alarmRemindersFlow.first()
             if (timeTag in alarmSet) {
                 AppLogger.d("ReminderWorker", "Напоминание $timeTag в режиме будильника — пропуск")
@@ -39,70 +38,14 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
             }
         }
 
-        val db = AppDatabase.getDatabase(applicationContext)
-        val calendar = Calendar.getInstance()
-        val isSunday = calendar.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
-
-        val today = calendar.get(Calendar.DAY_OF_YEAR)
-        val year = calendar.get(Calendar.YEAR)
-        val messages = mutableListOf<String>()
-        var hasAnyAction = false
-
-        // Проверка нужно ли действие для ПСП (работает и в воскресенье!)
-        var pspNeedsAction = false
-        val allPspFlows = db.premiumStartFlowDao().getAllFlows().first()
-        for (flow in allPspFlows) {
-            if (flow.isActive) {
-                val currentPeriod = db.premiumStartPeriodDao().getCurrentPeriod(flow.id)
-                if (currentPeriod != null && !currentPeriod.isContributionMade) {
-                    val now = Calendar.getInstance().timeInMillis
-                    if (now >= currentPeriod.endDate) {
-                        pspNeedsAction = true
-                        messages.add("ПСП - взнос номинала")
-                        hasAnyAction = true
-                    }
-                }
-            }
-        }
-
-        // Воскресенье - проверяем что делать: если есть ПСП - работаем, если нет - пропускаем
-        if (isSunday && !pspNeedsAction) {
-            // Воскресенье, нет ПСП требующего действия - выходной для Н/РП
-            return Result.success()
-        }
-
-        // Проверка Растущего Потока (ПН в воскресенье не работает!)
-        val lastGrowingEntry = db.growingFlowDao().getLastEntry()
-        if (lastGrowingEntry != null) {
-            val lastCal = Calendar.getInstance().apply { timeInMillis = lastGrowingEntry.date }
-            val isPressedToday = lastGrowingEntry.isButtonPressed &&
-                today == lastCal.get(Calendar.DAY_OF_YEAR) &&
-                year == lastCal.get(Calendar.YEAR)
-
-            // Воскресенье - пропускаем для РП/ПН
-            if (!isPressedToday && !isSunday) {
-                messages.add("РП - нажмите кнопку")
-                hasAnyAction = true
-            }
-        }
-
-        // Проверка Потока Новичка (в воскресенье не работает!)
-        val lastNoviceEntry = db.noviceFlowDao().getLastEntry()
-        if (lastNoviceEntry != null) {
-            val lastCal = Calendar.getInstance().apply { timeInMillis = lastNoviceEntry.date }
-            val isPressedToday = lastNoviceEntry.isButtonPressed &&
-                today == lastCal.get(Calendar.DAY_OF_YEAR) &&
-                year == lastCal.get(Calendar.YEAR)
-
-            // Воскресенье - пропускаем для ПН
-            if (!isPressedToday && !isSunday) {
-                messages.add("ПН - нажмите кнопку")
-                hasAnyAction = true
-            }
-        }
+        // Учитываем режим умных уведомлений при построении сообщений
+        val smartNotifications = settingsManager.getSmartNotifications()
+        val messages = ReminderMessageBuilder.buildReminderMessages(
+            applicationContext, smartNotifications
+        )
 
         // Отправляем уведомление только если есть что напомнить
-        if (hasAnyAction) {
+        if (messages.isNotEmpty()) {
             sendNotification(messages)
         }
 

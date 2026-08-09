@@ -46,7 +46,6 @@ obj/
 *.keystore
 release-keystore.jks
 release-keystore
-gradle.properties
 google-services.json
 
 # Credentials & secrets
@@ -78,10 +77,12 @@ crashlytics.properties
 
 # AI agents configuration files
 AGENTS.md
-GEMINI.md
 AI_DEV_LOG.md
 myAgents/
 myAgents/*
+.aider*
+aider*
+opencode*
 
 # Node.js
 node_modules/

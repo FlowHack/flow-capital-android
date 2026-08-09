@@ -4,7 +4,6 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import androidx.work.BackoffPolicy
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
@@ -72,8 +71,8 @@ fun scheduleDailyReminder(context: Context, hour: Int, min: Int, timeTag: String
 
 /**
  * Запланировать точное срабатывание будильника через AlarmManager.
- * Использует setAlarmClock() — гарантирует срабатывание даже в Doze-режиме
- * и не требует SCHEDULE_EXACT_ALARM на Android 12+.
+ * Использует setAlarmClock() — гарантирует срабатывание даже в Doze-режиме,
+ * но требует SCHEDULE_EXACT_ALARM на Android 12+; при отсутствии разрешения используется inexact fallback.
  */
 fun scheduleAlarmReminder(context: Context, hour: Int, min: Int, timeTag: String) {
     AppLogger.d("ReminderScheduler", "Планирование будильника: $timeTag ($hour:$min)")
@@ -97,25 +96,20 @@ fun scheduleAlarmReminder(context: Context, hour: Int, min: Int, timeTag: String
     }
     if (target.before(now)) target.add(Calendar.DAY_OF_YEAR, 1)
 
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
-            AppLogger.d("ReminderScheduler", "Будильник $timeTag: нет SCHEDULE_EXACT_ALARM — setAndAllowWhileIdle")
-            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, operation)
-        } else {
-            val showIntent = PendingIntent.getActivity(
-                context,
-                timeTag.hashCode() + 5000,
-                Intent(context, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK },
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            val alarmClockInfo = AlarmManager.AlarmClockInfo(target.timeInMillis, showIntent)
-            alarmManager.setAlarmClock(alarmClockInfo, operation)
-            AppLogger.d("ReminderScheduler", "Будильник $timeTag: setAlarmClock на ${target.timeInMillis}")
-        }
-    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-        alarmManager.setExact(AlarmManager.RTC_WAKEUP, target.timeInMillis, operation)
+    val showIntent = PendingIntent.getActivity(
+        context,
+        timeTag.hashCode() + 5000,
+        Intent(context, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK },
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+    
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, operation)
+        AppLogger.d("ReminderScheduler", "Будильник $timeTag: нет SCHEDULE_EXACT_ALARM, fallback на inexact")
     } else {
-        alarmManager.set(AlarmManager.RTC_WAKEUP, target.timeInMillis, operation)
+        val alarmClockInfo = AlarmManager.AlarmClockInfo(target.timeInMillis, showIntent)
+        alarmManager.setAlarmClock(alarmClockInfo, operation)
+        AppLogger.d("ReminderScheduler", "Будильник $timeTag: setAlarmClock на ${target.timeInMillis}")
     }
 }
 
@@ -162,24 +156,19 @@ fun scheduleFinalReminder(context: Context) {
         set(Calendar.SECOND, 0)
     }
     if (target.before(now)) target.add(Calendar.DAY_OF_YEAR, 1)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
-            AppLogger.d("ReminderScheduler", "Финальный 23:00: нет SCHEDULE_EXACT_ALARM — setAndAllowWhileIdle")
-            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, operation)
-        } else {
-            val showIntent = PendingIntent.getActivity(
-                context,
-                AlarmReceiver.FINAL_2300_TAG.hashCode() + 5000,
-                Intent(context, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK },
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            val alarmClockInfo = AlarmManager.AlarmClockInfo(target.timeInMillis, showIntent)
-            alarmManager.setAlarmClock(alarmClockInfo, operation)
-            AppLogger.d("ReminderScheduler", "Финальный будильник 23:00: setAlarmClock на ${target.timeInMillis}")
-        }
-    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-        alarmManager.setExact(AlarmManager.RTC_WAKEUP, target.timeInMillis, operation)
+    val showIntent = PendingIntent.getActivity(
+        context,
+        AlarmReceiver.FINAL_2300_TAG.hashCode() + 5000,
+        Intent(context, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK },
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+    
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, operation)
+        AppLogger.d("ReminderScheduler", "Финальный будильник 23:00: нет SCHEDULE_EXACT_ALARM, fallback на inexact")
     } else {
-        alarmManager.set(AlarmManager.RTC_WAKEUP, target.timeInMillis, operation)
+        val alarmClockInfo = AlarmManager.AlarmClockInfo(target.timeInMillis, showIntent)
+        alarmManager.setAlarmClock(alarmClockInfo, operation)
+        AppLogger.d("ReminderScheduler", "Финальный будильник 23:00: setAlarmClock на ${target.timeInMillis}")
     }
 }

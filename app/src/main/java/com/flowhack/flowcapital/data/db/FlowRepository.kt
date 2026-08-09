@@ -24,6 +24,8 @@ class GrowingFlowRepository(private val dao: GrowingFlowDao) {
 
     suspend fun getFirstStartEntry(): GrowingFlowEntity? =
         dao.getFirstStartEntry()
+
+    suspend fun getLastPressEntry(): GrowingFlowEntity? = dao.getLastPressEntry()
 }
 
 /**
@@ -48,6 +50,8 @@ class NoviceFlowRepository(private val dao: NoviceFlowDao) {
 
     suspend fun getFirstStartEntry(): NoviceFlowEntity? =
         dao.getFirstStartEntry()
+
+    suspend fun getLastPressEntry(): NoviceFlowEntity? = dao.getLastPressEntry()
 
     suspend fun updateEntry(entry: NoviceFlowEntity) = dao.update(entry)
 }
@@ -80,6 +84,9 @@ class PremiumStartFlowRepository(
 
     suspend fun getCurrentPeriod(flowId: Int): PremiumStartPeriodEntity? =
         periodDao.getCurrentPeriod(flowId)
+
+    suspend fun getPeriodByNumber(flowId: Int, periodNumber: Int): PremiumStartPeriodEntity? =
+        periodDao.getPeriodByNumber(flowId, periodNumber)
 
     suspend fun insertPeriod(period: PremiumStartPeriodEntity): Long =
         periodDao.insert(period)
