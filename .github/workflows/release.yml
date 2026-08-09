@@ -110,11 +110,17 @@ jobs:
       - name: Получение release notes
         id: get_release_notes
         run: |
+          echo "ref_name: ${{ github.ref_name }}"
+          echo "ref: ${{ github.ref }}"
+          echo "event_name: ${{ github.event_name }}"
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "${{ github.event.inputs.release_notes }}" > release_notes.md
           else
             git cat-file tag "${{ github.ref_name }}" | sed -n '/^$/,$p' | sed '1d' > release_notes.md
           fi
+          echo "=== release_notes.md ==="
+          cat release_notes.md
+          echo "=== end ==="
 
       - name: Создание GitHub Release
         env:
