@@ -7,8 +7,7 @@
 ![Compose](https://img.shields.io/badge/Compose-02569B?style=for-the-badge&logo=jetpackcompose&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
 
-[![CI develop](https://github.com/FlowHack/flow-capital-android/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/FlowHack/flow-capital-android/actions/workflows/ci.yml)
-[![CI master](https://github.com/FlowHack/flow-capital-android/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/FlowHack/flow-capital-android/actions/workflows/ci.yml)
+[![CI](https://github.com/FlowHack/flow-capital-android/actions/workflows/ci.yml/badge.svg)](https://github.com/FlowHack/flow-capital-android/actions/workflows/ci.yml)
 
 **Android-приложение для учёта финансовых потоков**
 
