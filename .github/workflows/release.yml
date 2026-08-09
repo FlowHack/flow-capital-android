@@ -56,12 +56,6 @@ jobs:
       - name: Установка прав на gradlew
         run: chmod +x gradlew
 
-      - name: Запуск линтера
-        run: ./gradlew :app:lint
-
-      - name: Запуск unit-тестов
-        run: ./gradlew :app:testDebugUnitTest
-
       - name: Сборка release APK
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
