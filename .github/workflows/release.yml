@@ -145,31 +145,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Получение release notes из тега
-        id: get_release_notes
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "${{ github.event.inputs.release_notes }}" > release_notes.md
-          else
-            # Тег уже на remote (релиз создан в предыдущей job), загружаем его объект
-            git fetch origin "refs/tags/${{ github.ref_name }}:refs/tags/${{ github.ref_name }}" --force
-            # Извлекаем текст тега (после заголовка tagger)
-            git cat-file tag "${{ github.ref_name }}" | sed -n '/^$/,$p' | sed '1d' > release_notes.md
-          fi
-
       - name: Обновление текста релиза
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Конвертируем LF в CRLF (GitHub рендерит Markdown с CRLF корректно)
-          sed -i 's/$/\r/' release_notes.md
-
-          # Формируем JSON с телом релиза (Markdown рендерится автоматически)
-          jq -n \
-            --arg tag "${{ github.ref_name }}" \
-            --rawfile body release_notes.md \
-            '{body: $body}' > update_payload.json
-
           # Получаем ID релиза по тегу
           RELEASE_ID=$(curl -s \
             -H "Authorization: token $GITHUB_TOKEN" \
@@ -177,6 +156,23 @@ jobs:
             "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ github.ref_name }}" | jq -r '.id')
 
           echo "Release ID: $RELEASE_ID"
+
+          # Получаем текущий текст релиза (он уже содержит настоящий текст из тега)
+          CURRENT_BODY=$(curl -s \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID" | jq -r '.body')
+
+          echo "Текущий текст релиза:"
+          echo "$CURRENT_BODY" | head -5
+
+          # Конвертируем LF в CRLF (GitHub рендерит Markdown с CRLF корректно)
+          printf '%s' "$CURRENT_BODY" | sed 's/$/\r/' > release_notes.md
+
+          # Формируем JSON с телом релиза
+          jq -n \
+            --rawfile body release_notes.md \
+            '{body: $body}' > update_payload.json
 
           # Обновляем текст релиза
           curl -s -X PATCH \
