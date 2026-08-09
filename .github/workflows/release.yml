@@ -110,6 +110,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: release-apk
+          path: .
 
       - name: Получение release notes
         id: get_release_notes
