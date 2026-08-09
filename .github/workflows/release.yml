@@ -76,7 +76,7 @@ jobs:
       - name: Извлечение versionName
         id: extract_version
         run: >-
-          VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          VERSION=$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts)
           echo "version_name=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Переименование APK
