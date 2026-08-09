@@ -105,6 +105,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          fetch-tags: true
 
       - name: Скачивание APK артефакта
         uses: actions/download-artifact@v5
@@ -118,7 +119,7 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "${{ github.event.inputs.release_notes }}" > release_notes.md
           else
-            git for-each-ref "refs/tags/${{ github.ref_name }}" --format='%(contents)' > release_notes.md
+            git cat-file tag "${{ github.ref_name }}" | sed -n '/^$/,$p' | sed '1d' > release_notes.md
           fi
 
       - name: Создание GitHub Release
