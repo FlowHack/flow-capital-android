@@ -344,21 +344,21 @@ fun parseMarkdown(text: String): AnnotatedString {
             when {
                 line.startsWith("###") -> {
                     pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
-                    append(line.removePrefix("###").trim())
+                    parseInlineMarkdown(line.removePrefix("###").trim())
                     pop()
                     if (i < lines.size - 1) appendLine()
                 }
                 line.startsWith("##") -> {
                     if (i > 0) appendLine()
                     pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
-                    append(line.removePrefix("##").trim())
+                    parseInlineMarkdown(line.removePrefix("##").trim())
                     pop()
                     if (i < lines.size - 1) appendLine()
                 }
                 line.startsWith("#") -> {
                     if (i > 0) appendLine()
                     pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
-                    append(line.removePrefix("#").trim())
+                    parseInlineMarkdown(line.removePrefix("#").trim())
                     pop()
                     if (i < lines.size - 1) appendLine()
                 }
