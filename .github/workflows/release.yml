@@ -100,6 +100,7 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
+          ref: ${{ github.ref }}
 
       - name: Скачивание APK артефакта
         uses: actions/download-artifact@v5
@@ -113,8 +114,6 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "${{ github.event.inputs.release_notes }}" > release_notes.md
           else
-            # Гарантированно загружаем аннотированный тег
-            git fetch origin tag "${{ github.ref_name }}" --force
             # Извлекаем текст тега (после заголовка tagger)
             git show "${{ github.ref_name }}" | sed -n '/^$/,$p' | sed '1d' > release_notes.md
           fi
