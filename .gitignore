@@ -46,7 +46,6 @@ obj/
 *.keystore
 release-keystore.jks
 release-keystore
-gradle.properties
 google-services.json
 
 # Credentials & secrets
