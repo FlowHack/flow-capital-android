@@ -112,7 +112,6 @@ import com.flowhack.flowcapital.data.proxy.ProxyStorage
 import com.flowhack.flowcapital.data.proxy.ProxyType
 import com.flowhack.flowcapital.data.proxy.ProxyValidator
 import com.flowhack.flowcapital.data.settings.SettingsManager
-import com.flowhack.flowcapital.notifications.ReminderWorker
 import com.flowhack.flowcapital.notifications.cancelAlarmReminder
 import com.flowhack.flowcapital.notifications.cancelDailyReminder
 import com.flowhack.flowcapital.notifications.rescheduleSavedReminders
