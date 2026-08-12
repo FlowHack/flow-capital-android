@@ -4,6 +4,7 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import androidx.work.WorkManager
 import com.flowhack.flowcapital.MainActivity
 import com.flowhack.flowcapital.data.logging.AppLogger
 import com.flowhack.flowcapital.data.settings.SettingsManager
@@ -21,6 +22,11 @@ suspend fun rescheduleSavedReminders(context: Context, settingsManager: Settings
     val reminders = settingsManager.remindersFlow.first()
     val alarmSet = settingsManager.alarmRemindersFlow.first()
     AppLogger.d("ReminderScheduler", "Напоминаний: ${reminders.size}, будильников: ${alarmSet.size}")
+    // Отменяем устаревшие WorkManager-задачи (миграция с прошлых версий),
+    // чтобы они не дублировали новые AlarmManager-напоминания.
+    for (time in reminders) {
+        WorkManager.getInstance(context).cancelUniqueWork("potok_rem_$time")
+    }
     for (time in reminders) {
         val parts = time.split(":")
         if (parts.size == 2) {

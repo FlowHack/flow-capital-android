@@ -51,6 +51,10 @@ object AppLogger {
     /** Файл логов во внутреннем хранилище (инициализируется в init). */
     private var logFile: File? = null
 
+    /** Флаг защиты от рекурсии при записи в файл. */
+    @Volatile
+    private var isWritingToFile = false
+
     fun init(context: Context) {
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
@@ -104,6 +108,8 @@ object AppLogger {
      */
     private fun appendToFile(entry: LogEntry) {
         val file = logFile ?: return
+        if (isWritingToFile) return
+        isWritingToFile = true
         try {
             if (file.exists() && file.length() > MAX_LOG_FILE_SIZE) {
                 // Усечение: оставляем только последние записи, чтобы файл не разрастался.
@@ -123,7 +129,9 @@ object AppLogger {
             file.appendText(line)
         } catch (e: Exception) {
             // Не логируем через Timber, чтобы избежать рекурсии.
-            android.util.Log.e("AppLogger", "Ошибка записи лога в файл: ${e.message}")
+            Timber.tag("AppLogger").e("Ошибка записи лога в файл: ${e.message}")
+        } finally {
+            isWritingToFile = false
         }
     }
 
@@ -139,7 +147,7 @@ object AppLogger {
             val kept = lines.takeLast(keepCount)
             file.writeText(kept.joinToString("\n") + "\n")
         } catch (e: Exception) {
-            android.util.Log.e("AppLogger", "Ошибка усечения файла логов: ${e.message}")
+            Timber.tag("AppLogger").e("Ошибка усечения файла логов: ${e.message}")
         }
     }
 
