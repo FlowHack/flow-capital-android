@@ -77,6 +77,8 @@ fun BrowserScreen(url: String) {
         url.contains("potok.cash") -> "ПОТОКCASH"
         url.contains("sberkassa") -> "СБЕРКАССА"
         url.contains("e-id") -> "E-ID"
+        url.contains("blackbit") -> "BLACKBIT"
+        url.contains("erub") -> "ERUB"
         else -> null
     }
 

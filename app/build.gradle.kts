@@ -11,8 +11,8 @@ android {
 
     defaultConfig {
         applicationId = "com.flowhack.flowcapital"
-        versionCode = 85
-        versionName = "0.8.5"
+        versionCode = 86
+        versionName = "0.8.6"
         minSdk = 28
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -1792,7 +1792,7 @@ fun ProxySettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
-                val availableSites = listOf("ПОТОКCASH", "СБЕРКАССА", "E-ID")
+                val availableSites = listOf("ПОТОКCASH", "СБЕРКАССА", "E-ID", "BLACKBIT", "ERUB")
                 availableSites.forEach { site ->
                     val isAnyProxyEnabled = savedProxies.any { site in it.enabledForSites }
                     val hasAnyProxy = savedProxies.isNotEmpty()

@@ -4,6 +4,7 @@ package com.flowhack.flowcapital
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -71,6 +72,13 @@ class MainActivity : ComponentActivity() {
     private lateinit var settingsManager: SettingsManager
 
     /**
+     * URL сайта, переданный через внешний Intent (например, при открытии ссылки
+     * на один из поддерживаемых сайтов через системный выбор приложения).
+     * Используется для открытия вкладки «Браузер» с нужным адресом.
+     */
+    private var pendingBrowserUrl by mutableStateOf<String?>(null)
+
+    /**
      * Лаунчер пакетного запроса runtime-разрешений при первом запуске.
      * - POST_NOTIFICATIONS (Android 13+) — для push-уведомлений
      * - SCHEDULE_EXACT_ALARM (Android 13+) — для точных будильников
@@ -102,6 +110,8 @@ class MainActivity : ComponentActivity() {
 
         AppLogger.init(this)
         settingsManager = SettingsManager(this)
+
+        pendingBrowserUrl = extractBrowserUrl(intent)
 
         val scope = CoroutineScope(Dispatchers.Main)
         settingsManager.initializePspCache(scope)
@@ -142,10 +152,34 @@ class MainActivity : ComponentActivity() {
                         repo = "flow-capital-android",
                         settingsManager = settingsManager
                     )
-                    MainScreen(defaultEntryTab = defaultEntryTab)
+                    MainScreen(defaultEntryTab = defaultEntryTab, initialBrowserUrl = pendingBrowserUrl)
                 }
             }
         }
+    }
+
+    /**
+     * Обработка нового Intent при уже запущенном приложении (например, повторное
+     * открытие ссылки на поддерживаемый сайт через системный выбор приложения).
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingBrowserUrl = extractBrowserUrl(intent)
+    }
+
+    /**
+     * Извлечь URL поддерживаемого сайта из Intent.
+     * Принимаются только http/https ссылки; остальные игнорируются.
+     *
+     * @param intent Входящий Intent
+     * @return URL сайта или null, если ссылка не подходит
+     */
+    private fun extractBrowserUrl(intent: Intent?): String? {
+        val data = intent?.data ?: return null
+        val scheme = data.scheme
+        if (scheme != "https" && scheme != "http") return null
+        return data.toString()
     }
 
     /**
@@ -170,7 +204,9 @@ data class WebSite(val name: String, val url: String, val iconRes: Int)
 val sites = listOf(
     WebSite("ПОТОКCASH", "https://potok.cash/cabinet", R.drawable.logo_potok),
     WebSite("СБЕРКАССА", "https://sberkassa.site/account", R.drawable.logo_sberkassa),
-    WebSite("E-ID", "https://e-id.cards/", R.drawable.logo_eid)
+    WebSite("E-ID", "https://e-id.cards/", R.drawable.logo_eid),
+    WebSite("BLACKBIT", "https://blackbit.exchange/", R.drawable.logo_blackbit),
+    WebSite("ERUB", "https://erub.site/", R.drawable.logo_erub)
 )
 
 /**
@@ -191,24 +227,29 @@ sealed class BottomNavItem(val route: String, val title: String, val icon: Image
  * Содержит три вкладки: Браузер, Расчёты, Настройки.
  * Вкладка Браузер поддерживает меню по долгому нажатию для выбора сайта.
  * @param defaultEntryTab Вкладка для открытия по умолчанию (0=Браузер, 1=Расчёты, 2=Настройки)
+ * @param initialBrowserUrl URL сайта для открытия во вкладке «Браузер» (если передан через Intent)
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun MainScreen(defaultEntryTab: Int = 1) {
+fun MainScreen(defaultEntryTab: Int = 1, initialBrowserUrl: String? = null) {
     val navController = rememberNavController()
-    var currentWebUrl by remember { mutableStateOf(sites[0].url) }
+    var currentWebUrl by remember { mutableStateOf(initialBrowserUrl ?: sites[0].url) }
     var showBrowserMenu by remember { mutableStateOf(false) }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // Определяем начальный маршрут на основе настройки
-    val startRoute = remember(defaultEntryTab) {
-        when (defaultEntryTab) {
-            0 -> BottomNavItem.Browser.route
-            1 -> BottomNavItem.Calculator.route
-            2 -> BottomNavItem.Settings.route
-            else -> BottomNavItem.Calculator.route
+    // Определяем начальный маршрут на основе настройки или переданного URL
+    val startRoute = remember(defaultEntryTab, initialBrowserUrl) {
+        if (initialBrowserUrl != null) {
+            BottomNavItem.Browser.route
+        } else {
+            when (defaultEntryTab) {
+                0 -> BottomNavItem.Browser.route
+                1 -> BottomNavItem.Calculator.route
+                2 -> BottomNavItem.Settings.route
+                else -> BottomNavItem.Calculator.route
+            }
         }
     }
 
