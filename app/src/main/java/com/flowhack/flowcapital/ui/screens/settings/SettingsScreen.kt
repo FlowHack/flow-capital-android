@@ -114,6 +114,7 @@ import com.flowhack.flowcapital.data.proxy.ProxyValidator
 import com.flowhack.flowcapital.data.settings.SettingsManager
 import com.flowhack.flowcapital.notifications.ReminderWorker
 import com.flowhack.flowcapital.notifications.cancelAlarmReminder
+import com.flowhack.flowcapital.notifications.cancelDailyReminder
 import com.flowhack.flowcapital.notifications.rescheduleSavedReminders
 import com.flowhack.flowcapital.notifications.scheduleAlarmReminder
 import com.flowhack.flowcapital.notifications.scheduleDailyReminder
@@ -1460,6 +1461,7 @@ fun NotificationsSettings(context: Context, settingsManager: SettingsManager, sc
                                     val min = parts[1].toIntOrNull() ?: return@launch
                                     if (checked) {
                                         WorkManager.getInstance(context).cancelUniqueWork("potok_rem_$time")
+                                        cancelDailyReminder(context, time)
                                         scheduleAlarmReminder(context, hour, min, time)
                                     } else {
                                         cancelAlarmReminder(context, time)
@@ -1476,6 +1478,7 @@ fun NotificationsSettings(context: Context, settingsManager: SettingsManager, sc
                             scope.launch {
                                 settingsManager.removeReminder(time)
                                 WorkManager.getInstance(context).cancelUniqueWork("potok_rem_$time")
+                                cancelDailyReminder(context, time)
                                 cancelAlarmReminder(context, time)
                                 scheduleFinalReminder(context)
                             }

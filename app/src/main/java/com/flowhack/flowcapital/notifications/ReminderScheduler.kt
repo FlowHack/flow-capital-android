@@ -4,22 +4,16 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import androidx.work.BackoffPolicy
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
-import androidx.work.workDataOf
 import com.flowhack.flowcapital.MainActivity
 import com.flowhack.flowcapital.data.logging.AppLogger
 import com.flowhack.flowcapital.data.settings.SettingsManager
 import kotlinx.coroutines.flow.first
 import java.util.Calendar
-import java.util.concurrent.TimeUnit
 
 
 /**
  * Перепланировать все сохранённые напоминания при старте приложения.
- * Читает список напоминаний из DataStore и создаёт задачи WorkManager или AlarmManager.
+ * Читает список напоминаний из DataStore и создаёт задачи AlarmManager.
  * Всегда планирует финальное напоминание в 23:00.
  */
 suspend fun rescheduleSavedReminders(context: Context, settingsManager: SettingsManager) {
@@ -43,10 +37,27 @@ suspend fun rescheduleSavedReminders(context: Context, settingsManager: Settings
 }
 
 /**
- * Запланировать ежедневное напоминание через WorkManager.
+ * Запланировать ежедневное напоминание через AlarmManager.
+ *
+ * Напоминание (в отличие от будильника) показывает обычное уведомление через
+ * [ReminderReceiver] без полноэкранного будильника и без звука будильника.
+ * AlarmManager обеспечивает надёжную доставку даже при убитом приложении.
+ * При отсутствии SCHEDULE_EXACT_ALARM используется inexact fallback.
  */
 fun scheduleDailyReminder(context: Context, hour: Int, min: Int, timeTag: String) {
-    AppLogger.d("ReminderScheduler", "Планирование WorkManager напоминания: $timeTag ($hour:$min)")
+    AppLogger.d("ReminderScheduler", "Планирование напоминания: $timeTag ($hour:$min)")
+    val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+    val intent = Intent(context, ReminderReceiver::class.java).apply {
+        putExtra(ReminderReceiver.EXTRA_TIME_TAG, timeTag)
+    }
+    val operation = PendingIntent.getBroadcast(
+        context,
+        timeTag.hashCode(),
+        intent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
     val now = Calendar.getInstance()
     val target = Calendar.getInstance().apply {
         set(Calendar.HOUR_OF_DAY, hour)
@@ -54,19 +65,14 @@ fun scheduleDailyReminder(context: Context, hour: Int, min: Int, timeTag: String
         set(Calendar.SECOND, 0)
     }
     if (target.before(now)) target.add(Calendar.DAY_OF_YEAR, 1)
-    val delay = target.timeInMillis - now.timeInMillis
 
-    val request = PeriodicWorkRequestBuilder<ReminderWorker>(24, TimeUnit.HOURS)
-        .setInitialDelay(delay, TimeUnit.MILLISECONDS)
-        .setBackoffCriteria(BackoffPolicy.LINEAR, 10, TimeUnit.MINUTES)
-        .setInputData(workDataOf("timeTag" to timeTag))
-        .build()
-
-    WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-        "potok_rem_$timeTag",
-        ExistingPeriodicWorkPolicy.REPLACE,
-        request
-    )
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, operation)
+        AppLogger.d("ReminderScheduler", "Напоминание $timeTag: нет SCHEDULE_EXACT_ALARM, fallback на inexact")
+    } else {
+        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, target.timeInMillis, operation)
+        AppLogger.d("ReminderScheduler", "Напоминание $timeTag: setExactAndAllowWhileIdle на ${target.timeInMillis}")
+    }
 }
 
 /**
@@ -111,6 +117,24 @@ fun scheduleAlarmReminder(context: Context, hour: Int, min: Int, timeTag: String
         alarmManager.setAlarmClock(alarmClockInfo, operation)
         AppLogger.d("ReminderScheduler", "Будильник $timeTag: setAlarmClock на ${target.timeInMillis}")
     }
+}
+
+/**
+ * Отменить напоминание (обычное уведомление) для указанного тайм-тега.
+ */
+fun cancelDailyReminder(context: Context, timeTag: String) {
+    AppLogger.d("ReminderScheduler", "Отмена напоминания: $timeTag")
+    val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+    val intent = Intent(context, ReminderReceiver::class.java).apply {
+        putExtra(ReminderReceiver.EXTRA_TIME_TAG, timeTag)
+    }
+    val pendingIntent = PendingIntent.getBroadcast(
+        context,
+        timeTag.hashCode(),
+        intent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+    alarmManager.cancel(pendingIntent)
 }
 
 /**
