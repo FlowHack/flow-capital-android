@@ -39,7 +39,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -255,22 +254,12 @@ private fun BrowserEmptyPlaceholder(onOpenSite: (String) -> Unit) {
                         onClick = { onOpenSite(site.url) },
                         modifier = Modifier.size(48.dp)
                     ) {
-                        // Светлая круглая подложка, чтобы тёмные логотипы
-                        // (например, BlackBit) были видны на любом фоне.
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(Color.White),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                painter = painterResource(id = site.iconRes),
-                                contentDescription = site.name,
-                                tint = Color.Unspecified,
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
+                        Icon(
+                            painter = painterResource(id = site.iconRes),
+                            contentDescription = site.name,
+                            tint = Color.Unspecified,
+                            modifier = Modifier.size(40.dp)
+                        )
                     }
                 }
             }

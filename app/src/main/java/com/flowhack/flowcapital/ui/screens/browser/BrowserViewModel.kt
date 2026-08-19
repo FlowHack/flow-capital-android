@@ -4,6 +4,7 @@ import android.app.Application
 import android.webkit.CookieManager
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -93,6 +94,17 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
                     Timber.tag("BrowserViewModel").e(
                         "Ошибка загрузки ${view?.url}: код=${error?.errorCode} " +
                             "описание=${error?.description}"
+                    )
+                }
+
+                override fun onReceivedHttpError(
+                    view: WebView?,
+                    request: WebResourceRequest?,
+                    errorResponse: WebResourceResponse?
+                ) {
+                    super.onReceivedHttpError(view, request, errorResponse)
+                    Timber.tag("BrowserViewModel").e(
+                        "HTTP-ошибка ${errorResponse?.statusCode} для ${request?.url}"
                     )
                 }
 

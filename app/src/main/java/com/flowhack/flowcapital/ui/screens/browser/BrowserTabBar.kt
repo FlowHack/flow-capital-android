@@ -1,6 +1,7 @@
 package com.flowhack.flowcapital.ui.screens.browser
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -10,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
@@ -59,7 +59,7 @@ fun BrowserTabBar(
         modifier = Modifier
             .fillMaxWidth()
             .height(48.dp)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .background(MaterialTheme.colorScheme.surface),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Стрелка влево — появляется, когда есть вкладки слева за пределами экрана.
@@ -134,27 +134,18 @@ private fun BrowserTabChip(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
             .background(background)
+            .clickable(onClick = onClick)
             .padding(start = 8.dp, end = 2.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         val iconRes = siteIconRes(tab.url)
         if (iconRes != null) {
-            // Светлая круглая подложка, чтобы тёмные логотипы (например, BlackBit)
-            // были видны на любом фоне вкладки.
-            Box(
-                modifier = Modifier
-                    .size(20.dp)
-                    .clip(CircleShape)
-                    .background(Color.White),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    painter = painterResource(id = iconRes),
-                    contentDescription = null,
-                    tint = Color.Unspecified,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
+            Icon(
+                painter = painterResource(id = iconRes),
+                contentDescription = null,
+                tint = Color.Unspecified,
+                modifier = Modifier.size(18.dp)
+            )
         }
         Text(
             text = tab.title,
