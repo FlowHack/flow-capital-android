@@ -2236,57 +2236,68 @@ fun ProxySettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
 
     fun simulateProxyConnection(proxy: ProxyConfig, onResult: (ProxyConfig) -> Unit) {
         scope.launch {
-            var socket: Socket? = null
             try {
-                val startTime = System.currentTimeMillis()
-                // Пингуем через TCP-сокет с явным CONNECT к https-сайту.
-                // Это надёжнее HttpURLConnection: заголовок Proxy-Authorization
-                // гарантированно уходит в CONNECT, а не в обычный запрос, и не
-                // зависит от политики cleartext-трафика Android.
-                socket = Socket()
-                socket.connect(InetSocketAddress(proxy.server, proxy.port), 5000)
-                socket.soTimeout = 5000
+                // Сетевые операции выполняются на фоновом диспетчере — иначе
+                // Android бросает NetworkOnMainThreadException (scope.launch = Main).
+                val result = withContext(Dispatchers.IO) {
+                    var socket: Socket? = null
+                    try {
+                        val startTime = System.currentTimeMillis()
+                        // Пингуем через TCP-сокет с явным CONNECT к https-сайту.
+                        // Заголовок Proxy-Authorization гарантированно уходит в CONNECT.
+                        socket = Socket()
+                        socket.connect(InetSocketAddress(proxy.server, proxy.port), 5000)
+                        socket.soTimeout = 5000
 
-                val credentials = "${proxy.username ?: ""}:${proxy.password ?: ""}"
-                val encoded = android.util.Base64.encodeToString(
-                    credentials.toByteArray(Charsets.UTF_8),
-                    android.util.Base64.NO_WRAP
-                )
-                val connectRequest = buildString {
-                    append("CONNECT www.google.com:443 HTTP/1.1\r\n")
-                    append("Host: www.google.com:443\r\n")
-                    if (!proxy.username.isNullOrBlank()) {
-                        append("Proxy-Authorization: Basic $encoded\r\n")
+                        val credentials = "${proxy.username ?: ""}:${proxy.password ?: ""}"
+                        val encoded = android.util.Base64.encodeToString(
+                            credentials.toByteArray(Charsets.UTF_8),
+                            android.util.Base64.NO_WRAP
+                        )
+                        val connectRequest = buildString {
+                            append("CONNECT www.google.com:443 HTTP/1.1\r\n")
+                            append("Host: www.google.com:443\r\n")
+                            if (!proxy.username.isNullOrBlank()) {
+                                append("Proxy-Authorization: Basic $encoded\r\n")
+                            }
+                            append("\r\n")
+                        }
+                        socket.getOutputStream().write(connectRequest.toByteArray(Charsets.UTF_8))
+                        socket.getOutputStream().flush()
+
+                        val statusLine = socket.getInputStream().bufferedReader().readLine()
+                        val endTime = System.currentTimeMillis()
+                        val ping = (endTime - startTime).toInt()
+
+                        val isOk = statusLine?.contains("200") == true
+                        AppLogger.d(
+                            "ProxySettings",
+                            "Пинг прокси ${proxy.server}:${proxy.port}: статус=$statusLine"
+                        )
+                        proxy.copy(
+                            status = if (isOk) ProxyStatus.CONNECTED else ProxyStatus.UNAVAILABLE,
+                            pingMs = if (isOk) ping else null
+                        )
+                    } catch (e: Exception) {
+                        AppLogger.e("ProxySettings", "Ошибка подключения к прокси", e)
+                        proxy.copy(
+                            status = ProxyStatus.UNAVAILABLE,
+                            pingMs = null
+                        )
+                    } finally {
+                        try {
+                            socket?.close()
+                        } catch (_: Exception) {
+                        }
                     }
-                    append("\r\n")
                 }
-                socket.getOutputStream().write(connectRequest.toByteArray(Charsets.UTF_8))
-                socket.getOutputStream().flush()
-
-                val statusLine = socket.getInputStream().bufferedReader().readLine()
-                val endTime = System.currentTimeMillis()
-                val ping = (endTime - startTime).toInt()
-
-                val isOk = statusLine?.contains("200") == true
-                AppLogger.d(
-                    "ProxySettings",
-                    "Пинг прокси ${proxy.server}:${proxy.port}: статус=$statusLine"
-                )
-                onResult(proxy.copy(
-                    status = if (isOk) ProxyStatus.CONNECTED else ProxyStatus.UNAVAILABLE,
-                    pingMs = if (isOk) ping else null
-                ))
+                onResult(result)
             } catch (e: Exception) {
-                AppLogger.e("ProxySettings", "Ошибка подключения к прокси", e)
+                AppLogger.e("ProxySettings", "Ошибка создания подключения к прокси", e)
                 onResult(proxy.copy(
                     status = ProxyStatus.UNAVAILABLE,
                     pingMs = null
                 ))
-            } finally {
-                try {
-                    socket?.close()
-                } catch (_: Exception) {
-                }
             }
         }
     }
