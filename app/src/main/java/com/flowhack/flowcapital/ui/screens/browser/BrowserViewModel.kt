@@ -24,6 +24,16 @@ import timber.log.Timber
 class BrowserViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
+     * Десктопный User-Agent Chrome. Используется для сайтов, которые блокируют
+     * мобильный User-Agent WebView (например, eRub) и из-за этого не загружаются.
+     */
+    private companion object {
+        const val DESKTOP_USER_AGENT =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+
+    /**
      * Вкладка браузера.
      *
      * @param id Уникальный идентификатор вкладки
@@ -108,6 +118,11 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
                     )
                 }
 
+                override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                    super.onPageStarted(view, url, favicon)
+                    Timber.tag("BrowserViewModel").d("Начало загрузки: $url")
+                }
+
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
                     Timber.tag("BrowserViewModel").d("Страница загружена: $url")
@@ -122,6 +137,10 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
                 displayZoomControls = false
                 cacheMode = WebSettings.LOAD_DEFAULT
                 setSupportZoom(true)
+                // eRub блокирует мобильный User-Agent WebView — используем десктопный.
+                if (detectSiteName(url) == "ERUB") {
+                    userAgentString = DESKTOP_USER_AGENT
+                }
             }
             val cookieManager = CookieManager.getInstance()
             cookieManager.setAcceptCookie(true)
