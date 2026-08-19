@@ -51,11 +51,14 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.flowhack.flowcapital.data.logging.AppLogger
 import com.flowhack.flowcapital.data.settings.SettingsManager
 import com.flowhack.flowcapital.data.update.UpdateChecker
 import com.flowhack.flowcapital.notifications.rescheduleSavedReminders
 import com.flowhack.flowcapital.ui.screens.browser.BrowserScreen
+import com.flowhack.flowcapital.ui.screens.browser.BrowserViewModel
+import com.flowhack.flowcapital.ui.screens.browser.sites
 import com.flowhack.flowcapital.ui.screens.calculator.CalculatorScreen
 import com.flowhack.flowcapital.ui.screens.settings.SettingsScreen
 import com.flowhack.flowcapital.ui.theme.FlowCapitalTheme
@@ -197,18 +200,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** Данные веб-сайтов для меню браузера */
-data class WebSite(val name: String, val url: String, val iconRes: Int)
-
-/** Список доступных сайтов в меню */
-val sites = listOf(
-    WebSite("ПОТОКCASH", "https://potok.cash/cabinet", R.drawable.logo_potok),
-    WebSite("СБЕРКАССА", "https://sberkassa.site/account", R.drawable.logo_sberkassa),
-    WebSite("E-ID", "https://e-id.cards/", R.drawable.logo_eid),
-    WebSite("BLACKBIT", "https://blackbit.exchange/", R.drawable.logo_blackbit),
-    WebSite("ERUB", "https://erub.site/", R.drawable.logo_erub)
-)
-
 /**
  * Элемент нижней навигации.
  *
@@ -233,8 +224,13 @@ sealed class BottomNavItem(val route: String, val title: String, val icon: Image
 @Composable
 fun MainScreen(defaultEntryTab: Int = 1, initialBrowserUrl: String? = null) {
     val navController = rememberNavController()
-    var currentWebUrl by remember { mutableStateOf(initialBrowserUrl ?: sites[0].url) }
+    val browserViewModel: BrowserViewModel = viewModel()
     var showBrowserMenu by remember { mutableStateOf(false) }
+
+    // Открыть вкладку с URL из внешнего Intent (однократно за жизнь ViewModel).
+    LaunchedEffect(Unit) {
+        browserViewModel.openInitialUrl(initialBrowserUrl)
+    }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -255,7 +251,7 @@ fun MainScreen(defaultEntryTab: Int = 1, initialBrowserUrl: String? = null) {
 
     // Callback для открытия URL из настроек
     val openBrowserUrl: (String) -> Unit = { url ->
-        currentWebUrl = url
+        browserViewModel.openTab(url)
         navController.navigate(BottomNavItem.Browser.route) {
             launchSingleTop = true
         }
@@ -308,7 +304,7 @@ fun MainScreen(defaultEntryTab: Int = 1, initialBrowserUrl: String? = null) {
                                         },
                                         text = { Text(site.name, fontSize = 14.sp, fontWeight = FontWeight.Medium) },
                                         onClick = {
-                                            currentWebUrl = site.url
+                                            browserViewModel.openTab(site.url)
                                             showBrowserMenu = false
                                             navController.navigate(BottomNavItem.Browser.route) {
                                                 launchSingleTop = true
@@ -351,7 +347,7 @@ fun MainScreen(defaultEntryTab: Int = 1, initialBrowserUrl: String? = null) {
         }
     ) { innerPadding ->
         NavHost(navController, startRoute, Modifier.padding(innerPadding)) {
-            composable(BottomNavItem.Browser.route) { BrowserScreen(currentWebUrl) }
+            composable(BottomNavItem.Browser.route) { BrowserScreen(browserViewModel) }
             composable(BottomNavItem.Calculator.route) { CalculatorScreen() }
             composable(BottomNavItem.Settings.route) { SettingsScreen(onOpenBrowserUrl = openBrowserUrl) }
         }

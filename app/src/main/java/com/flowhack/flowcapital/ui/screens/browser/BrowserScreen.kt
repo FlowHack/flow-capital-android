@@ -8,6 +8,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -23,6 +24,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -47,19 +49,26 @@ import androidx.webkit.ProxyConfig as WebKitProxyConfig
 
 /**
  * Главный экран встроенного браузера.
- * Отображает WebView с указанным URL, поддерживает прокси (SOCKS5, MTProto),
+ *
+ * Отображает панель вкладок и активный WebView. Вкладки хранятся в
+ * [BrowserViewModel] с живыми WebView, поэтому переключение между сайтами
+ * не сбрасывает состояние страниц. Поддерживает прокси (SOCKS5, MTProto),
  * перемещаемую кнопку обновления и управление куками.
  *
- * @param url URL для загрузки в WebView
+ * @param viewModel ViewModel вкладок браузера
  */
 @SuppressLint("SetJavaScriptEnabled", "DEPRECATION")
 @Composable
-fun BrowserScreen(url: String) {
+fun BrowserScreen(viewModel: BrowserViewModel) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val settingsManager = remember { SettingsManager(context) }
     val proxyStorage = remember { ProxyStorage(context) }
     val proxies by proxyStorage.proxiesFlow.collectAsState(initial = emptyList())
+
+    val tabs by viewModel.tabs.collectAsState()
+    val activeTabId by viewModel.activeTabId.collectAsState()
+    val activeTab = tabs.find { it.id == activeTabId }
 
     val savedOffsetX by settingsManager.browserFabOffsetXFlow.collectAsState(initial = 400)
     val savedOffsetY by settingsManager.browserFabOffsetYFlow.collectAsState(initial = 16)
@@ -73,48 +82,13 @@ fun BrowserScreen(url: String) {
         offsetY = savedOffsetY.toFloat()
     }
 
-    val siteName = when {
-        url.contains("potok.cash") -> "ПОТОКCASH"
-        url.contains("sberkassa") -> "СБЕРКАССА"
-        url.contains("e-id") -> "E-ID"
-        url.contains("blackbit") -> "BLACKBIT"
-        url.contains("erub") -> "ERUB"
-        else -> null
-    }
+    val siteName = activeTab?.let { detectSiteName(it.url) }
 
     val enabledProxies = remember(proxies, siteName) {
         if (siteName == null) emptyList()
         else proxies.filter {
             it.status == ProxyStatus.CONNECTED && siteName in it.enabledForSites
         }.sortedBy { it.pingMs ?: Int.MAX_VALUE }
-    }
-
-    val webView = remember {
-        WebView(context).apply {
-            layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-
-            webViewClient = WebViewClient()
-
-            settings.apply {
-                javaScriptEnabled = true
-                domStorageEnabled = true
-                loadWithOverviewMode = true
-                useWideViewPort = true
-                builtInZoomControls = true
-                displayZoomControls = false
-                cacheMode = WebSettings.LOAD_DEFAULT
-                setSupportZoom(true)
-            }
-
-            val cookieManager = CookieManager.getInstance()
-            cookieManager.setAcceptCookie(true)
-            cookieManager.setAcceptThirdPartyCookies(this, true)
-
-            loadUrl(url)
-        }
     }
 
     LaunchedEffect(enabledProxies, siteName) {
@@ -130,60 +104,77 @@ fun BrowserScreen(url: String) {
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { webView },
-            update = { view ->
-                if (view.url != url) {
-                    view.loadUrl(url)
-                }
-            }
+    Column(modifier = Modifier.fillMaxSize()) {
+        BrowserTabBar(
+            tabs = tabs,
+            activeTabId = activeTabId,
+            onSelect = viewModel::selectTab,
+            onClose = viewModel::closeTab
         )
 
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.BottomStart
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (activeTab != null) {
+                key(activeTab.id) {
+                    AndroidView(
+                        modifier = Modifier.fillMaxSize(),
+                        factory = {
+                            // Отцепляем WebView от прежнего родителя (поворот экрана,
+                            // повторное использование вкладки), чтобы избежать
+                            // исключения "child already has a parent".
+                            (activeTab.webView.parent as? ViewGroup)?.removeView(activeTab.webView)
+                            activeTab.webView
+                        }
+                    )
+                }
+            }
+
             Box(
-                modifier = Modifier
-                    .padding(start = 16.dp, bottom = 16.dp)
-                    .offset {
-                        IntOffset(offsetX.toInt(), offsetY.toInt())
-                    }
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.BottomStart
             ) {
-                FloatingActionButton(
-                    onClick = { webView.reload() },
-                    containerColor = if (isDragging > 0) {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
-                    } else {
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
-                    },
-                    shape = CircleShape,
+                Box(
                     modifier = Modifier
-                        .size(56.dp)
-                        .pointerInput(Unit) {
-                            detectDragGestures(
-                                onDragStart = { isDragging = 1f },
-                                onDragEnd = {
-                                    isDragging = 0f
-                                    scope.launch {
-                                        settingsManager.saveBrowserFabOffset(offsetX.toInt(), offsetY.toInt())
-                                    }
-                                },
-                                onDragCancel = { isDragging = 0f },
-                                onDrag = { change, dragAmount ->
-                                    change.consume()
-                                    offsetX += dragAmount.x
-                                    offsetY += dragAmount.y
-                                }
-                            )
+                        .padding(start = 16.dp, bottom = 16.dp)
+                        .offset {
+                            IntOffset(offsetX.toInt(), offsetY.toInt())
                         }
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Обновить страницу"
-                    )
+                    FloatingActionButton(
+                        onClick = { activeTab?.webView?.reload() },
+                        containerColor = if (isDragging > 0) {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                        } else {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+                        },
+                        shape = CircleShape,
+                        modifier = Modifier
+                            .size(56.dp)
+                            .pointerInput(Unit) {
+                                detectDragGestures(
+                                    onDragStart = { isDragging = 1f },
+                                    onDragEnd = {
+                                        isDragging = 0f
+                                        scope.launch {
+                                            settingsManager.saveBrowserFabOffset(
+                                                offsetX.toInt(),
+                                                offsetY.toInt()
+                                            )
+                                        }
+                                    },
+                                    onDragCancel = { isDragging = 0f },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        offsetX += dragAmount.x
+                                        offsetY += dragAmount.y
+                                    }
+                                )
+                            }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Обновить страницу"
+                        )
+                    }
                 }
             }
         }
