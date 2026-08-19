@@ -104,7 +104,7 @@ fun CalculatorScreen() {
     val startPercent by settingsManager.startPercentFlow.collectAsState(initial = 0.1)
     val pnBonusPercent by settingsManager.pnBonusPercentFlow.collectAsState(initial = 50.0)
     val pnDailyPercent by settingsManager.pnDailyPercentFlow.collectAsState(initial = 2.0)
-    val eCurrencyBonusPercent by settingsManager.eCurrencyBonusPercentState.collectAsState(initial = 0.0)
+    val eRubBonusPercent by settingsManager.eRubBonusPercentState.collectAsState(initial = 0.0)
 
     // Краткие и полные названия вкладок
     val isRpVip by settingsManager.isRpVipFlow.collectAsState(initial = false)
@@ -235,11 +235,11 @@ fun CalculatorScreen() {
             },
             defaultPercent = startPercent,
             isNewFlow = growingHistory.isEmpty(),
-            eCurrencyBonusPercent = eCurrencyBonusPercent,
+            eRubBonusPercent = eRubBonusPercent,
             onAmountChanged = { newAmount ->
                 val amountDouble = newAmount.replace(",", ".").toDoubleOrNull() ?: 0.0
                 CoroutineScope(Dispatchers.Main).launch {
-                    settingsManager.updateECurrencyBonusPercent(amountDouble)
+                    settingsManager.updateERubBonusPercent(amountDouble)
                 }
             }
         )

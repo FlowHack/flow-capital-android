@@ -115,8 +115,8 @@ class SettingsManagerTest {
 
         assertTrue(settingsManager.isRpVipFlow.first())
         assertEquals(0.3, settingsManager.startPercentFlow.first(), 0.0001)
-        // VIP-коэффициенты E-currency должны быть загружены в кэш.
-        val coefficients = settingsManager.eCurrencyCoefficientsFlow.first()
+        // VIP-коэффициенты eRub должны быть загружены в кэш.
+        val coefficients = settingsManager.eRubCoefficientsFlow.first()
         assertTrue(coefficients.isNotEmpty())
         // Порог 100 должен присутствовать в VIP-наборе.
         assertTrue(coefficients.containsKey(100.0))
@@ -130,7 +130,7 @@ class SettingsManagerTest {
         assertFalse(settingsManager.isRpVipFlow.first())
         assertEquals(0.1, settingsManager.startPercentFlow.first(), 0.0001)
         // Стандартный набор коэффициентов не содержит порога 100.
-        val coefficients = settingsManager.eCurrencyCoefficientsFlow.first()
+        val coefficients = settingsManager.eRubCoefficientsFlow.first()
         assertFalse(coefficients.containsKey(100.0))
     }
 
@@ -147,15 +147,15 @@ class SettingsManagerTest {
     }
 
     @Test
-    fun getECurrencyBonusPercent_returnsBonusForThreshold() = runTest(testDispatcher) {
+    fun getERubBonusPercent_returnsBonusForThreshold() = runTest(testDispatcher) {
         settingsManager.initializeDefaults()
 
         // Порог 100000 -> 150%.
-        assertEquals(150.0, settingsManager.getECurrencyBonusPercent(100_000.0), 0.0001)
+        assertEquals(150.0, settingsManager.getERubBonusPercent(100_000.0), 0.0001)
         // Порог 1000 -> 50%.
-        assertEquals(50.0, settingsManager.getECurrencyBonusPercent(1_000.0), 0.0001)
+        assertEquals(50.0, settingsManager.getERubBonusPercent(1_000.0), 0.0001)
         // Сумма ниже минимального порога -> 0.
-        assertEquals(0.0, settingsManager.getECurrencyBonusPercent(500.0), 0.0001)
+        assertEquals(0.0, settingsManager.getERubBonusPercent(500.0), 0.0001)
     }
 
     @Test

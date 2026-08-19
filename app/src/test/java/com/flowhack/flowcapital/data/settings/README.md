@@ -17,7 +17,7 @@
 7. **setRpVip_enablesVipModeAndUpdatesCoefficients** - Включение РП VIP обновляет коэффициенты
 8. **setRpVip_disablesVipModeAndRestoresDefaults** - Выключение РП VIP восстанавливает дефолты
 9. **initializeDefaults_setsDefaultValuesForMissingKeys** - Инициализация дефолтов
-10. **getECurrencyBonusPercent_returnsBonusForThreshold** - Расчёт бонуса E-currency по порогам
+10. **getERubBonusPercent_returnsBonusForThreshold** - Расчёт бонуса eRub по порогам
 11. **setDarkTheme_savesDarkThemeSetting** - Сохранение тёмной темы
 12. **setCheckUpdateOnStart_savesSetting** - Сохранение настройки проверки обновлений
 13. **setSmartNotifications_savesSetting** - Сохранение умных уведомлений

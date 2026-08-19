@@ -363,15 +363,15 @@ fun GrowingFlowSettings(
     var showCalculateExistingDialog by remember { mutableStateOf(false) }
     var ecExpanded by remember { mutableStateOf(false) }
 
-    val savedECurrency by settingsManager.eCurrencyCoefficientsFlow.collectAsState(initial = emptyMap())
-    var ecTextValues by remember { mutableStateOf(mapOf<Double, String>()) }
+    val savedERub by settingsManager.eRubCoefficientsFlow.collectAsState(initial = emptyMap())
+    var erubTextValues by remember { mutableStateOf(mapOf<Double, String>()) }
 
     val isMathChanged = remember(startPercentText, dailyAdditionText, savedStartPercent, savedDailyAddition) {
         startPercentText != savedStartPercent.toString() || dailyAdditionText != savedDailyAddition.toString()
     }
 
-    val isECurrencyChanged = remember(ecTextValues, savedECurrency) {
-        ecTextValues.any { (key, value) -> savedECurrency[key]?.toString() != value }
+    val isERubChanged = remember(erubTextValues, savedERub) {
+        erubTextValues.any { (key, value) -> savedERub[key]?.toString() != value }
     }
 
     LaunchedEffect(savedStartPercent, savedDailyAddition) {
@@ -379,8 +379,8 @@ fun GrowingFlowSettings(
         dailyAdditionText = savedDailyAddition.toString()
     }
 
-    LaunchedEffect(savedECurrency) {
-        ecTextValues = savedECurrency.mapValues { it.value.toString() }
+    LaunchedEffect(savedERub) {
+        erubTextValues = savedERub.mapValues { it.value.toString() }
     }
 
     val database = remember { AppDatabase.getDatabase(context) }
@@ -484,7 +484,7 @@ fun GrowingFlowSettings(
             HorizontalDivider()
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text("Коэффициенты E-currency", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text("Коэффициенты eRub", fontWeight = FontWeight.Bold, fontSize = 14.sp)
             Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -499,11 +499,11 @@ fun GrowingFlowSettings(
 
             if (ecExpanded) {
                 Spacer(modifier = Modifier.height(8.dp))
-                ecTextValues.keys.sorted().forEach { threshold ->
+                erubTextValues.keys.sorted().forEach { threshold ->
                     OutlinedTextField(
-                        value = ecTextValues[threshold] ?: "",
+                        value = erubTextValues[threshold] ?: "",
                         onValueChange = { newValue ->
-                            ecTextValues = ecTextValues.toMutableMap().apply { this[threshold] = newValue }
+                            erubTextValues = erubTextValues.toMutableMap().apply { this[threshold] = newValue }
                         },
                         label = { Text("От ${String.format(java.util.Locale.US, "%.0f", threshold)}") },
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -514,11 +514,11 @@ fun GrowingFlowSettings(
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
                     onClick = {
-                        val coefficients = ecTextValues.mapValues { it.value.replace(",", ".").toDoubleOrNull() ?: 0.0 }
-                        scope.launch { settingsManager.saveECurrencyCoefficients(coefficients) }
+                        val coefficients = erubTextValues.mapValues { it.value.replace(",", ".").toDoubleOrNull() ?: 0.0 }
+                        scope.launch { settingsManager.saveERubCoefficients(coefficients) }
                         Toast.makeText(context, "Сохранено", Toast.LENGTH_SHORT).show()
                     },
-                    enabled = isECurrencyChanged,
+                    enabled = isERubChanged,
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("Сохранить коэффициенты") }
             }
@@ -1086,8 +1086,8 @@ private fun getDefaultPspCoefficients(): Map<Int, Double> = mapOf(
     17 to 197.79, 18 to 198.0, 19 to 199.0, 20 to 200.0
 )
 
-/** Таблица коэффициентов E-currency для РП по умолчанию */
-private fun getDefaultECurrencyCoefficients(): Map<Double, Double> = mapOf(
+/** Таблица коэффициентов eRub для РП по умолчанию */
+private fun getDefaultERubCoefficients(): Map<Double, Double> = mapOf(
     1000.0 to 50.0,
     5000.0 to 75.0,
     10000.0 to 100.0,
@@ -1098,22 +1098,22 @@ private fun getDefaultECurrencyCoefficients(): Map<Double, Double> = mapOf(
 )
 
 @Composable
-fun ECurrencyCoefficientsDialog(onDismiss: () -> Unit) {
+fun ERubCoefficientsDialog(onDismiss: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val settingsManager = remember { SettingsManager(context) }
-    val eCurrencyCoefficients by settingsManager.eCurrencyCoefficientsFlow.collectAsState(initial = emptyMap())
-    if (eCurrencyCoefficients.isEmpty()) return
-    var textValues by remember(eCurrencyCoefficients) { mutableStateOf(eCurrencyCoefficients.mapValues { it.value.toString() }) }
+    val eRubCoefficients by settingsManager.eRubCoefficientsFlow.collectAsState(initial = emptyMap())
+    if (eRubCoefficients.isEmpty()) return
+    var textValues by remember(eRubCoefficients) { mutableStateOf(eRubCoefficients.mapValues { it.value.toString() }) }
 
-    LaunchedEffect(eCurrencyCoefficients) {
-        textValues = eCurrencyCoefficients.mapValues { it.value.toString() }
+    LaunchedEffect(eRubCoefficients) {
+        textValues = eRubCoefficients.mapValues { it.value.toString() }
     }
 
     AlertDialog(
         onDismissRequest = {},
         modifier = Modifier.fillMaxWidth().padding(16.dp),
-        title = { Text("Коэффициенты E-currency РП", fontSize = 18.sp) },
+        title = { Text("Коэффициенты eRub РП", fontSize = 18.sp) },
         text = {
             Column {
                 Row(
@@ -1124,7 +1124,7 @@ fun ECurrencyCoefficientsDialog(onDismiss: () -> Unit) {
                     Text("Бонус %", modifier = Modifier.weight(0.5f), fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
 
-                eCurrencyCoefficients.entries.sortedBy { it.key }.forEach { (threshold, _) ->
+                eRubCoefficients.entries.sortedBy { it.key }.forEach { (threshold, _) ->
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1149,7 +1149,7 @@ fun ECurrencyCoefficientsDialog(onDismiss: () -> Unit) {
             Button(onClick = {
                 val finalCoefficients = textValues.mapValues { it.value.replace(",", ".").toDoubleOrNull() ?: 0.0 }
                 scope.launch {
-                    settingsManager.saveECurrencyCoefficients(finalCoefficients)
+                    settingsManager.saveERubCoefficients(finalCoefficients)
                     Toast.makeText(context, "Сохранено", Toast.LENGTH_SHORT).show()
                 }
                 onDismiss()
@@ -3293,7 +3293,7 @@ private suspend fun exportSettingsToJson(context: Context, uri: Uri, settingsMan
             dailyAddition = settingsManager.dailyAdditionFlow.first(),
             pnBonusPercent = settingsManager.pnBonusPercentFlow.first(),
             pnDailyPercent = settingsManager.pnDailyPercentFlow.first(),
-            eCurrencyCoefficients = settingsManager.eCurrencyCoefficientsFlow.first(),
+            eRubCoefficients = settingsManager.eRubCoefficientsFlow.first(),
             pspCoefficients = settingsManager.pspCoefficientsFlow.first(),
             growingFlowHistory = growingHistory.map {
                 GrowingFlowEntityBackup(it.id, it.date, it.percent, it.inFlowAmount, it.dailyAccrual, it.walletAmount, it.isButtonPressed, it.actionType, step = it.step)
@@ -3495,8 +3495,8 @@ private suspend fun importSettingsFromJson(context: Context, uri: Uri, settingsM
         importData.pnBonusPercent?.let {
             settingsManager.savePnPercentages(it, importData.pnDailyPercent ?: 2.0)
         }
-        importData.eCurrencyCoefficients.let {
-            settingsManager.saveECurrencyCoefficients(it)
+        importData.eRubCoefficients.let {
+            settingsManager.saveERubCoefficients(it)
         }
         importData.pspCoefficients.let {
             settingsManager.savePspCoefficients(it)
@@ -3607,7 +3607,7 @@ data class FullBackupData(
     val dailyAddition: Double?,
     val pnBonusPercent: Double?,
     val pnDailyPercent: Double?,
-    val eCurrencyCoefficients: Map<Double, Double>,
+    val eRubCoefficients: Map<Double, Double>,
     val pspCoefficients: Map<Int, Double>,
     val growingFlowHistory: List<GrowingFlowEntityBackup>,
     val noviceFlowHistory: List<NoviceFlowEntityBackup>,
@@ -3647,7 +3647,7 @@ private fun CalculateGrowingFlowDialog(
 
     val savedStartPercent by settingsManager.startPercentFlow.collectAsState(initial = 0.1)
     val savedDailyAddition by settingsManager.dailyAdditionFlow.collectAsState(initial = 0.003)
-    val savedECurrency by settingsManager.eCurrencyCoefficientsFlow.collectAsState(initial = emptyMap())
+    val savedERub by settingsManager.eRubCoefficientsFlow.collectAsState(initial = emptyMap())
 
     var contributionText by remember { mutableStateOf("") }
     var percentText by remember(savedStartPercent) { mutableStateOf(savedStartPercent.toString()) }
@@ -3675,8 +3675,8 @@ private fun CalculateGrowingFlowDialog(
     val percent = parseDouble(percentText)
     val wallet = if (walletText.isBlank()) 0.0 else parseDouble(walletText)
 
-    val inFlow = if (contribution > 0 && savedECurrency.isNotEmpty()) {
-        val bonus = savedECurrency.entries.filter { it.key <= contribution }.maxByOrNull { it.key }?.value ?: 0.0
+    val inFlow = if (contribution > 0 && savedERub.isNotEmpty()) {
+        val bonus = savedERub.entries.filter { it.key <= contribution }.maxByOrNull { it.key }?.value ?: 0.0
         contribution + contribution * bonus / 100.0
     } else contribution
     val dailyAccrual = if (inFlow > 0) inFlow * (percent / 100.0) else 0.0
@@ -3689,8 +3689,8 @@ private fun CalculateGrowingFlowDialog(
                 Text("Введите параметры нового потока для расчёта прогноза:", fontSize = 12.sp, color = Color.Gray)
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Text("Бонус ко взносу по таблице: ${if (contribution > 0 && savedECurrency.isNotEmpty()) {
-                    savedECurrency.entries.filter { it.key <= contribution }.maxByOrNull { it.key }?.value ?: 0.0
+                Text("Бонус ко взносу по таблице: ${if (contribution > 0 && savedERub.isNotEmpty()) {
+                    savedERub.entries.filter { it.key <= contribution }.maxByOrNull { it.key }?.value ?: 0.0
                 } else 0.0}%", fontSize = 11.sp, color = Color.Gray)
 
                 OutlinedTextField(

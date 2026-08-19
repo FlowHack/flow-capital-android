@@ -172,10 +172,10 @@ object ProxyValidator {
 }
 
 /**
- * Калькулятор бонусов E-currency.
+ * Калькулятор бонусов eRub.
  * Использует прогрессивную шкалу: чем больше сумма, тем выше бонус.
  */
-object ProxyECurrencyBonus {
+object ProxyERubBonus {
     /**
      * Рассчитать бонус для указанной суммы.
      * @param amount Сумма взноса

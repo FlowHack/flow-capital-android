@@ -88,56 +88,56 @@ class ProxyValidatorTest {
 }
 
 /**
- * Юнит-тесты расчёта бонусов E-currency [ProxyECurrencyBonus].
+ * Юнит-тесты расчёта бонусов eRub [ProxyERubBonus].
  *
  * Проверяют реальную шкалу бонусов в зависимости от суммы взноса.
  */
-class ProxyECurrencyBonusTest {
+class ProxyERubBonusTest {
 
     @Test
     fun calculateBonus_amountAboveMillion_returnsDouble() {
-        assertEquals(2_000_000.0, ProxyECurrencyBonus.calculateBonus(1_000_000.0), 0.0001)
+        assertEquals(2_000_000.0, ProxyERubBonus.calculateBonus(1_000_000.0), 0.0001)
     }
 
     @Test
     fun calculateBonus_amountAt500k_returns175Percent() {
-        assertEquals(875_000.0, ProxyECurrencyBonus.calculateBonus(500_000.0), 0.0001)
+        assertEquals(875_000.0, ProxyERubBonus.calculateBonus(500_000.0), 0.0001)
     }
 
     @Test
     fun calculateBonus_amountAt100k_returns150Percent() {
-        assertEquals(150_000.0, ProxyECurrencyBonus.calculateBonus(100_000.0), 0.0001)
+        assertEquals(150_000.0, ProxyERubBonus.calculateBonus(100_000.0), 0.0001)
     }
 
     @Test
     fun calculateBonus_amountAt10k_returns100Percent() {
-        assertEquals(10_000.0, ProxyECurrencyBonus.calculateBonus(10_000.0), 0.0001)
+        assertEquals(10_000.0, ProxyERubBonus.calculateBonus(10_000.0), 0.0001)
     }
 
     @Test
     fun calculateBonus_amountAt5k_returns75Percent() {
-        assertEquals(3_750.0, ProxyECurrencyBonus.calculateBonus(5_000.0), 0.0001)
+        assertEquals(3_750.0, ProxyERubBonus.calculateBonus(5_000.0), 0.0001)
     }
 
     @Test
     fun calculateBonus_amountAt1k_returns50Percent() {
-        assertEquals(500.0, ProxyECurrencyBonus.calculateBonus(1_000.0), 0.0001)
+        assertEquals(500.0, ProxyERubBonus.calculateBonus(1_000.0), 0.0001)
     }
 
     @Test
     fun calculateBonus_amountBelow1k_returnsZero() {
-        assertEquals(0.0, ProxyECurrencyBonus.calculateBonus(999.0), 0.0001)
+        assertEquals(0.0, ProxyERubBonus.calculateBonus(999.0), 0.0001)
     }
 
     @Test
     fun getTotalWithBonus_returnsAmountPlusBonus() {
         // 1000 + 500 (50%) = 1500
-        assertEquals(1_500.0, ProxyECurrencyBonus.getTotalWithBonus(1_000.0), 0.0001)
+        assertEquals(1_500.0, ProxyERubBonus.getTotalWithBonus(1_000.0), 0.0001)
         // 5000 + 3750 (75%) = 8750
-        assertEquals(8_750.0, ProxyECurrencyBonus.getTotalWithBonus(5_000.0), 0.0001)
+        assertEquals(8_750.0, ProxyERubBonus.getTotalWithBonus(5_000.0), 0.0001)
         // 10000 + 10000 (100%) = 20000
-        assertEquals(20_000.0, ProxyECurrencyBonus.getTotalWithBonus(10_000.0), 0.0001)
+        assertEquals(20_000.0, ProxyERubBonus.getTotalWithBonus(10_000.0), 0.0001)
         // Ниже порога 1000 - бонус 0, сумма без изменений.
-        assertEquals(999.0, ProxyECurrencyBonus.getTotalWithBonus(999.0), 0.0001)
+        assertEquals(999.0, ProxyERubBonus.getTotalWithBonus(999.0), 0.0001)
     }
 }

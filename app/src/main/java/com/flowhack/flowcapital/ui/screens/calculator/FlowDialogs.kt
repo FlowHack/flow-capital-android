@@ -72,7 +72,7 @@ fun ReinvestDialog(
     onConfirm: (Double, Double?, Double?, Boolean) -> Unit,
     defaultPercent: Double = 0.1,
     isNewFlow: Boolean = false,
-    eCurrencyBonusPercent: Double = 0.0,
+    eRubBonusPercent: Double = 0.0,
     onAmountChanged: (String) -> Unit = {}
 ) {
     var amountText by remember { mutableStateOf("") }
@@ -81,7 +81,7 @@ fun ReinvestDialog(
     var walletExplicitlySet by remember { mutableStateOf(false) }
     var isExistingFlow by remember { mutableStateOf(false) }
 
-    val eCurrencyBonus = if (amountText.isNotEmpty()) eCurrencyBonusPercent else 0.0
+    val eRubBonus = if (amountText.isNotEmpty()) eRubBonusPercent else 0.0
 
     val currentPercent: Double = if (isExistingFlow && amountText.isNotEmpty() && percentText.isNotEmpty()) {
         val amount = amountText.replace(",", ".").toDoubleOrNull() ?: 0.0
@@ -119,7 +119,7 @@ fun ReinvestDialog(
                     Text("Процент начинается с ${String.format(Locale.US, "%.3f", defaultPercent)}%", fontSize = 12.sp, color = Color.Gray)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        if (amountText.isNotEmpty()) "Бонус ко взносу по таблице: ${String.format(Locale.US, "%.0f", eCurrencyBonus)}%"
+                        if (amountText.isNotEmpty()) "Бонус ко взносу по таблице: ${String.format(Locale.US, "%.0f", eRubBonus)}%"
                         else "Бонус ко взносу по таблице",
                         fontSize = 12.sp, color = Color.Gray
                     )

@@ -1,7 +1,7 @@
 # Тесты прокси-логики (data/proxy)
 
 ## Общая информация
-Тесты покрывают чистую JVM-логику валидации прокси и расчёта бонусов E-currency.
+Тесты покрывают чистую JVM-логику валидации прокси и расчёта бонусов eRub.
 Не требуют Android-зависимостей.
 
 ## Структура тестов
@@ -18,8 +18,8 @@
 8. **validateMtProtoProxy_validConfig_returnsValid** - Валидная MTProto конфигурация
 9. **validateMtProtoProxy_missingSecret_returnsError** - Отсутствие ключа MTProto
 
-### ProxyECurrencyBonusTest.kt
-Проверяет логику `ProxyECurrencyBonus`:
+### ProxyERubBonusTest.kt
+Проверяет логику `ProxyERubBonus`:
 1. **calculateBonus_amountAboveMillion_returnsDouble** - Бонус 200% при сумме >= 1 000 000
 2. **calculateBonus_amountAt500k_returns175Percent** - Бонус 175% при сумме >= 500 000
 3. **calculateBonus_amountAt100k_returns150Percent** - Бонус 150% при сумме >= 100 000

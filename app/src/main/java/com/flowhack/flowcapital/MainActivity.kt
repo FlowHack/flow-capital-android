@@ -115,7 +115,7 @@ class MainActivity : ComponentActivity() {
 
         val scope = CoroutineScope(Dispatchers.Main)
         settingsManager.initializePspCache(scope)
-        settingsManager.initializeECurrencyCache(scope)
+        settingsManager.initializeERubCache(scope)
 
         scope.launch {
             settingsManager.initializeDefaults()

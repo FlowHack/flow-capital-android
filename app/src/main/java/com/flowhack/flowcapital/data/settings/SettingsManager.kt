@@ -65,8 +65,8 @@ class SettingsManager internal constructor(private val dataStore: DataStore<Pref
         val PSP_PERIOD_PERCENTAGES = stringPreferencesKey("psp_period_percentages")
                 /** Ключ для флага РП VIP */
         val IS_RP_VIP = booleanPreferencesKey("is_rp_vip")
-        /** Ключ для коэффициентов E-currency РП */
-        val E_CURRENCY_COEFFICIENTS = stringPreferencesKey("e_currency_coefficients")
+        /** Ключ для коэффициентов eRub РП */
+        val ERUB_COEFFICIENTS = stringPreferencesKey("e_currency_coefficients")
         /** Ключ для коэффициентов Быстрого Потока (БП) */
         val BP_COEFFICIENTS = stringPreferencesKey("bp_coefficients")
         /** Ключ для коэффициентов Супер Быстрого Потока (СБП) */
@@ -97,7 +97,7 @@ val BROWSER_FAB_OFFSET_Y = intPreferencesKey("browser_fab_offset_y")
             17 to 197.79, 18 to 198.0, 19 to 199.0, 20 to 200.0
         )
 
-        private val DEFAULT_E_CURRENCY_COEFFICIENTS = mapOf(
+        private val DEFAULT_ERUB_COEFFICIENTS = mapOf(
             1000.0 to 50.0,
             5000.0 to 75.0,
             10000.0 to 100.0,
@@ -148,7 +148,7 @@ val BROWSER_FAB_OFFSET_Y = intPreferencesKey("browser_fab_offset_y")
         /** Дефолтные коэффициенты для РП VIP (стартовый 0.3%, daily 0.003%) */
         val VIP_START_PERCENT = 0.3
         val VIP_DAILY_ADDITION = 0.003
-        val VIP_E_CURRENCY_COEFFICIENTS = mapOf(
+        val VIP_ERUB_COEFFICIENTS = mapOf(
             100.0 to 30.0,
             500.0 to 40.0,
             1000.0 to 50.0,
@@ -240,11 +240,11 @@ val BROWSER_FAB_OFFSET_Y = intPreferencesKey("browser_fab_offset_y")
             prefs[IS_RP_VIP] = vip
             prefs[START_PERCENT] = if (vip) VIP_START_PERCENT else 0.1
             prefs[DAILY_ADDITION] = if (vip) VIP_DAILY_ADDITION else 0.003
-            val coefficients = if (vip) VIP_E_CURRENCY_COEFFICIENTS else DEFAULT_E_CURRENCY_COEFFICIENTS
+            val coefficients = if (vip) VIP_ERUB_COEFFICIENTS else DEFAULT_ERUB_COEFFICIENTS
             val entries = coefficients.entries.joinToString(";") { "${it.key}=${it.value}" }
-            prefs[E_CURRENCY_COEFFICIENTS] = entries
-            _eCurrencyCoefficientsFlow.value = coefficients
-            cachedECurrencyCoefficients = coefficients
+            prefs[ERUB_COEFFICIENTS] = entries
+            _eRubCoefficientsFlow.value = coefficients
+            cachedERubCoefficients = coefficients
         }
     }
 
@@ -602,9 +602,9 @@ suspend fun saveBrowserFabOffset(offsetX: Int, offsetY: Int) {
                 val entries = DEFAULT_PSP_COEFFICIENTS.entries.joinToString(";") { "${it.key}=${it.value}" }
                 prefs[PSP_PERIOD_PERCENTAGES] = entries
             }
-            if (!prefs.contains(E_CURRENCY_COEFFICIENTS)) {
-                val entries = DEFAULT_E_CURRENCY_COEFFICIENTS.entries.joinToString(";") { "${it.key}=${it.value}" }
-                prefs[E_CURRENCY_COEFFICIENTS] = entries
+            if (!prefs.contains(ERUB_COEFFICIENTS)) {
+                val entries = DEFAULT_ERUB_COEFFICIENTS.entries.joinToString(";") { "${it.key}=${it.value}" }
+                prefs[ERUB_COEFFICIENTS] = entries
             }
             if (!prefs.contains(BP_COEFFICIENTS)) {
                 prefs[BP_COEFFICIENTS] = serializeDoubleMap(DEFAULT_BP_COEFFICIENTS)
@@ -634,22 +634,22 @@ if (!prefs.contains(DEFAULT_CALC_TAB)) {
         initialized = true
     }
 
-    private var cachedECurrencyCoefficients: Map<Double, Double> = DEFAULT_E_CURRENCY_COEFFICIENTS
+    private var cachedERubCoefficients: Map<Double, Double> = DEFAULT_ERUB_COEFFICIENTS
 
     /**
-     * MutableStateFlow для коэффициентов E-currency - обновляется сразу после сохранения.
+     * MutableStateFlow для коэффициентов eRub - обновляется сразу после сохранения.
      */
-    private val _eCurrencyCoefficientsFlow = MutableStateFlow(DEFAULT_E_CURRENCY_COEFFICIENTS)
+    private val _eRubCoefficientsFlow = MutableStateFlow(DEFAULT_ERUB_COEFFICIENTS)
 
     /**
-     * Поток с коэффициентами E-currency для РП.
+     * Поток с коэффициентами eRub для РП.
      */
-    val eCurrencyCoefficientsFlow: StateFlow<Map<Double, Double>> = _eCurrencyCoefficientsFlow.asStateFlow()
+    val eRubCoefficientsFlow: StateFlow<Map<Double, Double>> = _eRubCoefficientsFlow.asStateFlow()
 
     init {
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
             dataStore.data.first().let { preferences ->
-                val serialized = preferences[E_CURRENCY_COEFFICIENTS]
+                val serialized = preferences[ERUB_COEFFICIENTS]
                 val parsed = mutableMapOf<Double, Double>()
                 if (!serialized.isNullOrEmpty()) {
                     serialized.split(";").forEach { entry ->
@@ -664,32 +664,32 @@ if (!prefs.contains(DEFAULT_CALC_TAB)) {
                     }
                 }
                 if (parsed.isNotEmpty()) {
-                    _eCurrencyCoefficientsFlow.value = parsed
+                    _eRubCoefficientsFlow.value = parsed
                 }
             }
         }
     }
 
     /**
-     * Сохранить коэффициенты E-currency для РП.
+     * Сохранить коэффициенты eRub для РП.
      * @param coefficients Карта пороговых сумм к процентам бонуса
      */
-    suspend fun saveECurrencyCoefficients(coefficients: Map<Double, Double>) {
-        _eCurrencyCoefficientsFlow.value = coefficients
-        cachedECurrencyCoefficients = coefficients
+    suspend fun saveERubCoefficients(coefficients: Map<Double, Double>) {
+        _eRubCoefficientsFlow.value = coefficients
+        cachedERubCoefficients = coefficients
         dataStore.edit { prefs ->
             val entries = coefficients.entries.joinToString(";") { "${it.key}=${it.value}" }
-            prefs[E_CURRENCY_COEFFICIENTS] = entries
+            prefs[ERUB_COEFFICIENTS] = entries
         }
     }
 
     /**
-     * Инициализировать кеш коэффициентов E-currency.
+     * Инициализировать кеш коэффициентов eRub.
      */
-    fun initializeECurrencyCache(scope: kotlinx.coroutines.CoroutineScope) {
+    fun initializeERubCache(scope: kotlinx.coroutines.CoroutineScope) {
         scope.launch(Dispatchers.IO) {
             dataStore.data.collect { preferences ->
-                val serialized = preferences[E_CURRENCY_COEFFICIENTS]
+                val serialized = preferences[ERUB_COEFFICIENTS]
                 if (!serialized.isNullOrEmpty()) {
                     val parsed = mutableMapOf<Double, Double>()
                     serialized.split(";").forEach { entry ->
@@ -703,7 +703,7 @@ if (!prefs.contains(DEFAULT_CALC_TAB)) {
                         }
                     }
                     if (parsed.isNotEmpty()) {
-                        cachedECurrencyCoefficients = parsed
+                        cachedERubCoefficients = parsed
                     }
                 }
             }
@@ -715,8 +715,8 @@ if (!prefs.contains(DEFAULT_CALC_TAB)) {
      * Использует .first() для получения актуальных данных из DataStore.
      * Важно: вызывать из корутины!
      */
-    suspend fun getECurrencyBonusPercent(amount: Double): Double {
-        val coefficients = eCurrencyCoefficientsFlow.first().entries.sortedByDescending { it.key }
+    suspend fun getERubBonusPercent(amount: Double): Double {
+        val coefficients = eRubCoefficientsFlow.first().entries.sortedByDescending { it.key }
         for ((threshold, bonus) in coefficients) {
             if (amount >= threshold) {
                 return bonus
@@ -729,15 +729,15 @@ if (!prefs.contains(DEFAULT_CALC_TAB)) {
      * StateFlow для отображения бонуса в UI при изменении суммы.
      * Обновляется автоматически при изменении суммы.
      */
-    private val _eCurrencyBonusPercentState = MutableStateFlow(0.0)
-    val eCurrencyBonusPercentState: StateFlow<Double> = _eCurrencyBonusPercentState.asStateFlow()
+    private val _eRubBonusPercentState = MutableStateFlow(0.0)
+    val eRubBonusPercentState: StateFlow<Double> = _eRubBonusPercentState.asStateFlow()
 
     /**
      * Обновить процент бонуса для указанной суммы.
      * Вызывать из корутины!
      */
-    suspend fun updateECurrencyBonusPercent(amount: Double) {
-        _eCurrencyBonusPercentState.value = getECurrencyBonusPercent(amount)
+    suspend fun updateERubBonusPercent(amount: Double) {
+        _eRubBonusPercentState.value = getERubBonusPercent(amount)
     }
 
     /**

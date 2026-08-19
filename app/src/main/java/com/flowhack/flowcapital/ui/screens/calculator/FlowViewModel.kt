@@ -60,9 +60,9 @@ class FlowViewModel(
     /** Ежедневное увеличение процента для РП */
     private val dailyAddition = settingsManager.dailyAdditionFlow.stateIn(viewModelScope, SharingStarted.Eagerly, 0.003)
 
-    /** E-currency коэффициенты из настроек */
-    private val eCurrencyCoefficients: Flow<Map<Double, Double>>
-        get() = settingsManager.eCurrencyCoefficientsFlow
+    /** eRub коэффициенты из настроек */
+    private val eRubCoefficients: Flow<Map<Double, Double>>
+        get() = settingsManager.eRubCoefficientsFlow
 
     /** Результаты прогноза РП */
     private val _forecastResults = MutableStateFlow<List<GrowingFlowEntity>>(emptyList())
@@ -92,7 +92,7 @@ class FlowViewModel(
     }
 
     /**
-     * Расчёт E-currency бонуса в зависимости от суммы взноса.
+     * Расчёт eRub бонуса в зависимости от суммы взноса.
      * Таблица коэффициентов из настроек:
      * - >= 1 000 000: +200%
      * - >= 500 000: +175%
@@ -102,8 +102,8 @@ class FlowViewModel(
      * - >= 5 000: +75%
      * - >= 1 000: +50%
      */
-    private suspend fun calculateECurrencyBonus(amount: Double): Double {
-        val coefficients = eCurrencyCoefficients.first().entries.sortedByDescending { it.key }
+    private suspend fun calculateERubBonus(amount: Double): Double {
+        val coefficients = eRubCoefficients.first().entries.sortedByDescending { it.key }
         for ((threshold, bonus) in coefficients) {
             if (amount >= threshold) {
                 return amount * (1 + bonus / 100.0)
@@ -142,7 +142,7 @@ class FlowViewModel(
                 Timber.tag("FlowViewModel").d("Режим действующего: inFlow=%.2f, percent=%.3f, accrual=%.2f", newInFlowAmount, newPercent, newDailyAccrual)
             } else {
                 // Новый поток - применяем бонус
-                val amountToAdd = calculateECurrencyBonus(amount)
+                val amountToAdd = calculateERubBonus(amount)
                 newInFlowAmount = previousInFlow + amountToAdd
                 newPercent = percentOrAccrual ?: startPercent.value
                 newDailyAccrual = newInFlowAmount * (newPercent / 100.0)
