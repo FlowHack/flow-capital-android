@@ -102,6 +102,7 @@ fun BrowserScreen(viewModel: BrowserViewModel) {
     // Локальный прокси-форвардер для прокси с авторизацией
     // (WebView ProxyConfig не поддерживает credentials в правиле).
     val localProxyServerState = remember { mutableStateOf<LocalProxyServer?>(null) }
+    var lastAppliedProxy by remember { mutableStateOf<ProxyConfig?>(null) }
 
     val enabledProxies = remember(proxies, siteName) {
         if (siteName == null) emptyList()
@@ -114,6 +115,17 @@ fun BrowserScreen(viewModel: BrowserViewModel) {
     LaunchedEffect(enabledProxies, siteName) {
         val selectedProxy = enabledProxies.firstOrNull()
         applyProxyToWebView(selectedProxy, localProxyServerState)
+        // Если прокси изменился — перезагружаем активную вкладку, чтобы
+        // WebView гарантированно использовал прокси (иначе страница может
+        // загрузиться напрямую, если прокси применился после loadUrl).
+        if (selectedProxy != lastAppliedProxy) {
+            lastAppliedProxy = selectedProxy
+            activeTab?.webView?.let { webView ->
+                val url = webView.url ?: activeTab.url
+                webView.stopLoading()
+                webView.loadUrl(url)
+            }
+        }
     }
 
     DisposableEffect(Unit) {

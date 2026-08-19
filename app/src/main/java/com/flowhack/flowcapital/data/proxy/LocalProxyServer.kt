@@ -113,6 +113,7 @@ class LocalProxyServer(
             }
             val method = parts[0]
             val target = parts[1]
+            Timber.tag("LocalProxy").d("Запрос от WebView: $method $target")
 
             // Соединение с удалённым прокси.
             val remote = Socket(remoteHost, remotePort)
@@ -143,6 +144,7 @@ class LocalProxyServer(
                 remoteOut.flush()
 
                 val statusLine = readLine(remoteIn)
+                Timber.tag("LocalProxy").d("Статус удалённого прокси: $statusLine")
                 if (statusLine == null || !statusLine.contains("200")) {
                     Timber.tag("LocalProxy").w("CONNECT отклонён: $statusLine")
                     client.close()

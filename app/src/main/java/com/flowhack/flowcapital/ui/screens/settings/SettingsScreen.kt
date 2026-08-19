@@ -3356,6 +3356,8 @@ private suspend fun exportSettingsToJson(
             emptyMap()
         }
 
+        val proxiesJson = ProxyStorage(context).getProxiesJson()
+        AppLogger.d("SettingsScreen", "Прокси для экспорта: $proxiesJson")
         val exportData = FullBackupData(
             appMarker = "FlowCapital_Backup",
             exportDate = System.currentTimeMillis(),
@@ -3394,7 +3396,7 @@ private suspend fun exportSettingsToJson(
             browserFabOffsetY = settingsManager.browserFabOffsetYFlow.first(),
             skipAutoUpdate = settingsManager.skipAutoUpdateFlow.first(),
             skippedVersion = settingsManager.skippedVersionFlow.first(),
-            proxiesJson = ProxyStorage(context).getProxiesJson(),
+            proxiesJson = proxiesJson,
             smartNotifications = settingsManager.smartNotificationsFlow.first(),
             browserCookies = browserCookies
         )
@@ -3589,7 +3591,10 @@ private suspend fun importSettingsFromJson(context: Context, uri: Uri, settingsM
         }
         importData.skipAutoUpdate?.let { settingsManager.setSkipAutoUpdate(it) }
         importData.skippedVersion?.let { settingsManager.setSkippedVersion(it) }
-        importData.proxiesJson?.let { ProxyStorage(context).saveProxiesJson(it) }
+        importData.proxiesJson?.let {
+            AppLogger.d("SettingsScreen", "Прокси из файла: $it")
+            ProxyStorage(context).saveProxiesJson(it)
+        }
         importData.smartNotifications?.let { settingsManager.setSmartNotifications(it) }
         importData.browserCookies?.forEach { (url, cookies) ->
             CookieManager.getInstance().setCookie(url, cookies)
