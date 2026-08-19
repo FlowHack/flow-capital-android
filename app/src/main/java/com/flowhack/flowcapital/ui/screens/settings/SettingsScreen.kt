@@ -12,6 +12,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.webkit.CookieManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -110,6 +111,7 @@ import com.flowhack.flowcapital.data.forecast.FAST_FLOW_TYPE_BP
 import com.flowhack.flowcapital.data.forecast.FAST_FLOW_TYPE_SBP
 import com.flowhack.flowcapital.data.forecast.calculateFastFlowDailyAccrual
 import com.flowhack.flowcapital.data.forecast.calculateFastFlowForecast
+import com.flowhack.flowcapital.ui.screens.browser.sites
 import com.flowhack.flowcapital.data.forecast.getFastFlowDayCount
 import com.flowhack.flowcapital.data.forecast.getFastFlowPercentForNominal
 import com.flowhack.flowcapital.data.forecast.PspForecastResult
@@ -2867,13 +2869,17 @@ fun SupportSection() {
 fun ImportExportSettingsCard(scope: CoroutineScope = rememberCoroutineScope(), settingsManager: SettingsManager) {
     val context = LocalContext.current
 
+    var showExportDialog by remember { mutableStateOf(false) }
+    var showImportDialog by remember { mutableStateOf(false) }
+    var includeBrowserCookies by remember { mutableStateOf(false) }
+
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
         if (uri != null) {
             scope.launch {
                 try {
-                    exportSettingsToJson(context, uri, settingsManager)
+                    exportSettingsToJson(context, uri, settingsManager, includeBrowserCookies)
                     Toast.makeText(context, "Данные успешно экспортированы", Toast.LENGTH_SHORT).show()
                 } catch (e: Exception) {
                     AppLogger.e("SettingsScreen", "Ошибка экспорта настроек", e)
@@ -2919,25 +2925,96 @@ fun ImportExportSettingsCard(scope: CoroutineScope = rememberCoroutineScope(), s
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(
-                    onClick = {
-                        val timestamp = SimpleDateFormat("dd_MM_yyyy", Locale.getDefault()).format(Date())
-                        exportLauncher.launch("FlowCapital_Backup_$timestamp.json")
-                    },
+                    onClick = { showExportDialog = true },
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(containerColor = FlowColors.PSP_COLOR)
                 ) {
                     Text("Экспортировать", fontSize = 12.sp)
                 }
                 OutlinedButton(
-                    onClick = {
-                        importLauncher.launch(arrayOf("application/json"))
-                    },
+                    onClick = { showImportDialog = true },
                     modifier = Modifier.weight(1f)
                 ) {
                     Text("Импортировать", fontSize = 12.sp)
                 }
             }
         }
+    }
+
+    if (showExportDialog) {
+        AlertDialog(
+            onDismissRequest = { showExportDialog = false },
+            title = { Text("Экспорт настроек") },
+            text = {
+                Column {
+                    Text(
+                        "Экспортировать настройки браузера (куки)?",
+                        fontSize = 14.sp,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Куки содержат данные сессий и авторизации. Файл экспорта становится " +
+                            "чувствительным — храните его безопасно и удалите сразу после импорта.",
+                        fontSize = 12.sp,
+                        color = Color(0xFFFF9800)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = includeBrowserCookies,
+                            onCheckedChange = { includeBrowserCookies = it }
+                        )
+                        Text("Экспортировать куки браузера", fontSize = 13.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    showExportDialog = false
+                    val timestamp = SimpleDateFormat("dd_MM_yyyy", Locale.getDefault()).format(Date())
+                    exportLauncher.launch("FlowCapital_Backup_$timestamp.json")
+                }) { Text("Экспортировать") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showExportDialog = false }) { Text("Отмена") }
+            }
+        )
+    }
+
+    if (showImportDialog) {
+        AlertDialog(
+            onDismissRequest = { showImportDialog = false },
+            title = { Text("Импорт настроек") },
+            text = {
+                Column {
+                    Text(
+                        "Импорт полностью перезапишет текущие данные. Продолжить?",
+                        fontSize = 14.sp,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Если в файле есть куки браузера — они будут восстановлены. " +
+        "После импорта рекомендуется удалить файл экспорта (он содержит чувствительные данные).",
+                        fontSize = 12.sp,
+                        color = Color(0xFFFF9800)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    showImportDialog = false
+                    importLauncher.launch(arrayOf("application/json"))
+                }) { Text("Импортировать") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showImportDialog = false }) { Text("Отмена") }
+            }
+        )
     }
 }
 
@@ -3204,7 +3281,12 @@ fun openBatterySettings(context: Context) {
  * @param uri URI файла, выбранного через SAF
  * @param settingsManager Экземпляр SettingsManager (должен быть тот же, что наблюдает UI для реактивности)
  */
-private suspend fun exportSettingsToJson(context: Context, uri: Uri, settingsManager: SettingsManager) {
+private suspend fun exportSettingsToJson(
+    context: Context,
+    uri: Uri,
+    settingsManager: SettingsManager,
+    includeBrowserCookies: Boolean = false
+) {
     withContext(Dispatchers.IO) {
         AppLogger.d("SettingsScreen", "Начат экспорт настроек")
         val database = AppDatabase.getDatabase(context)
@@ -3260,6 +3342,22 @@ private suspend fun exportSettingsToJson(context: Context, uri: Uri, settingsMan
         }
         AppLogger.d("SettingsScreen", "Собрано периодов ПСП: ${allPeriods.size}")
 
+        // Сбор кук браузера для известных сайтов (восстановление сессий после импорта).
+        // Выполняется только если пользователь явно согласился экспортировать куки.
+        val browserCookies = if (includeBrowserCookies) {
+            val cookieManager = CookieManager.getInstance()
+            val cookiesMap = mutableMapOf<String, String>()
+            sites.forEach { site ->
+                val cookies = cookieManager.getCookie(site.url)
+                if (!cookies.isNullOrBlank()) {
+                    cookiesMap[site.url] = cookies
+                }
+            }
+            cookiesMap
+        } else {
+            emptyMap()
+        }
+
         val exportData = FullBackupData(
             appMarker = "FlowCapital_Backup",
             exportDate = System.currentTimeMillis(),
@@ -3299,7 +3397,8 @@ private suspend fun exportSettingsToJson(context: Context, uri: Uri, settingsMan
             skipAutoUpdate = settingsManager.skipAutoUpdateFlow.first(),
             skippedVersion = settingsManager.skippedVersionFlow.first(),
             proxiesJson = ProxyStorage(context).getProxiesJson(),
-            smartNotifications = settingsManager.smartNotificationsFlow.first()
+            smartNotifications = settingsManager.smartNotificationsFlow.first(),
+            browserCookies = browserCookies
         )
 
         val json = Json.encodeToString(FullBackupData.serializer(), exportData)
@@ -3494,6 +3593,9 @@ private suspend fun importSettingsFromJson(context: Context, uri: Uri, settingsM
         importData.skippedVersion?.let { settingsManager.setSkippedVersion(it) }
         importData.proxiesJson?.let { ProxyStorage(context).saveProxiesJson(it) }
         importData.smartNotifications?.let { settingsManager.setSmartNotifications(it) }
+        importData.browserCookies?.forEach { (url, cookies) ->
+            CookieManager.getInstance().setCookie(url, cookies)
+        }
 
         rescheduleSavedReminders(context, settingsManager)
         AppLogger.d("SettingsScreen", "Импорт завершён успешно")
@@ -3606,7 +3708,8 @@ data class FullBackupData(
     val skipAutoUpdate: Boolean? = null,
     val skippedVersion: String? = null,
     val proxiesJson: String? = null,
-    val smartNotifications: Boolean? = null
+    val smartNotifications: Boolean? = null,
+    val browserCookies: Map<String, String>? = null
 )
 
 /**
