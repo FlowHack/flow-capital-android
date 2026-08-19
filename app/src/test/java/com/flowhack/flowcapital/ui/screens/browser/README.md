@@ -11,5 +11,6 @@
 - `detectSiteName_withUnknownUrl_returnsNull` — неизвестный URL возвращает null.
 - `detectSiteName_withExtraQueryParams_stillDetectsSite` — URL с query-параметрами всё равно распознаётся.
 - `siteIconRes_withKnownUrl_returnsIconResource` — для известного URL возвращается ресурс иконки.
+- `siteIconRes_withUrlWithoutPath_returnsIconResource` — для URL без точного пути (например, `https://potok.cash/`) иконка всё равно находится.
 - `siteIconRes_withUnknownUrl_returnsNull` — для неизвестного URL возвращается null.
 - `sites_listIsNotEmptyAndUrlsUnique` — список сайтов не пуст, URL уникальны.

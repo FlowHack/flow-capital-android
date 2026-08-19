@@ -8,8 +8,10 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -22,6 +24,7 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,8 +39,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -186,7 +191,7 @@ fun BrowserScreen(viewModel: BrowserViewModel) {
                 }
             }
         } else {
-            BrowserEmptyPlaceholder()
+            BrowserEmptyPlaceholder(onOpenSite = viewModel::openTab)
         }
     }
 }
@@ -194,11 +199,14 @@ fun BrowserScreen(viewModel: BrowserViewModel) {
 /**
  * Стартовый экран-заглушка браузера.
  *
- * Показывается, когда открытых вкладок нет. Поясняет пользователю, что для
- * выбора сайта нужно удержать кнопку «Браузер» в нижней панели.
+ * Показывается, когда открытых вкладок нет. Содержит быстрые кнопки сайтов
+ * (тап открывает вкладку) и подсказку, что сайт также можно выбрать
+ * удержанием кнопки «Браузер» в нижней панели.
+ *
+ * @param onOpenSite Обработчик открытия сайта по URL
  */
 @Composable
-private fun BrowserEmptyPlaceholder() {
+private fun BrowserEmptyPlaceholder(onOpenSite: (String) -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -221,9 +229,26 @@ private fun BrowserEmptyPlaceholder() {
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+            // Быстрые кнопки выбора сайта.
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                sites.forEach { site ->
+                    IconButton(
+                        onClick = { onOpenSite(site.url) },
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = site.iconRes),
+                            contentDescription = site.name,
+                            tint = Color.Unspecified,
+                            modifier = Modifier.size(40.dp)
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "Удерживайте кнопку «Браузер» в нижней панели, чтобы открыть список сайтов",
+                text = "или удерживайте кнопку «Браузер» в нижней панели",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center

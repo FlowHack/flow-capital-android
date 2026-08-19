@@ -38,7 +38,13 @@ fun detectSiteName(url: String): String? = when {
 /**
  * Получить ресурс иконки сайта по URL.
  *
+ * Использует [detectSiteName] для распознавания сайта, поэтому корректно
+ * работает и для URL без точного совпадения пути (например, "https://potok.cash/").
+ *
  * @param url Адрес сайта
  * @return Ресурс иконки или null, если сайт не распознан
  */
-fun siteIconRes(url: String): Int? = sites.find { url.startsWith(it.url) }?.iconRes
+fun siteIconRes(url: String): Int? {
+    val name = detectSiteName(url) ?: return null
+    return sites.find { it.name == name }?.iconRes
+}

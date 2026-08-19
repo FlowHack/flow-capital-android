@@ -51,6 +51,12 @@ class BrowserSitesTest {
     }
 
     @Test
+    fun siteIconRes_withUrlWithoutPath_returnsIconResource() {
+        val icon = siteIconRes("https://potok.cash/")
+        assertEquals(sites.first { it.name == "ПОТОКCASH" }.iconRes, icon)
+    }
+
+    @Test
     fun siteIconRes_withUnknownUrl_returnsNull() {
         assertNull(siteIconRes("https://example.com/"))
     }
