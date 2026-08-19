@@ -387,29 +387,25 @@ fun FastFlowInfoCard(flow: FastFlowEntity) {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
+            Row(modifier = Modifier.fillMaxWidth()) {
                 InfoItem("Номинал", String.format(Locale.US, "%.0f₽", flow.nominalAmount))
-                InfoItem("Текущий день", "${flow.currentDay}/$dayCount", alignRight = true)
-                InfoItem("Текущий день", "${flow.currentDay}/$dayCount")
+                Box(modifier = Modifier.weight(1f)) {
+                    InfoItem("Текущий день", "${flow.currentDay}/$dayCount", alignRight = true)
+                }
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
+            Row(modifier = Modifier.fillMaxWidth()) {
                 InfoItem("Закрытие", dateFormat.format(Date(closeDate)))
-                InfoItem("Начисление", String.format(Locale.US, "%.2f₽", flow.dailyAccrual), alignRight = true)
+                Box(modifier = Modifier.weight(1f)) {
+                    InfoItem("Начисление", String.format(Locale.US, "%.2f₽", flow.dailyAccrual), alignRight = true)
+                }
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
+            Row(modifier = Modifier.fillMaxWidth()) {
                 InfoItem("Процент", String.format(Locale.US, "%.2f", flow.percent))
-                InfoItem("Всего начислено", String.format(Locale.US, "%.2f₽", flow.totalAccrued), alignRight = true)
+                Box(modifier = Modifier.weight(1f)) {
+                    InfoItem("Всего начислено", String.format(Locale.US, "%.2f₽", flow.totalAccrued), alignRight = true)
+                }
             }
         }
     }
