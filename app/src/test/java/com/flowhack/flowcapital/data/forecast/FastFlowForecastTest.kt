@@ -1,5 +1,6 @@
 package com.flowhack.flowcapital.data.forecast
 
+import com.flowhack.flowcapital.data.db.FastFlowEntity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -157,6 +158,54 @@ class FastFlowForecastTest {
         val start = createDateMillis(2026, Calendar.JANUARY, 5)
         val result = generateFastFlowPastDays(start, 1, FAST_FLOW_TYPE_BP, 862.50)
         assertTrue("При currentDay=1 прошлых дней нет", result.isEmpty())
+    }
+
+    @Test
+    fun buildTitle_singleFlow_sameDay_noNumber() {
+        val start = createDateMillis(2026, Calendar.AUGUST, 19)
+        val flow = FastFlowEntity(
+            id = 1, type = FAST_FLOW_TYPE_SBP, nominalAmount = 100000.0,
+            startDate = start, currentDay = 1, totalAccrued = 0.0,
+            dailyAccrual = 0.0, percent = 2.1, isActive = true
+        )
+        val title = buildFastFlowTitle(flow, listOf(flow))
+        assertEquals("Один поток в день — без номера", "СБП 19.08.26", title)
+    }
+
+    @Test
+    fun buildTitle_multipleFlows_sameDay_addsNumber() {
+        val start = createDateMillis(2026, Calendar.AUGUST, 19)
+        val flow1 = FastFlowEntity(
+            id = 1, type = FAST_FLOW_TYPE_SBP, nominalAmount = 100000.0,
+            startDate = start, currentDay = 1, totalAccrued = 0.0,
+            dailyAccrual = 0.0, percent = 2.1, isActive = true
+        )
+        val flow2 = FastFlowEntity(
+            id = 2, type = FAST_FLOW_TYPE_SBP, nominalAmount = 50000.0,
+            startDate = start, currentDay = 1, totalAccrued = 0.0,
+            dailyAccrual = 0.0, percent = 2.0, isActive = true
+        )
+        val title1 = buildFastFlowTitle(flow1, listOf(flow1, flow2))
+        val title2 = buildFastFlowTitle(flow2, listOf(flow1, flow2))
+        assertEquals("Первый поток дня — #1", "СБП 19.08.26 #1", title1)
+        assertEquals("Второй поток дня — #2", "СБП 19.08.26 #2", title2)
+    }
+
+    @Test
+    fun buildTitle_differentTypes_sameDay_notNumberedTogether() {
+        val start = createDateMillis(2026, Calendar.AUGUST, 19)
+        val bp = FastFlowEntity(
+            id = 1, type = FAST_FLOW_TYPE_BP, nominalAmount = 100000.0,
+            startDate = start, currentDay = 1, totalAccrued = 0.0,
+            dailyAccrual = 0.0, percent = 3.7, isActive = true
+        )
+        val sbp = FastFlowEntity(
+            id = 2, type = FAST_FLOW_TYPE_SBP, nominalAmount = 50000.0,
+            startDate = start, currentDay = 1, totalAccrued = 0.0,
+            dailyAccrual = 0.0, percent = 2.0, isActive = true
+        )
+        assertEquals("БП и СБП нумеруются раздельно", "БП 19.08.26", buildFastFlowTitle(bp, listOf(bp, sbp)))
+        assertEquals("СБП без номера, т.к. БП другого типа", "СБП 19.08.26", buildFastFlowTitle(sbp, listOf(bp, sbp)))
     }
 
     private fun createDateMillis(year: Int, month: Int, day: Int): Long {

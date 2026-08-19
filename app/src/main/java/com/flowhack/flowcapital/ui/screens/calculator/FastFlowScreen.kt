@@ -4,6 +4,10 @@ package com.flowhack.flowcapital.ui.screens.calculator
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -67,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -77,6 +82,7 @@ import com.flowhack.flowcapital.data.db.FastFlowEntity
 import com.flowhack.flowcapital.data.db.FastFlowRepository
 import com.flowhack.flowcapital.data.forecast.FAST_FLOW_TYPE_BP
 import com.flowhack.flowcapital.data.forecast.FAST_FLOW_TYPE_SBP
+import com.flowhack.flowcapital.data.forecast.buildFastFlowTitle
 import com.flowhack.flowcapital.data.forecast.calculateFastFlowCloseDate
 import com.flowhack.flowcapital.data.forecast.getFastFlowDayCount
 import com.flowhack.flowcapital.data.logging.AppLogger
@@ -107,7 +113,6 @@ private const val TAG_FAST_SCREEN = "FastFlowScreen"
 @Composable
 fun FastFlowScreen() {
     AppLogger.d(TAG_FAST_SCREEN, "Инициализация экрана БП/СБП")
-    val dateFormat = remember { SimpleDateFormat("dd.MM.yy", Locale.getDefault()) }
     val context = LocalContext.current
     val database = remember { AppDatabase.getDatabase(context) }
     val flowRepository = remember {
@@ -133,6 +138,30 @@ fun FastFlowScreen() {
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    // Перегенерация пропущенных дней при смене даты/времени устройства,
+    // пока вкладка открыта (например, ручная смена даты в настройках системы).
+    DisposableEffect(Unit) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                AppLogger.d(TAG_FAST_SCREEN, "Изменена дата/время (${intent?.action}), перегенерация пропусков")
+                viewModel.generateMissedDaysForFastFlow()
+            }
+        }
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_DATE_CHANGED)
+            addAction(Intent.ACTION_TIME_CHANGED)
+        }
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            filter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        onDispose {
+            context.unregisterReceiver(receiver)
         }
     }
 
@@ -169,7 +198,7 @@ fun FastFlowScreen() {
             }
 
             Text(
-                text = buildFlowTitle(flows, currentIndex, dateFormat),
+                text = flows.getOrNull(currentIndex)?.let { buildFastFlowTitle(it, flows) } ?: "БП",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = FlowColors.BP_COLOR
@@ -346,34 +375,6 @@ fun FastFlowScreen() {
     }
 }
 
-/** Формирует заголовок потока: "БП 19.08.2026" / "СБП 19.08.2026 #1" */
-private fun buildFlowTitle(
-    flows: List<FastFlowEntity>,
-    currentIndex: Int,
-    dateFormat: SimpleDateFormat
-): String {
-    val flow = flows.getOrNull(currentIndex) ?: return "БП"
-    val prefix = if (flow.type == FAST_FLOW_TYPE_BP) "БП" else "СБП"
-    val dateStr = dateFormat.format(Date(flow.startDate))
-
-    // Нумерация среди потоков того же типа, открытых в тот же календарный день
-    val flowDayStart = startOfDayMillis(flow.startDate)
-    val sameDayFlows = flows.filter {
-        it.type == flow.type && startOfDayMillis(it.startDate) == flowDayStart
-    }.sortedBy { it.id }
-    val number = sameDayFlows.indexOfFirst { it.id == flow.id } + 1
-
-    return if (sameDayFlows.size > 1) "$prefix $dateStr #$number" else "$prefix $dateStr"
-}
-
-/** Нормализует timestamp к началу календарного дня */
-private fun startOfDayMillis(millis: Long): Long {
-    val cal = Calendar.getInstance().apply { timeInMillis = millis }
-    cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0)
-    cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
-    return cal.timeInMillis
-}
-
 /** Карточка инфо БП/СБП: номинал, текущий день, закрытие, начисление, процент, всего */
 @Composable
 fun FastFlowInfoCard(flow: FastFlowEntity) {
@@ -391,6 +392,7 @@ fun FastFlowInfoCard(flow: FastFlowEntity) {
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 InfoItem("Номинал", String.format(Locale.US, "%.0f₽", flow.nominalAmount))
+                InfoItem("Текущий день", "${flow.currentDay}/$dayCount", alignRight = true)
                 InfoItem("Текущий день", "${flow.currentDay}/$dayCount")
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -399,7 +401,7 @@ fun FastFlowInfoCard(flow: FastFlowEntity) {
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 InfoItem("Закрытие", dateFormat.format(Date(closeDate)))
-                InfoItem("Начисление", String.format(Locale.US, "%.2f₽", flow.dailyAccrual))
+                InfoItem("Начисление", String.format(Locale.US, "%.2f₽", flow.dailyAccrual), alignRight = true)
             }
             Spacer(modifier = Modifier.height(8.dp))
             Row(
@@ -407,7 +409,7 @@ fun FastFlowInfoCard(flow: FastFlowEntity) {
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 InfoItem("Процент", String.format(Locale.US, "%.2f", flow.percent))
-                InfoItem("Всего начислено", String.format(Locale.US, "%.2f₽", flow.totalAccrued))
+                InfoItem("Всего начислено", String.format(Locale.US, "%.2f₽", flow.totalAccrued), alignRight = true)
             }
         }
     }
@@ -536,7 +538,10 @@ fun FastFlowHistoryTable(days: List<FastFlowDayEntity>) {
                 Text("Начислено", modifier = Modifier.weight(1f), fontSize = 10.sp, textAlign = TextAlign.Center)
             }
 
-            days.sortedBy { it.dayNumber }.forEach { day ->
+            days.sortedWith(
+                    compareByDescending<FastFlowDayEntity> { it.dayNumber }
+                        .thenByDescending { it.date }
+                ).forEach { day ->
                 val backgroundColor = when (day.actionType) {
                     "SUNDAY" -> Color(0x33E040FB)
                     "MISSED" -> Color(0x33FF9800)

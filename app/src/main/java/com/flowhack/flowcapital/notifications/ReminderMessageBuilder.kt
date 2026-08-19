@@ -2,7 +2,9 @@ package com.flowhack.flowcapital.notifications
 
 import android.content.Context
 import com.flowhack.flowcapital.data.db.AppDatabase
+import com.flowhack.flowcapital.data.db.FastFlowEntity
 import com.flowhack.flowcapital.data.forecast.FAST_FLOW_TYPE_BP
+import com.flowhack.flowcapital.data.forecast.buildFastFlowTitle
 import com.flowhack.flowcapital.data.forecast.getFastFlowDayCount
 import com.flowhack.flowcapital.data.logging.AppLogger
 import kotlinx.coroutines.flow.first
@@ -31,6 +33,10 @@ object ReminderMessageBuilder {
      *   после последнего клика по кнопке, а в момент активации кнопки показывается
      *   сообщение «Вчера в это время вы выполнили действия по РП потоку»
      *   или «Вчера в это время вы выполнили действия по ПН потоку»
+     * - Для БП/СБП в момент активации формируется сообщение «Вчера в это время Вы
+     *   выполнили действие по СБП «СБП 18.08.2026»»; если несколько потоков нажаты
+     *   в пределах ±1 минуты, события объединяются в одно сообщение с перечнем типов
+     *   («Вчера в это время Вы выполнили действие по СБП, БП»)
      *
      * @param smartNotifications Включён ли режим умных уведомлений
      * @param currentTimeMillis Текущее время (для тестируемости). По умолчанию System.currentTimeMillis()
@@ -146,8 +152,13 @@ object ReminderMessageBuilder {
             }
         }
 
-        // Проверка Быстрого Потока (БП/СБП) — ежедневная кнопка, воскресенье выходной
+        // Проверка Быстрого Потока (БП/СБП) — ежедневная кнопка, воскресенье выходной.
+        // События «Вчера в это время…» группируются по времени последнего нажатия
+        // (в пределах ±1 минуты), чтобы несколько потоков не спамили сообщениями.
         val allFastFlows = db.fastFlowDao().getAllFlows().first()
+        val fastActivations = mutableListOf<Pair<FastFlowEntity, Long>>()
+        val fastPressMessages = mutableListOf<String>()
+
         for (flow in allFastFlows) {
             if (!flow.isActive) continue
             val dayCount = getFastFlowDayCount(flow.type)
@@ -164,19 +175,46 @@ object ReminderMessageBuilder {
                 val isReadyForPress = lastDay == null || now >= lastDay.date + DAY_MILLIS
                 if (isReadyForPress && !isPressedToday && !isSunday) {
                     if (lastDay != null && now < lastDay.date + DAY_MILLIS + ACTIVATION_WINDOW_MILLIS) {
-                        messages.add("Вчера в это время вы выполнили действия по $flowLabel потоку")
+                        // Кнопка снова активна и нажатие было «вчера в это время»
+                        fastActivations.add(flow to lastDay.date)
                     } else {
-                        messages.add("$flowLabel - нажмите кнопку")
+                        fastPressMessages.add("$flowLabel - нажмите кнопку")
                     }
                 }
             } else {
                 if (!isPressedToday && !isSunday) {
-                    messages.add("$flowLabel - нажмите кнопку")
+                    fastPressMessages.add("$flowLabel - нажмите кнопку")
                 }
             }
             AppLogger.d("ReminderMessageBuilder",
                 "$flowLabel поток id=${flow.id}: текущий день=${flow.currentDay}, нажато сегодня=$isPressedToday")
         }
+
+        // Группировка активаций по времени нажатия (±1 минута)
+        val sortedActivations = fastActivations.sortedBy { it.second }
+        val timeClusters = ReminderGrouping.withPressTimes(sortedActivations.map { it.second })
+        timeClusters.forEach { clusterTimes ->
+            val clusterEvents = sortedActivations.filter { it.second in clusterTimes }
+            if (clusterEvents.isEmpty()) return@forEach
+            if (clusterEvents.size == 1) {
+                // Один поток — указываем его название: «СБП «СБП 18.08.2026»»
+                val (flow, _) = clusterEvents.first()
+                val prefix = if (flow.type == FAST_FLOW_TYPE_BP) "БП" else "СБП"
+                val title = buildFastFlowTitle(flow, allFastFlows)
+                messages.add("Вчера в это время Вы выполнили действие по $prefix «$title»")
+            } else {
+                // Несколько потоков — перечисляем типы: «по СБП, БП»
+                val types = clusterEvents
+                    .map { (flow, _) -> if (flow.type == FAST_FLOW_TYPE_BP) "БП" else "СБП" }
+                    .distinct()
+                    .joinToString(", ")
+                messages.add("Вчера в это время Вы выполнили действие по $types")
+            }
+            AppLogger.d("ReminderMessageBuilder",
+                "Группа активаций «вчера в это время»: потоков=${clusterEvents.size}, " +
+                    "времена=${clusterTimes.joinToString()}")
+        }
+        messages.addAll(fastPressMessages)
 
         if (messages.isEmpty()) {
             AppLogger.d("ReminderMessageBuilder", "Все действия выполнены")

@@ -442,10 +442,34 @@ fun PSPInfoCard(flow: PremiumStartFlowEntity, period: PremiumStartPeriodEntity) 
 }
 
 @Composable
-fun InfoItem(title: String, value: String) {
-    Column {
-        Text(title, fontSize = 11.sp, color = Color.Gray)
-        Text(value, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+fun InfoItem(
+    title: String,
+    value: String,
+    alignRight: Boolean = false
+) {
+    if (alignRight) {
+        // Правый элемент пары: значения прижаты к правому краю, чтобы не «скакали»
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                title,
+                fontSize = 11.sp,
+                color = Color.Gray,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.End
+            )
+            Text(
+                value,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.End
+            )
+        }
+    } else {
+        Column {
+            Text(title, fontSize = 11.sp, color = Color.Gray)
+            Text(value, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        }
     }
 }
 

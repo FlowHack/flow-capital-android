@@ -1,10 +1,14 @@
 package com.flowhack.flowcapital.data.forecast
 
 import com.flowhack.flowcapital.data.db.FastFlowDayEntity
+import com.flowhack.flowcapital.data.db.FastFlowEntity
 import timber.log.Timber
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 /**
  * Чистые функции расчёта Быстрого Потока (БП) и Супер Быстрого Потока (СБП).
@@ -33,6 +37,43 @@ const val FAST_FLOW_TYPE_SBP = "SBP"
  * @return 30 для БП, 15 для СБП
  */
 fun getFastFlowDayCount(type: String): Int = if (type == FAST_FLOW_TYPE_BP) 30 else 15
+
+/**
+ * Нормализует timestamp к началу календарного дня (локальная временная зона).
+ * @param millis Исходный timestamp
+ * @return Timestamp начала дня
+ */
+fun startOfDayMillisForFlow(millis: Long): Long {
+    val cal = Calendar.getInstance().apply { timeInMillis = millis }
+    cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0)
+    cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
+    return cal.timeInMillis
+}
+
+/**
+ * Формирует заголовок БП/СБП потока: "БП 19.08.2026" / "СБП 19.08.2026 #1".
+ * Нумерация проставляется среди потоков того же типа, открытых в тот же
+ * календарный день (по возрастанию id).
+ *
+ * Используется на экране потока и в умных уведомлениях (единый формат).
+ *
+ * @param flow Поток
+ * @param allFlows Все БП/СБП потоки (для подсчёта потоков того же дня)
+ * @return Заголовок потока
+ */
+fun buildFastFlowTitle(
+    flow: FastFlowEntity,
+    allFlows: List<FastFlowEntity>
+): String {
+    val prefix = if (flow.type == FAST_FLOW_TYPE_BP) "БП" else "СБП"
+    val dateStr = SimpleDateFormat("dd.MM.yy", Locale.getDefault()).format(Date(flow.startDate))
+    val flowDayStart = startOfDayMillisForFlow(flow.startDate)
+    val sameDayFlows = allFlows.filter {
+        it.type == flow.type && startOfDayMillisForFlow(it.startDate) == flowDayStart
+    }.sortedBy { it.id }
+    val number = sameDayFlows.indexOfFirst { it.id == flow.id } + 1
+    return if (sameDayFlows.size > 1) "$prefix $dateStr #$number" else "$prefix $dateStr"
+}
 
 /**
  * Округляет значение до 2 знаков после запятой (BigDecimal).

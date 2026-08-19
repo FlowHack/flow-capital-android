@@ -95,6 +95,9 @@
 13. **closeDate_lastDay_returnsToday** - При последнем дне закрытие = сегодня
 14. **pastDays_currentDay5_creates4PressedDays** - Генерация 4 прошлых нажатых дней (день 1 = START)
 15. **pastDays_currentDay1_returnsEmpty** - При currentDay=1 прошлых дней нет
+16. **buildTitle_singleFlow_sameDay_noNumber** - Один поток в день -> заголовок без номера («СБП 19.08.26»)
+17. **buildTitle_multipleFlows_sameDay_addsNumber** - Несколько потоков одного типа в день -> нумерация #1, #2
+18. **buildTitle_differentTypes_sameDay_notNumberedTogether** - БП и СБП нумеруются раздельно
 
 ## Запуск тестов
 ```bash
