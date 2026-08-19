@@ -34,6 +34,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -49,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.webkit.ProxyController
 import androidx.webkit.WebViewFeature
+import com.flowhack.flowcapital.data.proxy.LocalProxyServer
 import com.flowhack.flowcapital.data.proxy.ProxyConfig
 import com.flowhack.flowcapital.data.proxy.ProxyStatus
 import com.flowhack.flowcapital.data.proxy.ProxyStorage
@@ -57,6 +59,7 @@ import com.flowhack.flowcapital.data.settings.SettingsManager
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.util.concurrent.Executors
+import androidx.compose.runtime.MutableState
 import androidx.webkit.ProxyConfig as WebKitProxyConfig
 
 /**
@@ -96,6 +99,10 @@ fun BrowserScreen(viewModel: BrowserViewModel) {
 
     val siteName = activeTab?.let { detectSiteName(it.url) }
 
+    // Локальный прокси-форвардер для прокси с авторизацией
+    // (WebView ProxyConfig не поддерживает credentials в правиле).
+    val localProxyServerState = remember { mutableStateOf<LocalProxyServer?>(null) }
+
     val enabledProxies = remember(proxies, siteName) {
         if (siteName == null) emptyList()
         else proxies.filter {
@@ -106,12 +113,12 @@ fun BrowserScreen(viewModel: BrowserViewModel) {
 
     LaunchedEffect(enabledProxies, siteName) {
         val selectedProxy = enabledProxies.firstOrNull()
-        applyProxyToWebView(selectedProxy)
+        applyProxyToWebView(selectedProxy, localProxyServerState)
     }
 
     DisposableEffect(Unit) {
         onDispose {
-            clearProxy()
+            clearProxy(localProxyServerState)
             val cookieManager = CookieManager.getInstance()
             cookieManager.flush()
         }
@@ -276,9 +283,12 @@ private fun BrowserEmptyPlaceholder(onOpenSite: (String) -> Unit) {
     }
 }
 
-private fun applyProxyToWebView(proxy: ProxyConfig?) {
+private fun applyProxyToWebView(
+    proxy: ProxyConfig?,
+    localProxyServerState: MutableState<LocalProxyServer?>
+) {
     if (proxy == null) {
-        clearProxy()
+        clearProxy(localProxyServerState)
         return
     }
 
@@ -291,9 +301,20 @@ private fun applyProxyToWebView(proxy: ProxyConfig?) {
     try {
         val proxyRule = when (proxy.type) {
             ProxyType.HTTP -> {
-                // HTTP-прокси поддерживает авторизацию через user:pass@ в URL.
                 if (!proxy.username.isNullOrBlank()) {
-                    "http://${proxy.username}:${proxy.password}@${proxy.server}:${proxy.port}"
+                    // WebView ProxyConfig НЕ поддерживает логин/пароль в правиле
+                    // («Invalid Proxy URL»). Запускаем локальный прокси-форвардер,
+                    // который добавляет Proxy-Authorization и шлёт трафик на удалённый прокси.
+                    val server = LocalProxyServer(
+                        proxy.server,
+                        proxy.port,
+                        proxy.username,
+                        proxy.password
+                    )
+                    localProxyServerState.value?.stop()
+                    localProxyServerState.value = server
+                    val localPort = server.start()
+                    "http://127.0.0.1:$localPort"
                 } else {
                     "http://${proxy.server}:${proxy.port}"
                 }
@@ -308,14 +329,17 @@ private fun applyProxyToWebView(proxy: ProxyConfig?) {
             proxyConfig,
             executor
         ) {
-            Timber.tag("BrowserScreen").d("Прокси применён: ${proxy.server}:${proxy.port}")
+            Timber.tag("BrowserScreen").d("Прокси применён: $proxyRule")
         }
     } catch (e: Exception) {
         Timber.tag("BrowserScreen").e("Ошибка применения прокси: ${e.message}")
     }
 }
 
-private fun clearProxy() {
+private fun clearProxy(localProxyServerState: MutableState<LocalProxyServer?>) {
+    localProxyServerState.value?.stop()
+    localProxyServerState.value = null
+
     val isProxyOverrideSupported = WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)
     if (!isProxyOverrideSupported) {
         return
