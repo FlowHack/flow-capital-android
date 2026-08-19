@@ -67,6 +67,10 @@ class SettingsManager internal constructor(private val dataStore: DataStore<Pref
         val IS_RP_VIP = booleanPreferencesKey("is_rp_vip")
         /** Ключ для коэффициентов E-currency РП */
         val E_CURRENCY_COEFFICIENTS = stringPreferencesKey("e_currency_coefficients")
+        /** Ключ для коэффициентов Быстрого Потока (БП) */
+        val BP_COEFFICIENTS = stringPreferencesKey("bp_coefficients")
+        /** Ключ для коэффициентов Супер Быстрого Потока (СБП) */
+        val SBP_COEFFICIENTS = stringPreferencesKey("sbp_coefficients")
         /** Ключ для пропуска автопроверки обновлений */
         val SKIP_AUTO_UPDATE = booleanPreferencesKey("skip_auto_update")
         /** Ключ для пропущенной версии (чтобы не показывать повторно) */
@@ -101,6 +105,44 @@ val BROWSER_FAB_OFFSET_Y = intPreferencesKey("browser_fab_offset_y")
             100000.0 to 150.0,
             500000.0 to 175.0,
             1000000.0 to 200.0
+        )
+
+        /** Дефолтные коэффициенты Быстрого Потока (БП): порог -> итоговый процент прироста */
+        val DEFAULT_BP_COEFFICIENTS = mapOf(
+            25000.0 to 3.5,
+            50000.0 to 3.6,
+            100000.0 to 3.7,
+            150000.0 to 3.8,
+            200000.0 to 3.9,
+            300000.0 to 4.0,
+            400000.0 to 4.1,
+            500000.0 to 4.2,
+            600000.0 to 4.3,
+            700000.0 to 4.4,
+            800000.0 to 4.5,
+            900000.0 to 4.6,
+            1000000.0 to 4.7,
+            2500000.0 to 4.8,
+            5000000.0 to 4.9,
+            10000000.0 to 5.0
+        )
+
+        /** Дефолтные коэффициенты Супер Быстрого Потока (СБП): порог -> итоговый процент прироста */
+        val DEFAULT_SBP_COEFFICIENTS = mapOf(
+            50000.0 to 2.0,
+            100000.0 to 2.1,
+            200000.0 to 2.2,
+            300000.0 to 2.3,
+            400000.0 to 2.4,
+            500000.0 to 2.5,
+            600000.0 to 2.6,
+            700000.0 to 2.7,
+            800000.0 to 2.8,
+            900000.0 to 2.9,
+            1000000.0 to 3.0,
+            2500000.0 to 3.1,
+            5000000.0 to 3.2,
+            10000000.0 to 3.3
         )
 
         /** Дефолтные коэффициенты для РП VIP (стартовый 0.3%, daily 0.003%) */
@@ -564,6 +606,12 @@ suspend fun saveBrowserFabOffset(offsetX: Int, offsetY: Int) {
                 val entries = DEFAULT_E_CURRENCY_COEFFICIENTS.entries.joinToString(";") { "${it.key}=${it.value}" }
                 prefs[E_CURRENCY_COEFFICIENTS] = entries
             }
+            if (!prefs.contains(BP_COEFFICIENTS)) {
+                prefs[BP_COEFFICIENTS] = serializeDoubleMap(DEFAULT_BP_COEFFICIENTS)
+            }
+            if (!prefs.contains(SBP_COEFFICIENTS)) {
+                prefs[SBP_COEFFICIENTS] = serializeDoubleMap(DEFAULT_SBP_COEFFICIENTS)
+            }
 if (!prefs.contains(CHECK_UPDATE_ON_START)) {
     prefs[CHECK_UPDATE_ON_START] = true
 }
@@ -690,5 +738,79 @@ if (!prefs.contains(DEFAULT_CALC_TAB)) {
      */
     suspend fun updateECurrencyBonusPercent(amount: Double) {
         _eCurrencyBonusPercentState.value = getECurrencyBonusPercent(amount)
+    }
+
+    /**
+     * MutableStateFlow для коэффициентов Быстрого Потока (БП).
+     */
+    private val _bpCoefficientsFlow = MutableStateFlow(DEFAULT_BP_COEFFICIENTS)
+
+    /**
+     * Поток с коэффициентами Быстрого Потока (БП) для Compose.
+     */
+    val bpCoefficientsFlow: StateFlow<Map<Double, Double>> = _bpCoefficientsFlow.asStateFlow()
+
+    /**
+     * MutableStateFlow для коэффициентов Супер Быстрого Потока (СБП).
+     */
+    private val _sbpCoefficientsFlow = MutableStateFlow(DEFAULT_SBP_COEFFICIENTS)
+
+    /**
+     * Поток с коэффициентами Супер Быстрого Потока (СБП) для Compose.
+     */
+    val sbpCoefficientsFlow: StateFlow<Map<Double, Double>> = _sbpCoefficientsFlow.asStateFlow()
+
+    init {
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            dataStore.data.first().let { preferences ->
+                val bpParsed = parseDoubleMap(preferences[BP_COEFFICIENTS])
+                if (bpParsed.isNotEmpty()) _bpCoefficientsFlow.value = bpParsed
+                val sbpParsed = parseDoubleMap(preferences[SBP_COEFFICIENTS])
+                if (sbpParsed.isNotEmpty()) _sbpCoefficientsFlow.value = sbpParsed
+            }
+        }
+    }
+
+    /**
+     * Сохранить коэффициенты Быстрого Потока (БП).
+     * @param coefficients Карта пороговых сумм к процентам прироста
+     */
+    suspend fun saveBpCoefficients(coefficients: Map<Double, Double>) {
+        _bpCoefficientsFlow.value = coefficients
+        dataStore.edit { prefs ->
+            prefs[BP_COEFFICIENTS] = serializeDoubleMap(coefficients)
+        }
+    }
+
+    /**
+     * Сохранить коэффициенты Супер Быстрого Потока (СБП).
+     * @param coefficients Карта пороговых сумм к процентам прироста
+     */
+    suspend fun saveSbpCoefficients(coefficients: Map<Double, Double>) {
+        _sbpCoefficientsFlow.value = coefficients
+        dataStore.edit { prefs ->
+            prefs[SBP_COEFFICIENTS] = serializeDoubleMap(coefficients)
+        }
+    }
+
+    /** Сериализует карту порог->процент в строку "key=value;..." */
+    private fun serializeDoubleMap(map: Map<Double, Double>): String =
+        map.entries.joinToString(";") { "${it.key}=${it.value}" }
+
+    /** Парсит строку "key=value;..." в карту порог->процент */
+    private fun parseDoubleMap(serialized: String?): Map<Double, Double> {
+        val parsed = mutableMapOf<Double, Double>()
+        if (serialized.isNullOrEmpty()) return parsed
+        serialized.split(";").forEach { entry ->
+            val parts = entry.split("=")
+            if (parts.size == 2) {
+                val key = parts[0].toDoubleOrNull()
+                val value = parts[1].toDoubleOrNull()
+                if (key != null && value != null) {
+                    parsed[key] = value
+                }
+            }
+        }
+        return parsed
     }
 }

@@ -205,6 +205,8 @@ fun CalculatorScreen() {
                 onCycleEndClick = { viewModel.generateNoviceCycleEndForecast() },
                 onDailyButtonClick = { viewModel.pressNoviceButton() }
             )
+            // Быстрый Поток (БП/СБП)
+            1 -> FastFlowScreen()
             // Премиум Стартовый Поток
             2 -> PremiumStartScreen()
             // Растущий Поток

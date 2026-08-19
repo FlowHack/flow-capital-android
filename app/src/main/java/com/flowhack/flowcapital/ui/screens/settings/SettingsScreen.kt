@@ -54,6 +54,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -101,6 +102,15 @@ import com.flowhack.flowcapital.data.db.NoviceFlowRepository
 import com.flowhack.flowcapital.data.db.PremiumStartFlowEntity
 import com.flowhack.flowcapital.data.db.PremiumStartFlowRepository
 import com.flowhack.flowcapital.data.db.PremiumStartPeriodEntity
+import com.flowhack.flowcapital.data.db.FastFlowEntity
+import com.flowhack.flowcapital.data.db.FastFlowDayEntity
+import com.flowhack.flowcapital.data.db.FastFlowRepository
+import com.flowhack.flowcapital.data.forecast.FAST_FLOW_TYPE_BP
+import com.flowhack.flowcapital.data.forecast.FAST_FLOW_TYPE_SBP
+import com.flowhack.flowcapital.data.forecast.calculateFastFlowDailyAccrual
+import com.flowhack.flowcapital.data.forecast.calculateFastFlowForecast
+import com.flowhack.flowcapital.data.forecast.getFastFlowDayCount
+import com.flowhack.flowcapital.data.forecast.getFastFlowPercentForNominal
 import com.flowhack.flowcapital.data.forecast.PspForecastResult
 import com.flowhack.flowcapital.data.forecast.calculateFlowForecast
 import com.flowhack.flowcapital.data.forecast.calculateNoviceFlowForecast
@@ -120,6 +130,7 @@ import com.flowhack.flowcapital.notifications.scheduleDailyReminder
 import com.flowhack.flowcapital.notifications.scheduleFinalReminder
 import com.flowhack.flowcapital.ui.screens.calculator.GrowingForecastResultsDialog
 import com.flowhack.flowcapital.ui.screens.calculator.NoviceForecastResultsDialog
+import com.flowhack.flowcapital.ui.screens.calculator.FastForecastResultsDialog
 import com.flowhack.flowcapital.ui.theme.FlowColors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -131,6 +142,7 @@ import kotlinx.serialization.json.Json
 import java.net.HttpURLConnection
 import java.net.URL
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -194,6 +206,7 @@ fun SettingsScreen(onOpenBrowserUrl: (String) -> Unit = {}) {
         // Настройки конкретного потока
         when (selectedFlowTab) {
             0 -> NoviceFlowSettings(settingsManager = settingsManager, scope = scope)
+            1 -> FastFlowSettings(settingsManager = settingsManager, scope = scope)
             2 -> PremiumStartSettings(settingsManager = settingsManager, scope = scope)
             3 -> GrowingFlowSettings(settingsManager = settingsManager, scope = scope)
             else -> PlaceholderSettings(fullNames[selectedFlowTab])
@@ -1213,6 +1226,624 @@ private suspend fun exportPspToExcel(
                 workbook.finish()
             }
         } catch (e: Exception) { AppLogger.e("Export", "Ошибка экспорта PSP", e) }
+    }
+}
+
+/**
+ * Настройки Быстрого Потока (БП/СБП).
+ * Коэффициенты БП и СБП, выгрузка в Excel, расчёт потока, очистка данных.
+ *
+ * @param settingsManager Менеджер настроек
+ * @param scope Корутинный скоуп
+ */
+@Composable
+fun FastFlowSettings(settingsManager: SettingsManager, scope: kotlinx.coroutines.CoroutineScope) {
+    val context = LocalContext.current
+    var showClearDialog by remember { mutableStateOf(false) }
+    var showCalculateDialog by remember { mutableStateOf(false) }
+    var showCalculateExistingDialog by remember { mutableStateOf(false) }
+    var bpExpanded by remember { mutableStateOf(false) }
+    var sbpExpanded by remember { mutableStateOf(false) }
+
+    val savedBp by settingsManager.bpCoefficientsFlow.collectAsState(initial = emptyMap())
+    val savedSbp by settingsManager.sbpCoefficientsFlow.collectAsState(initial = emptyMap())
+    var bpTextValues by remember { mutableStateOf(mapOf<Double, String>()) }
+    var sbpTextValues by remember { mutableStateOf(mapOf<Double, String>()) }
+
+    val isBpChanged = remember(bpTextValues, savedBp) {
+        bpTextValues.any { (key, value) -> savedBp[key]?.toString() != value }
+    }
+    val isSbpChanged = remember(sbpTextValues, savedSbp) {
+        sbpTextValues.any { (key, value) -> savedSbp[key]?.toString() != value }
+    }
+
+    LaunchedEffect(savedBp) {
+        bpTextValues = savedBp.mapValues { it.value.toString() }
+    }
+    LaunchedEffect(savedSbp) {
+        sbpTextValues = savedSbp.mapValues { it.value.toString() }
+    }
+
+    val exportLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val database = AppDatabase.getDatabase(context)
+                val flowDao = database.fastFlowDao()
+                val dayDao = database.fastFlowDayDao()
+                val flows = flowDao.getAllFlows().first()
+                exportFastFlowToExcel(context, uri, flows, dayDao)
+                Toast.makeText(context, "Экспорт завершён", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    var hasFastFlows by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        val db = AppDatabase.getDatabase(context)
+        db.fastFlowDao().getAllFlows().collect { flows ->
+            hasFastFlows = flows.isNotEmpty()
+        }
+    }
+
+    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Коэффициенты Быстрого Потока (БП)", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Нажмите для редактирования", fontSize = 12.sp, color = Color.Gray)
+                TextButton(onClick = { bpExpanded = !bpExpanded }) {
+                    Text(if (bpExpanded) "Свернуть" else "Развернуть")
+                }
+            }
+            if (bpExpanded) {
+                Spacer(modifier = Modifier.height(8.dp))
+                bpTextValues.keys.sorted().forEach { threshold ->
+                    OutlinedTextField(
+                        value = bpTextValues[threshold] ?: "",
+                        onValueChange = { newValue ->
+                            bpTextValues = bpTextValues.toMutableMap().apply { this[threshold] = newValue }
+                        },
+                        label = { Text("От ${String.format(java.util.Locale.US, "%.0f", threshold)}") },
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        val coefficients = bpTextValues.mapValues { it.value.replace(",", ".").toDoubleOrNull() ?: 0.0 }
+                        scope.launch { settingsManager.saveBpCoefficients(coefficients) }
+                        Toast.makeText(context, "Сохранено", Toast.LENGTH_SHORT).show()
+                    },
+                    enabled = isBpChanged,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Сохранить коэффициенты БП") }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+            HorizontalDivider()
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text("Коэффициенты Супер Быстрого Потока (СБП)", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Нажмите для редактирования", fontSize = 12.sp, color = Color.Gray)
+                TextButton(onClick = { sbpExpanded = !sbpExpanded }) {
+                    Text(if (sbpExpanded) "Свернуть" else "Развернуть")
+                }
+            }
+            if (sbpExpanded) {
+                Spacer(modifier = Modifier.height(8.dp))
+                sbpTextValues.keys.sorted().forEach { threshold ->
+                    OutlinedTextField(
+                        value = sbpTextValues[threshold] ?: "",
+                        onValueChange = { newValue ->
+                            sbpTextValues = sbpTextValues.toMutableMap().apply { this[threshold] = newValue }
+                        },
+                        label = { Text("От ${String.format(java.util.Locale.US, "%.0f", threshold)}") },
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        val coefficients = sbpTextValues.mapValues { it.value.replace(",", ".").toDoubleOrNull() ?: 0.0 }
+                        scope.launch { settingsManager.saveSbpCoefficients(coefficients) }
+                        Toast.makeText(context, "Сохранено", Toast.LENGTH_SHORT).show()
+                    },
+                    enabled = isSbpChanged,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Сохранить коэффициенты СБП") }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+            HorizontalDivider()
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text("Данные БП/СБП", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = { exportLauncher.launch("БП_Все_${System.currentTimeMillis()}.xlsx") },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = hasFastFlows
+            ) { Text("Выгрузить всё в Excel") }
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = { showCalculateDialog = true },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Рассчитать поток") }
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = { showCalculateExistingDialog = true },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Рассчитать действующий поток") }
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { showClearDialog = true },
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Очистить данные") }
+        }
+    }
+
+    if (showCalculateDialog) {
+        CalculateFastFlowDialog(
+            settingsManager = settingsManager,
+            onDismiss = { showCalculateDialog = false }
+        )
+    }
+
+    if (showCalculateExistingDialog) {
+        CalculateExistingFastFlowDialog(
+            settingsManager = settingsManager,
+            onDismiss = { showCalculateExistingDialog = false }
+        )
+    }
+
+    if (showClearDialog) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Очистить данные?") },
+            text = { Text("Все данные БП/СБП будут удалены. Это действие нельзя отменить.") },
+            confirmButton = {
+                Button(onClick = {
+                    scope.launch {
+                        val database = AppDatabase.getDatabase(context)
+                        val flowDao = database.fastFlowDao()
+                        val dayDao = database.fastFlowDayDao()
+                        val flowRepository = FastFlowRepository(flowDao, dayDao)
+                        flowRepository.clearAll()
+                        Toast.makeText(context, "Все БП/СБП очищены", Toast.LENGTH_SHORT).show()
+                    }
+                    showClearDialog = false
+                }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("Очистить") }
+            },
+            dismissButton = { TextButton(onClick = { showClearDialog = false }) { Text("Отмена") } }
+        )
+    }
+}
+
+/** Экспорт всех БП/СБП в Excel - каждый поток на отдельном листе */
+private suspend fun exportFastFlowToExcel(
+    context: Context,
+    uri: Uri,
+    flows: List<FastFlowEntity>,
+    dayDao: com.flowhack.flowcapital.data.db.FastFlowDayDao
+) {
+    withContext(Dispatchers.IO) {
+        try {
+            context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                val workbook = org.dhatim.fastexcel.Workbook(outputStream, "Все БП/СБП", null)
+                val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+
+                flows.forEachIndexed { index, flow ->
+                    val dateStr = dateFormat.format(Date(flow.startDate))
+                    val prefix = if (flow.type == FAST_FLOW_TYPE_BP) "БП" else "СБП"
+                    val worksheetName = if (index == 0) "${prefix}_$dateStr" else "${prefix}${index + 1}_$dateStr"
+                    val worksheet = workbook.newWorksheet(worksheetName)
+                    var currentRow = 0
+
+                    worksheet.value(currentRow, 0, "=== $prefix ${index + 1} ($dateStr) ===")
+                    currentRow++
+
+                    worksheet.value(currentRow, 0, "Номинал")
+                    worksheet.value(currentRow, 1, flow.nominalAmount)
+                    currentRow++
+
+                    worksheet.value(currentRow, 0, "Текущий день")
+                    worksheet.value(currentRow, 1, "${flow.currentDay}/${getFastFlowDayCount(flow.type)}")
+                    currentRow++
+
+                    worksheet.value(currentRow, 0, "Процент")
+                    worksheet.value(currentRow, 1, flow.percent)
+                    currentRow++
+
+                    worksheet.value(currentRow, 0, "Начисление")
+                    worksheet.value(currentRow, 1, flow.dailyAccrual)
+                    currentRow++
+
+                    worksheet.value(currentRow, 0, "Всего начислено")
+                    worksheet.value(currentRow, 1, flow.totalAccrued)
+                    currentRow += 2
+
+                    worksheet.value(currentRow, 0, "День")
+                    worksheet.value(currentRow, 1, "Дата")
+                    worksheet.value(currentRow, 2, "Начислено")
+                    worksheet.value(currentRow, 3, "Действие")
+                    currentRow++
+
+                    val days = dayDao.getAllDaysForFlow(flow.id).sortedBy { it.dayNumber }
+                    days.forEach { day ->
+                        worksheet.value(currentRow, 0, day.dayNumber)
+                        worksheet.value(currentRow, 1, dateFormat.format(Date(day.date)))
+                        worksheet.value(currentRow, 2, day.accrualAmount)
+                        worksheet.value(currentRow, 3, day.actionType)
+                        currentRow++
+                    }
+                    currentRow += 2
+
+                    val totalAll = flows.sumOf { it.totalAccrued }
+                    worksheet.value(currentRow, 0, "ИТОГО ВО ВСЕХ БП/СБП")
+                    worksheet.value(currentRow, 1, totalAll)
+                    val lastDataRow = currentRow
+                    val lastDataCol = 3
+                    worksheet.range(0, 0, lastDataRow, lastDataCol).style().horizontalAlignment("center").set()
+                }
+                workbook.finish()
+            }
+        } catch (e: Exception) { AppLogger.e("Export", "Ошибка экспорта БП/СБП", e) }
+    }
+}
+
+/**
+ * Диалог расчёта нового БП/СБП потока.
+ * Процент определяется автоматически из таблицы коэффициентов по номиналу.
+ */
+@Composable
+private fun CalculateFastFlowDialog(
+    settingsManager: SettingsManager,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    val savedBp by settingsManager.bpCoefficientsFlow.collectAsState(initial = emptyMap())
+    val savedSbp by settingsManager.sbpCoefficientsFlow.collectAsState(initial = emptyMap())
+
+    var flowType by remember { mutableStateOf(FAST_FLOW_TYPE_BP) }
+    var nominalText by remember { mutableStateOf("") }
+    var startDateMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var showStartDatePicker by remember { mutableStateOf(false) }
+
+    var forecastResults by remember { mutableStateOf<List<FastFlowDayEntity>>(emptyList()) }
+    var showResults by remember { mutableStateOf(false) }
+
+    val exportLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        if (uri != null) {
+            scope.launch {
+                exportFastForecastToExcel(context, uri, forecastResults)
+                Toast.makeText(context, "Экспорт завершён", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun parseDouble(text: String): Double = text.replace(",", ".").toDoubleOrNull() ?: 0.0
+
+    val nominal = parseDouble(nominalText)
+    val coefficients = if (flowType == FAST_FLOW_TYPE_BP) savedBp else savedSbp
+    val percent = getFastFlowPercentForNominal(nominal, coefficients)
+    val dailyAccrual = calculateFastFlowDailyAccrual(nominal, percent, flowType)
+    val dayCount = getFastFlowDayCount(flowType)
+
+    AlertDialog(
+        onDismissRequest = {},
+        title = { Text("Рассчитать поток БП/СБП", fontSize = 18.sp) },
+        text = {
+            Column {
+                Text("Введите параметры нового потока для расчёта прогноза:", fontSize = 12.sp, color = Color.Gray)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = flowType == FAST_FLOW_TYPE_BP,
+                        onClick = { flowType = FAST_FLOW_TYPE_BP },
+                        label = { Text("БП (30 дней)") }
+                    )
+                    FilterChip(
+                        selected = flowType == FAST_FLOW_TYPE_SBP,
+                        onClick = { flowType = FAST_FLOW_TYPE_SBP },
+                        label = { Text("СБП (15 дней)") }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = nominalText,
+                    onValueChange = { nominalText = it },
+                    label = { Text("Номинал") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true
+                )
+
+                if (nominal > 0) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Процент: ${String.format(Locale.US, "%.2f", percent)}%", fontSize = 13.sp)
+                    Text("Начисление в день: ${String.format(Locale.US, "%.2f", dailyAccrual)}", fontSize = 13.sp)
+                    if (percent <= 0) {
+                        Text("Номинал ниже минимального порога — прирост 0%", fontSize = 11.sp, color = Color(0xFFC62828))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+                OutlinedButton(
+                    onClick = { showStartDatePicker = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Старт: ${dateFormat.format(Date(startDateMillis))}")
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (nominal > 0) {
+                        forecastResults = calculateFastFlowForecast(nominal, percent, flowType, startDateMillis)
+                        showResults = true
+                    }
+                },
+                enabled = nominal > 0
+            ) { Text("Рассчитать") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
+    )
+
+    if (showStartDatePicker) {
+        val startDatePickerState = rememberDatePickerState(initialSelectedDateMillis = startDateMillis)
+        DatePickerDialog(
+            onDismissRequest = {},
+            confirmButton = {
+                Button(onClick = {
+                    startDatePickerState.selectedDateMillis?.let { startDateMillis = it }
+                    showStartDatePicker = false
+                }) { Text("Выбрать") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showStartDatePicker = false }) { Text("Отмена") }
+            }
+        ) {
+            DatePicker(state = startDatePickerState)
+        }
+    }
+
+    if (showResults && forecastResults.isNotEmpty()) {
+        FastForecastResultsDialog(
+            title = "Прогноз потока БП/СБП",
+            forecastList = forecastResults,
+            onDismiss = { showResults = false },
+            onExportToExcel = { exportLauncher.launch("БП_Расчет_${System.currentTimeMillis()}.xlsx") }
+        )
+    }
+}
+
+/**
+ * Диалог расчёта действующего БП/СБП потока.
+ * Поля: номинал, текущий день, начисление (автозаполняется), дата старта.
+ */
+@Composable
+private fun CalculateExistingFastFlowDialog(
+    settingsManager: SettingsManager,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    val savedBp by settingsManager.bpCoefficientsFlow.collectAsState(initial = emptyMap())
+    val savedSbp by settingsManager.sbpCoefficientsFlow.collectAsState(initial = emptyMap())
+
+    var flowType by remember { mutableStateOf(FAST_FLOW_TYPE_BP) }
+    var nominalText by remember { mutableStateOf("") }
+    var currentDayText by remember { mutableStateOf("1") }
+    var accrualText by remember { mutableStateOf("") }
+    var startDateMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var showStartDatePicker by remember { mutableStateOf(false) }
+
+    var forecastResults by remember { mutableStateOf<List<FastFlowDayEntity>>(emptyList()) }
+    var showResults by remember { mutableStateOf(false) }
+
+    val exportLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        if (uri != null) {
+            scope.launch {
+                exportFastForecastToExcel(context, uri, forecastResults)
+                Toast.makeText(context, "Экспорт завершён", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    fun parseDouble(text: String): Double = text.replace(",", ".").toDoubleOrNull() ?: 0.0
+
+    val nominal = parseDouble(nominalText)
+    val currentDay = currentDayText.toIntOrNull() ?: 1
+    val dayCount = getFastFlowDayCount(flowType)
+    val coefficients = if (flowType == FAST_FLOW_TYPE_BP) savedBp else savedSbp
+    val percent = getFastFlowPercentForNominal(nominal, coefficients)
+    val autoAccrual = calculateFastFlowDailyAccrual(nominal, percent, flowType)
+    val accrual = if (accrualText.isBlank()) autoAccrual else parseDouble(accrualText)
+
+    val isFormValid = nominal > 0 && currentDay in 1..dayCount
+
+    AlertDialog(
+        onDismissRequest = {},
+        title = { Text("Рассчитать действующий поток БП/СБП", fontSize = 18.sp) },
+        text = {
+            Column {
+                Text("Введите параметры текущего состояния потока:", fontSize = 12.sp, color = Color.Gray)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = flowType == FAST_FLOW_TYPE_BP,
+                        onClick = { flowType = FAST_FLOW_TYPE_BP },
+                        label = { Text("БП (30 дней)") }
+                    )
+                    FilterChip(
+                        selected = flowType == FAST_FLOW_TYPE_SBP,
+                        onClick = { flowType = FAST_FLOW_TYPE_SBP },
+                        label = { Text("СБП (15 дней)") }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = nominalText,
+                    onValueChange = { nominalText = it },
+                    label = { Text("Номинал") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = currentDayText,
+                    onValueChange = { currentDayText = it },
+                    label = { Text("Текущий день (1..$dayCount)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = accrualText,
+                    onValueChange = { accrualText = it },
+                    label = { Text("Начисление (авто: ${String.format(Locale.US, "%.2f", autoAccrual)})") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+                OutlinedButton(
+                    onClick = { showStartDatePicker = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Старт: ${dateFormat.format(Date(startDateMillis))}")
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (isFormValid) {
+                        // Прогноз от текущего дня до конца с учётом воскресений
+                        val forecast = mutableListOf<FastFlowDayEntity>()
+                        val calendar = Calendar.getInstance().apply {
+                            timeInMillis = startDateMillis
+                            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+                            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+                        }
+                        var dayNumber = currentDay
+                        var accruedSum = 0.0
+                        val total = nominal * (1.0 + percent / 100.0)
+                        while (dayNumber <= dayCount) {
+                            val isSunday = calendar.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
+                            if (isSunday) {
+                                forecast.add(FastFlowDayEntity(
+                                    flowId = 0, dayNumber = dayNumber, date = calendar.timeInMillis,
+                                    accrualAmount = 0.0, isButtonPressed = false, actionType = "SUNDAY"
+                                ))
+                            } else {
+                                val isLastDay = dayNumber == dayCount
+                                val dayAccrual = if (isLastDay) {
+                                    (total - (currentDay - 1) * accrual - accruedSum).let { if (it < 0) 0.0 else it }
+                                } else accrual
+                                accruedSum += dayAccrual
+                                forecast.add(FastFlowDayEntity(
+                                    flowId = 0, dayNumber = dayNumber, date = calendar.timeInMillis,
+                                    accrualAmount = dayAccrual, isButtonPressed = true, actionType = "DAILY"
+                                ))
+                                dayNumber++
+                            }
+                            calendar.add(Calendar.DAY_OF_YEAR, 1)
+                        }
+                        forecastResults = forecast
+                        showResults = true
+                    }
+                },
+                enabled = isFormValid
+            ) { Text("Рассчитать") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
+    )
+
+    if (showStartDatePicker) {
+        val startDatePickerState = rememberDatePickerState(initialSelectedDateMillis = startDateMillis)
+        DatePickerDialog(
+            onDismissRequest = {},
+            confirmButton = {
+                Button(onClick = {
+                    startDatePickerState.selectedDateMillis?.let { startDateMillis = it }
+                    showStartDatePicker = false
+                }) { Text("Выбрать") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showStartDatePicker = false }) { Text("Отмена") }
+            }
+        ) {
+            DatePicker(state = startDatePickerState)
+        }
+    }
+
+    if (showResults && forecastResults.isNotEmpty()) {
+        FastForecastResultsDialog(
+            title = "Прогноз действующего потока БП/СБП",
+            forecastList = forecastResults,
+            onDismiss = { showResults = false },
+            onExportToExcel = { exportLauncher.launch("БП_Действующий_${System.currentTimeMillis()}.xlsx") }
+        )
+    }
+}
+
+/** Экспорт прогноза БП/СБП в Excel */
+private suspend fun exportFastForecastToExcel(context: Context, uri: Uri, forecast: List<FastFlowDayEntity>) {
+    withContext(Dispatchers.IO) {
+        try {
+            context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                val workbook = org.dhatim.fastexcel.Workbook(outputStream, "Прогноз БП/СБП", null)
+                val worksheet = workbook.newWorksheet("БП")
+                worksheet.value(0, 0, "День")
+                worksheet.value(0, 1, "Дата")
+                worksheet.value(0, 2, "Начислено")
+                worksheet.value(0, 3, "Действие")
+                val dateFormat = SimpleDateFormat("dd.MM.yyyy", Locale.getDefault())
+                forecast.forEachIndexed { index, day ->
+                    val row = index + 1
+                    worksheet.value(row, 0, day.dayNumber)
+                    worksheet.value(row, 1, dateFormat.format(Date(day.date)))
+                    worksheet.value(row, 2, day.accrualAmount)
+                    worksheet.value(row, 3, day.actionType)
+                }
+                val lastRow = forecast.size
+                worksheet.range(0, 0, lastRow, 3).style().horizontalAlignment("center").set()
+                workbook.finish()
+            }
+        } catch (e: Exception) { AppLogger.e("SettingsScreen", "Ошибка экспорта прогноза БП/СБП", e) }
     }
 }
 
@@ -2608,7 +3239,29 @@ private suspend fun exportSettingsToJson(context: Context, uri: Uri, settingsMan
         val growingHistory = database.growingFlowDao().getAllHistory().first()
         val noviceHistory = database.noviceFlowDao().getAllHistory().first()
         val pspFlows = database.premiumStartFlowDao().getAllFlows().first()
-        AppLogger.d("SettingsScreen", "Собрано: РП=${growingHistory.size}, ПН=${noviceHistory.size}, ПСП=${pspFlows.size} потоков")
+        val fastFlows = database.fastFlowDao().getAllFlows().first()
+        AppLogger.d("SettingsScreen", "Собрано: РП=${growingHistory.size}, ПН=${noviceHistory.size}, " +
+                "ПСП=${pspFlows.size} потоков, БП/СБП=${fastFlows.size} потоков")
+
+        // Сбор дней для всех БП/СБП
+        val allFastDays = mutableListOf<FastFlowDayBackup>()
+        fastFlows.forEach { flow ->
+            val days = database.fastFlowDayDao().getAllDaysForFlow(flow.id)
+            days.forEach { day ->
+                allFastDays.add(
+                    FastFlowDayBackup(
+                        id = day.id,
+                        flowId = day.flowId,
+                        dayNumber = day.dayNumber,
+                        date = day.date,
+                        accrualAmount = day.accrualAmount,
+                        isButtonPressed = day.isButtonPressed,
+                        actionType = day.actionType
+                    )
+                )
+            }
+        }
+        AppLogger.d("SettingsScreen", "Собрано дней БП/СБП: ${allFastDays.size}")
 
         // Сбор периодов для всех ПСП
         val allPeriods = mutableListOf<PremiumStartPeriodBackup>()
@@ -2652,6 +3305,13 @@ private suspend fun exportSettingsToJson(context: Context, uri: Uri, settingsMan
                 PremiumStartFlowBackup(it.id, it.nominalAmount, it.startDate, it.totalAccrued, it.isActive, it.currentPeriod)
             },
             pspPeriods = allPeriods,
+            bpCoefficients = settingsManager.bpCoefficientsFlow.first(),
+            sbpCoefficients = settingsManager.sbpCoefficientsFlow.first(),
+            fastFlows = fastFlows.map {
+                FastFlowBackup(it.id, it.type, it.nominalAmount, it.startDate, it.currentDay,
+                    it.totalAccrued, it.dailyAccrual, it.percent, it.isActive)
+            },
+            fastFlowDays = allFastDays,
             isRpVip = settingsManager.isRpVipFlow.first(),
             checkUpdateOnStart = settingsManager.checkUpdateOnStartFlow.first(),
             darkTheme = settingsManager.darkThemeFlow.first(),
@@ -2791,6 +3451,40 @@ private suspend fun importSettingsFromJson(context: Context, uri: Uri, settingsM
                 )
             }
             AppLogger.d("SettingsScreen", "Импортировано периодов ПСП: ${importData.pspPeriods.size}")
+
+            database.fastFlowDayDao().clearAll()
+            database.fastFlowDao().clearAll()
+            importData.fastFlows?.forEach { backup ->
+                database.fastFlowDao().insert(
+                    FastFlowEntity(
+                        id = backup.id,
+                        type = backup.type,
+                        nominalAmount = backup.nominalAmount,
+                        startDate = backup.startDate,
+                        currentDay = backup.currentDay,
+                        totalAccrued = backup.totalAccrued,
+                        dailyAccrual = backup.dailyAccrual,
+                        percent = backup.percent,
+                        isActive = backup.isActive
+                    )
+                )
+            }
+            AppLogger.d("SettingsScreen", "Импортировано БП/СБП потоков: ${importData.fastFlows?.size ?: 0}")
+
+            importData.fastFlowDays?.forEach { backup ->
+                database.fastFlowDayDao().insert(
+                    FastFlowDayEntity(
+                        id = backup.id,
+                        flowId = backup.flowId,
+                        dayNumber = backup.dayNumber,
+                        date = backup.date,
+                        accrualAmount = backup.accrualAmount,
+                        isButtonPressed = backup.isButtonPressed,
+                        actionType = backup.actionType
+                    )
+                )
+            }
+            AppLogger.d("SettingsScreen", "Импортировано дней БП/СБП: ${importData.fastFlowDays?.size ?: 0}")
         }
 
         // 3. Импорт настроек в DataStore — только после успешной Room-транзакции
@@ -2807,6 +3501,8 @@ private suspend fun importSettingsFromJson(context: Context, uri: Uri, settingsM
         importData.pspCoefficients.let {
             settingsManager.savePspCoefficients(it)
         }
+        importData.bpCoefficients?.let { settingsManager.saveBpCoefficients(it) }
+        importData.sbpCoefficients?.let { settingsManager.saveSbpCoefficients(it) }
         importData.reminders?.let { settingsManager.saveReminders(it) }
         importData.alarmReminders?.let { settingsManager.saveAlarmReminders(it) }
         importData.pspReminders?.let { settingsManager.savePspReminders(it) }
@@ -2880,6 +3576,30 @@ data class PremiumStartPeriodBackup(
 )
 
 @Serializable
+data class FastFlowBackup(
+    val id: Int,
+    val type: String,
+    val nominalAmount: Double,
+    val startDate: Long,
+    val currentDay: Int,
+    val totalAccrued: Double,
+    val dailyAccrual: Double,
+    val percent: Double,
+    val isActive: Boolean
+)
+
+@Serializable
+data class FastFlowDayBackup(
+    val id: Int,
+    val flowId: Int,
+    val dayNumber: Int,
+    val date: Long,
+    val accrualAmount: Double,
+    val isButtonPressed: Boolean,
+    val actionType: String
+)
+
+@Serializable
 data class FullBackupData(
     val appMarker: String,
     val exportDate: Long,
@@ -2893,6 +3613,10 @@ data class FullBackupData(
     val noviceFlowHistory: List<NoviceFlowEntityBackup>,
     val pspFlows: List<PremiumStartFlowBackup>,
     val pspPeriods: List<PremiumStartPeriodBackup>,
+    val bpCoefficients: Map<Double, Double>? = null,
+    val sbpCoefficients: Map<Double, Double>? = null,
+    val fastFlows: List<FastFlowBackup>? = null,
+    val fastFlowDays: List<FastFlowDayBackup>? = null,
     val reminders: Set<String>? = null,
     val alarmReminders: Set<String>? = null,
     val pspReminders: Set<String>? = null,

@@ -162,3 +162,67 @@ interface PremiumStartPeriodDao {
     @Query("DELETE FROM premium_start_periods")
     suspend fun clearAll()
 }
+
+/**
+ * DAO для работы с экземплярами Быстрого/Супер Быстрого Потока (БП/СБП).
+ */
+@Dao
+interface FastFlowDao {
+    @Query("SELECT * FROM fast_flows ORDER BY id DESC")
+    fun getAllFlows(): Flow<List<FastFlowEntity>>
+
+    @Query("SELECT * FROM fast_flows WHERE id = :id")
+    suspend fun getFlowById(id: Int): FastFlowEntity?
+
+    @Insert
+    suspend fun insert(flow: FastFlowEntity): Long
+
+    @Update
+    suspend fun update(flow: FastFlowEntity)
+
+    @Query("DELETE FROM fast_flows WHERE id = :id")
+    suspend fun deleteById(id: Int)
+
+    @Query("DELETE FROM fast_flows")
+    suspend fun clearAll()
+
+    @Query("SELECT COUNT(*) FROM fast_flows")
+    suspend fun getFlowsCount(): Int
+}
+
+/**
+ * DAO для работы с днями Быстрого/Супер Быстрого Потока (БП/СБП).
+ */
+@Dao
+interface FastFlowDayDao {
+    @Query("SELECT * FROM fast_flow_days WHERE flowId = :flowId ORDER BY dayNumber ASC")
+    fun getDaysByFlowId(flowId: Int): Flow<List<FastFlowDayEntity>>
+
+    @Query("SELECT * FROM fast_flow_days WHERE flowId = :flowId")
+    suspend fun getAllDaysForFlow(flowId: Int): List<FastFlowDayEntity>
+
+    @Query("SELECT * FROM fast_flow_days WHERE flowId = :flowId AND dayNumber = :dayNumber")
+    suspend fun getDayByNumber(flowId: Int, dayNumber: Int): FastFlowDayEntity?
+
+    @Query("SELECT * FROM fast_flow_days WHERE flowId = :flowId AND isButtonPressed = 1 ORDER BY date DESC LIMIT 1")
+    suspend fun getLastPressEntry(flowId: Int): FastFlowDayEntity?
+
+    /** Возвращает первый необработанный день (кнопка не нажата и не воскресенье) */
+    @Query("SELECT * FROM fast_flow_days WHERE flowId = :flowId AND isButtonPressed = 0 AND actionType != 'SUNDAY' ORDER BY dayNumber ASC LIMIT 1")
+    suspend fun getCurrentDay(flowId: Int): FastFlowDayEntity?
+
+    @Insert
+    suspend fun insert(day: FastFlowDayEntity): Long
+
+    @Insert
+    suspend fun insertAll(days: List<FastFlowDayEntity>)
+
+    @Update
+    suspend fun update(day: FastFlowDayEntity)
+
+    @Query("DELETE FROM fast_flow_days WHERE flowId = :flowId")
+    suspend fun deleteByFlowId(flowId: Int)
+
+    @Query("DELETE FROM fast_flow_days")
+    suspend fun clearAll()
+}

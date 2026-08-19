@@ -143,3 +143,60 @@ data class PremiumStartPeriodEntity(
     val contributionDate: Long? = null,
     val isCompleted: Boolean = false
 )
+
+/**
+ * Сущность Быстрого Потока (БП) или Супер Быстрого Потока (СБП).
+ * Каждый экземпляр создаётся отдельно и имеет свой номинал и тип.
+ * БП длится 30 дней, СБП — 15 дней. Ежедневное начисление одинаково для обоих типов,
+ * различаются только срок и коэффициенты.
+ *
+ * @property id Уникальный идентификатор (автогенерация)
+ * @property type Тип потока: "BP" (Быстрый) или "SBP" (Супер Быстрый)
+ * @property nominalAmount Номинал потока (сумма взноса)
+ * @property startDate Дата создания потока (старт, timestamp)
+ * @property currentDay Текущий день (1..30 для БП, 1..15 для СБП)
+ * @property totalAccrued Всего начислено (сумма всех ежедневных начислений)
+ * @property dailyAccrual Ежедневное начисление (номинал * (1 + процент/100) / дней)
+ * @property percent Итоговый процент прироста (из таблицы коэффициентов)
+ * @property isActive Активен ли поток (true - можно нажимать кнопку)
+ */
+@Entity(tableName = "fast_flows")
+data class FastFlowEntity(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val type: String,
+    val nominalAmount: Double,
+    val startDate: Long,
+    val currentDay: Int = 1,
+    val totalAccrued: Double = 0.0,
+    val dailyAccrual: Double = 0.0,
+    val percent: Double = 0.0,
+    val isActive: Boolean = true
+)
+
+/**
+ * Сущность дня Быстрого/Супер Быстрого Потока (БП/СБП).
+ * Хранит информацию о каждом дне потока отдельно.
+ *
+ * @property id Уникальный идентификатор (автогенерация)
+ * @property flowId ID родительского потока (FastFlowEntity)
+ * @property dayNumber Номер дня (1..30 для БП, 1..15 для СБП)
+ * @property date Дата дня (timestamp)
+ * @property accrualAmount Начисление за этот день
+ * @property isButtonPressed Была ли нажата кнопка в этот день
+ * @property actionType Тип действия:
+ *     - START: старт потока
+ *     - DAILY: ежедневное начисление
+ *     - SUNDAY: воскресенье (нет начислений)
+ *     - MISSED: пропущенный день (не нажали кнопку)
+ *     - CORRECTION: ручная корректировка значений
+ */
+@Entity(tableName = "fast_flow_days")
+data class FastFlowDayEntity(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val flowId: Int,
+    val dayNumber: Int,
+    val date: Long,
+    val accrualAmount: Double,
+    val isButtonPressed: Boolean,
+    val actionType: String
+)

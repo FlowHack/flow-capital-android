@@ -103,3 +103,57 @@ class PremiumStartFlowRepository(
         flowDao.clearAll()
     }
 }
+
+/**
+ * Репозиторий для управления Быстрым/Супер Быстрым Потоком (БП/СБП).
+ */
+class FastFlowRepository(
+    private val flowDao: FastFlowDao,
+    private val dayDao: FastFlowDayDao
+) {
+    val allFlows: Flow<List<FastFlowEntity>> = flowDao.getAllFlows()
+
+    suspend fun getFlowById(id: Int): FastFlowEntity? = flowDao.getFlowById(id)
+
+    suspend fun insertFlow(flow: FastFlowEntity): Long = flowDao.insert(flow)
+
+    suspend fun updateFlow(flow: FastFlowEntity) = flowDao.update(flow)
+
+    /** Удаляет поток и все связанные дни */
+    suspend fun deleteFlow(id: Int) {
+        dayDao.deleteByFlowId(id)
+        flowDao.deleteById(id)
+    }
+
+    suspend fun getFlowsCount(): Int = flowDao.getFlowsCount()
+
+    fun getDaysByFlowId(flowId: Int): Flow<List<FastFlowDayEntity>> =
+        dayDao.getDaysByFlowId(flowId)
+
+    suspend fun getAllDaysForFlow(flowId: Int): List<FastFlowDayEntity> =
+        dayDao.getAllDaysForFlow(flowId)
+
+    suspend fun getCurrentDay(flowId: Int): FastFlowDayEntity? =
+        dayDao.getCurrentDay(flowId)
+
+    suspend fun getDayByNumber(flowId: Int, dayNumber: Int): FastFlowDayEntity? =
+        dayDao.getDayByNumber(flowId, dayNumber)
+
+    suspend fun getLastPressEntry(flowId: Int): FastFlowDayEntity? =
+        dayDao.getLastPressEntry(flowId)
+
+    suspend fun insertDay(day: FastFlowDayEntity): Long =
+        dayDao.insert(day)
+
+    suspend fun insertDays(days: List<FastFlowDayEntity>) =
+        dayDao.insertAll(days)
+
+    suspend fun updateDay(day: FastFlowDayEntity) =
+        dayDao.update(day)
+
+    /** Удаляет все дни и все потоки */
+    suspend fun clearAll() {
+        dayDao.clearAll()
+        flowDao.clearAll()
+    }
+}

@@ -78,6 +78,24 @@
 17. **growingFlow_sundayWithNeedMissedCheck_returnsEmptyResult** - Воскресенье при needMissedCheck=true - пустой результат
 18. **growingFlow_weekdayWithNoChecks_returnsEmptyResult** - Будний день без проверок - пустой результат
 
+### FastFlowForecastTest.kt (Быстрый/Супер Быстрый Поток - БП/СБП)
+Проверяет логику функций `FastFlowForecast.kt`:
+1. **dayCount_bp_returns30** - БП длится 30 дней
+2. **dayCount_sbp_returns15** - СБП длится 15 дней
+3. **percentForNominal_exactThreshold_returnsPercent** - Процент по точному порогу из таблицы
+4. **percentForNominal_betweenThresholds_takesFloor** - Между порогами берётся нижний порог
+5. **percentForNominal_belowMin_returnsZero** - Номинал ниже минимального порога -> 0%
+6. **percentForNominal_aboveMax_takesMax** - Номинал выше максимума -> максимальный %
+7. **dailyAccrual_bp25000_equals862_50** - Начисление БП 25000 (3.5%) = 862.50 (итог 25875/30)
+8. **dailyAccrual_sbp50000_equals3400** - Начисление СБП 50000 (2%) = 3400 (итог 51000/15)
+9. **forecast_bp_creates30DaysAndConverges** - Прогноз БП создаёт 30 рабочих дней, сумма сходится
+10. **forecast_lastDay_adjustsToConverge** - Последний день корректируется для сходимости суммы
+11. **forecast_sundaysIncludedAsNoAccrual** - Воскресенья в прогнозе без начислений
+12. **closeDate_noSundays_equalsTodayPlusRemaining** - Дата закрытия = сегодня + оставшиеся дни + воскресенья
+13. **closeDate_lastDay_returnsToday** - При последнем дне закрытие = сегодня
+14. **pastDays_currentDay5_creates4PressedDays** - Генерация 4 прошлых нажатых дней (день 1 = START)
+15. **pastDays_currentDay1_returnsEmpty** - При currentDay=1 прошлых дней нет
+
 ## Запуск тестов
 ```bash
 export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64

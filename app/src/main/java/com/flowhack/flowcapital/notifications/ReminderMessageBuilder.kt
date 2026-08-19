@@ -2,6 +2,8 @@ package com.flowhack.flowcapital.notifications
 
 import android.content.Context
 import com.flowhack.flowcapital.data.db.AppDatabase
+import com.flowhack.flowcapital.data.forecast.FAST_FLOW_TYPE_BP
+import com.flowhack.flowcapital.data.forecast.getFastFlowDayCount
 import com.flowhack.flowcapital.data.logging.AppLogger
 import kotlinx.coroutines.flow.first
 import java.util.Calendar
@@ -142,6 +144,38 @@ object ReminderMessageBuilder {
                     messages.add("ПН - нажмите кнопку")
                 }
             }
+        }
+
+        // Проверка Быстрого Потока (БП/СБП) — ежедневная кнопка, воскресенье выходной
+        val allFastFlows = db.fastFlowDao().getAllFlows().first()
+        for (flow in allFastFlows) {
+            if (!flow.isActive) continue
+            val dayCount = getFastFlowDayCount(flow.type)
+            if (flow.currentDay > dayCount) continue
+            val flowLabel = if (flow.type == FAST_FLOW_TYPE_BP) "БП" else "СБП"
+
+            val lastDay = db.fastFlowDayDao().getLastPressEntry(flow.id)
+            val isPressedToday = lastDay != null && lastDay.isButtonPressed &&
+                today == Calendar.getInstance().apply { timeInMillis = lastDay.date }.get(Calendar.DAY_OF_YEAR) &&
+                year == Calendar.getInstance().apply { timeInMillis = lastDay.date }.get(Calendar.YEAR)
+
+            if (smartNotifications) {
+                val now = currentTimeMillis
+                val isReadyForPress = lastDay == null || now >= lastDay.date + DAY_MILLIS
+                if (isReadyForPress && !isPressedToday && !isSunday) {
+                    if (lastDay != null && now < lastDay.date + DAY_MILLIS + ACTIVATION_WINDOW_MILLIS) {
+                        messages.add("Вчера в это время вы выполнили действия по $flowLabel потоку")
+                    } else {
+                        messages.add("$flowLabel - нажмите кнопку")
+                    }
+                }
+            } else {
+                if (!isPressedToday && !isSunday) {
+                    messages.add("$flowLabel - нажмите кнопку")
+                }
+            }
+            AppLogger.d("ReminderMessageBuilder",
+                "$flowLabel поток id=${flow.id}: текущий день=${flow.currentDay}, нажато сегодня=$isPressedToday")
         }
 
         if (messages.isEmpty()) {
