@@ -41,7 +41,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.DpOffset
@@ -225,10 +224,7 @@ sealed class BottomNavItem(val route: String, val title: String, val icon: Image
 @Composable
 fun MainScreen(defaultEntryTab: Int = 1, initialBrowserUrl: String? = null) {
     val navController = rememberNavController()
-    val context = LocalContext.current
-    val browserViewModel: BrowserViewModel = viewModel(
-        factory = BrowserViewModel.factory(context)
-    )
+    val browserViewModel: BrowserViewModel = viewModel()
     var showBrowserMenu by remember { mutableStateOf(false) }
 
     // Открыть вкладку с URL из внешнего Intent (однократно за жизнь ViewModel).

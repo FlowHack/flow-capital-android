@@ -1,6 +1,6 @@
 package com.flowhack.flowcapital.ui.screens.browser
 
-import android.content.Context
+import android.app.Application
 import android.webkit.CookieManager
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -8,10 +8,7 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.viewmodel.initializer
-import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.lifecycle.AndroidViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,31 +20,17 @@ import timber.log.Timber
  * Держит по одному ЖИВОМУ [WebView] на вкладку. WebView сохраняет состояние
  * страницы (прокрутку, введённые данные, состояние форм), пока он жив, поэтому
  * переключение между вкладками не сбрасывает состояние сайта.
- *
- * @param context Activity context для создания WebView (WebView с
- * applicationContext некорректно работает с сетью HTTP/2/QUIC на некоторых сайтах)
  */
-class BrowserViewModel(private val context: Context) : ViewModel() {
+class BrowserViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Десктопный User-Agent Chrome. Используется для сайтов, которые блокируют
      * мобильный User-Agent WebView (например, eRub) и из-за этого не загружаются.
      */
-    companion object {
-        private const val DESKTOP_USER_AGENT =
+    private companion object {
+        const val DESKTOP_USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
                 "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-
-        /**
-         * Фабрика ViewModel с Activity context.
-         * WebView должен создаваться с Activity context (не applicationContext),
-         * иначе на некоторых сайтах возникают сетевые ошибки HTTP/2/QUIC.
-         *
-         * @param context Activity context
-         */
-        fun factory(context: Context): ViewModelProvider.Factory = viewModelFactory {
-            initializer { BrowserViewModel(context) }
-        }
     }
 
     /**
@@ -79,6 +62,8 @@ class BrowserViewModel(private val context: Context) : ViewModel() {
 
     private var initialUrlOpened = false
 
+    private val appContext get() = getApplication<Application>()
+
     /**
      * Открыть вкладку с URL из внешнего Intent.
      *
@@ -108,7 +93,7 @@ class BrowserViewModel(private val context: Context) : ViewModel() {
             return
         }
 
-        val webView = WebView(context).apply {
+        val webView = WebView(appContext).apply {
             webViewClient = object : WebViewClient() {
                 override fun onReceivedError(
                     view: WebView?,
