@@ -50,11 +50,6 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
 
     private val appContext get() = getApplication<Application>()
 
-    init {
-        // Стартовая вкладка с первым сайтом из списка.
-        openTab(sites.first().url)
-    }
-
     /**
      * Открыть вкладку с URL из внешнего Intent.
      *
@@ -126,23 +121,26 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     /**
      * Закрыть вкладку по идентификатору.
      *
-     * Если закрывается активная вкладка — активируется соседняя. Последняя
-     * вкладка не закрывается. WebView уничтожается после того, как Compose
-     * уберёт его из композиции.
+     * Если закрывается активная вкладка — активируется соседняя. При закрытии
+     * последней вкладки список становится пустым (показывается стартовый
+     * экран-заглушка). WebView уничтожается после того, как Compose уберёт его
+     * из композиции.
      *
      * @param id Идентификатор вкладки
      */
     fun closeTab(id: Long) {
         val tabs = _tabs.value
-        if (tabs.size <= 1) return
-
         val tab = tabs.find { it.id == id } ?: return
         val remaining = tabs.filterNot { it.id == id }
 
         if (_activeTabId.value == id) {
-            val index = tabs.indexOfFirst { it.id == id }
-            val neighbor = if (index > 0) tabs[index - 1] else tabs[index + 1]
-            _activeTabId.value = neighbor.id
+            if (remaining.isNotEmpty()) {
+                val index = tabs.indexOfFirst { it.id == id }
+                val neighbor = if (index > 0) tabs[index - 1] else tabs[index + 1]
+                _activeTabId.value = neighbor.id
+            } else {
+                _activeTabId.value = null
+            }
         }
 
         _tabs.value = remaining
