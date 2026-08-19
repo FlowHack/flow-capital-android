@@ -83,6 +83,7 @@ myAgents/*
 .aider*
 aider*
 opencode*
+.opencode*
 
 # Node.js
 node_modules/

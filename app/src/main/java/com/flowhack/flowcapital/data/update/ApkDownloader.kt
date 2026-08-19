@@ -123,10 +123,6 @@ class ApkDownloader(private val context: Context) {
     /** Скачанный файл */
     private var downloadedFile: File? = null
 
-    init {
-        Timber.tag(TAG).d("ApkDownloader инициализирован")
-    }
-
     /**
      * Поиск APK файла в последнем релизе GitHub.
      *

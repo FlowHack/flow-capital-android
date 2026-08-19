@@ -2230,10 +2230,6 @@ fun ProxySettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
 
     val isAddButtonEnabled = savedProxies.size < MAX_PROXIES
 
-    LaunchedEffect(savedProxies) {
-        AppLogger.log("ProxySettings", "Proxy list updated: ${savedProxies.size} proxies")
-    }
-
     fun simulateProxyConnection(proxy: ProxyConfig, onResult: (ProxyConfig) -> Unit) {
         scope.launch {
             try {
