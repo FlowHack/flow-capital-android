@@ -43,7 +43,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -639,21 +639,30 @@ fun CreateFastFlowDialog(
 
                 Text("Тип потока", fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
-                Slider(
-                    value = flowTypeIndex,
-                    onValueChange = { flowTypeIndex = it },
-                    valueRange = 0f..1f,
-                    steps = 0,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Text(
-                    text = if (flowType == FAST_FLOW_TYPE_BP) "БП (30 дней)" else "СБП (15 дней)",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = FlowColors.BP_COLOR,
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
-                )
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = if (flowType == FAST_FLOW_TYPE_BP) "БП (30 дней)" else "СБП (15 дней)",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            text = if (flowType == FAST_FLOW_TYPE_BP) "Быстрый поток" else "Супер Быстрый поток",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                    }
+                    Switch(
+                        checked = flowType == FAST_FLOW_TYPE_SBP,
+                        onCheckedChange = { checked ->
+                            flowTypeIndex = if (checked) 1f else 0f
+                        }
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
