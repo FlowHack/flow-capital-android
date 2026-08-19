@@ -4,9 +4,7 @@ import android.util.Base64
 import timber.log.Timber
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
-import java.io.BufferedReader
 import java.io.InputStream
-import java.io.InputStreamReader
 import java.io.OutputStream
 import java.net.InetAddress
 import java.net.ServerSocket
@@ -27,6 +25,10 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Поддерживает:
  * - HTTPS через CONNECT (туннель в обе стороны);
  * - HTTP запросы (проксирование с добавлением авторизации).
+ *
+ * ВАЖНО: заголовки читаются ПОБАЙТНО из InputStream (без BufferedReader),
+ * чтобы не потерять начало TLS-данных (ClientHello), которые WebView
+ * отправляет сразу после CONNECT.
  *
  * @property remoteHost Хост удалённого прокси
  * @property remotePort Порт удалённого прокси
@@ -86,19 +88,22 @@ class LocalProxyServer(
     private fun handleClient(client: Socket) {
         try {
             client.soTimeout = 60000
-            val reader = BufferedReader(InputStreamReader(client.getInputStream()))
-            val requestLine = reader.readLine()
+            val clientIn = client.getInputStream()
+            val clientOut = client.getOutputStream()
+
+            // Читаем строку запроса и заголовки ПОБАЙТНО — буферизация
+            // потеряла бы начало TLS-данных (ClientHello) от WebView.
+            val requestLine = readLine(clientIn)
             if (requestLine.isNullOrBlank()) {
                 client.close()
                 return
             }
 
-            // Читаем заголовки запроса до пустой строки.
             val headers = mutableListOf<String>()
-            var line = reader.readLine()
+            var line = readLine(clientIn)
             while (line != null && line.isNotBlank()) {
                 headers.add(line)
-                line = reader.readLine()
+                line = readLine(clientIn)
             }
 
             val parts = requestLine.split(" ")
@@ -137,7 +142,7 @@ class LocalProxyServer(
                 remoteOut.write(connectRequest.toByteArray(Charsets.UTF_8))
                 remoteOut.flush()
 
-                val statusLine = readLineFromStream(remoteIn)
+                val statusLine = readLine(remoteIn)
                 if (statusLine == null || !statusLine.contains("200")) {
                     Timber.tag("LocalProxy").w("CONNECT отклонён: $statusLine")
                     client.close()
@@ -145,13 +150,13 @@ class LocalProxyServer(
                     return
                 }
                 // Пропускаем остальные заголовки ответа удалённого прокси.
-                readHeadersFromStream(remoteIn)
+                readHeaders(remoteIn)
 
                 // Клиенту (WebView) сообщаем, что туннель установлен.
-                client.getOutputStream().write("HTTP/1.1 200 Connection Established\r\n\r\n".toByteArray())
-                client.getOutputStream().flush()
+                clientOut.write("HTTP/1.1 200 Connection Established\r\n\r\n".toByteArray())
+                clientOut.flush()
 
-                tunnel(client, remote)
+                tunnel(client, remote, clientIn, clientOut, remoteIn, remoteOut)
             } else {
                 // HTTP: форвардим запрос с авторизацией и Connection: close.
                 val request = buildString {
@@ -180,7 +185,7 @@ class LocalProxyServer(
                     val body = ByteArray(contentLength)
                     var readTotal = 0
                     while (readTotal < contentLength) {
-                        val n = client.getInputStream().read(body, readTotal, contentLength - readTotal)
+                        val n = clientIn.read(body, readTotal, contentLength - readTotal)
                         if (n < 0) break
                         readTotal += n
                     }
@@ -190,7 +195,7 @@ class LocalProxyServer(
                     }
                 }
 
-                copyStream(remoteIn, client.getOutputStream())
+                copyStream(remoteIn, clientOut)
                 remote.close()
             }
         } catch (e: Exception) {
@@ -205,12 +210,21 @@ class LocalProxyServer(
 
     /**
      * Туннель в обе стороны (для CONNECT/HTTPS).
+     * Соединение живёт, пока клиент не закроет его — таймауты не нужны,
+     * иначе SSL-handshake/долгие запросы обрываются (ERR_CONNECTION_RESET).
+     * Используются переданные потоки (не новые), чтобы не потерять
+     * буферизованные данные.
      */
-    private fun tunnel(client: Socket, remote: Socket) {
-        val clientIn = client.getInputStream()
-        val clientOut = client.getOutputStream()
-        val remoteIn = remote.getInputStream()
-        val remoteOut = remote.getOutputStream()
+    private fun tunnel(
+        client: Socket,
+        remote: Socket,
+        clientIn: InputStream,
+        clientOut: OutputStream,
+        remoteIn: InputStream,
+        remoteOut: OutputStream
+    ) {
+        client.soTimeout = 0
+        remote.soTimeout = 0
 
         val toRemote = Thread {
             try {
@@ -218,7 +232,7 @@ class LocalProxyServer(
             } catch (_: Exception) {
             }
             try {
-                remote.shutdownOutput()
+                remote.close()
             } catch (_: Exception) {
             }
         }
@@ -228,18 +242,18 @@ class LocalProxyServer(
             } catch (_: Exception) {
             }
             try {
-                client.shutdownOutput()
+                client.close()
             } catch (_: Exception) {
             }
         }
         toRemote.start()
         toClient.start()
         try {
-            toRemote.join(30000)
+            toRemote.join()
         } catch (_: InterruptedException) {
         }
         try {
-            toClient.join(30000)
+            toClient.join()
         } catch (_: InterruptedException) {
         }
         try {
@@ -268,7 +282,11 @@ class LocalProxyServer(
         }
     }
 
-    private fun readLineFromStream(input: InputStream): String? {
+    /**
+     * Читает строку до \n из потока ПОБАЙТНО (без буферизации),
+     * чтобы не потерять данные, следующие за строкой.
+     */
+    private fun readLine(input: InputStream): String? {
         val sb = StringBuilder()
         while (true) {
             val b = input.read()
@@ -280,9 +298,9 @@ class LocalProxyServer(
         }
     }
 
-    private fun readHeadersFromStream(input: InputStream) {
+    private fun readHeaders(input: InputStream) {
         while (true) {
-            val line = readLineFromStream(input) ?: return
+            val line = readLine(input) ?: return
             if (line.isEmpty()) return
         }
     }
