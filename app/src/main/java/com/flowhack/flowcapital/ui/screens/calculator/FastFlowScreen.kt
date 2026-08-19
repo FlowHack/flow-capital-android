@@ -43,11 +43,13 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.Slider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -139,7 +141,6 @@ fun FastFlowScreen() {
     val days by viewModel.days.collectAsState()
     val forecastResults by viewModel.forecastResults.collectAsState()
     val currentIndex by viewModel.currentFlowIndex.collectAsState()
-    val totalAccrued by viewModel.totalAccruedAllFlows.collectAsState()
 
     var showCreateDialog by remember { mutableStateOf(false) }
     var showCorrectionDialog by remember { mutableStateOf(false) }
@@ -184,14 +185,6 @@ fun FastFlowScreen() {
         }
 
         Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = "Всего начислено: ${String.format(Locale.US, "%.2f", totalAccrued)}",
-            fontSize = 14.sp,
-            color = FlowColors.BP_COLOR,
-            modifier = Modifier.fillMaxWidth(),
-            textAlign = TextAlign.Center
-        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -575,7 +568,7 @@ fun FastFlowHistoryTable(days: List<FastFlowDayEntity>) {
                         modifier = Modifier.weight(1f),
                         fontSize = 11.sp,
                         textAlign = TextAlign.Center,
-                        color = if (day.actionType == "SUNDAY") Color.Gray else Color(0xFF4CAF50)
+                        color = if (day.actionType == "SUNDAY") Color(0xFF9C27B0) else Color(0xFF4CAF50)
                     )
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
@@ -595,7 +588,8 @@ fun CreateFastFlowDialog(
     onConfirm: (String, Double, Int, Long) -> Unit
 ) {
     AppLogger.d(TAG_FAST_SCREEN, "Открыт диалог создания БП/СБП")
-    var flowType by remember { mutableStateOf(FAST_FLOW_TYPE_BP) }
+    var flowTypeIndex by remember { mutableFloatStateOf(0f) }
+    val flowType = if (flowTypeIndex < 0.5f) FAST_FLOW_TYPE_BP else FAST_FLOW_TYPE_SBP
     var nominalText by remember { mutableStateOf("") }
     var currentDay by remember { mutableIntStateOf(1) }
     var startDate by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -645,21 +639,21 @@ fun CreateFastFlowDialog(
 
                 Text("Тип потока", fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(
+                Slider(
+                    value = flowTypeIndex,
+                    onValueChange = { flowTypeIndex = it },
+                    valueRange = 0f..1f,
+                    steps = 0,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    text = if (flowType == FAST_FLOW_TYPE_BP) "БП (30 дней)" else "СБП (15 дней)",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = FlowColors.BP_COLOR,
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilterChip(
-                        selected = flowType == FAST_FLOW_TYPE_BP,
-                        onClick = { flowType = FAST_FLOW_TYPE_BP },
-                        label = { Text("БП (30 дней)") }
-                    )
-                    FilterChip(
-                        selected = flowType == FAST_FLOW_TYPE_SBP,
-                        onClick = { flowType = FAST_FLOW_TYPE_SBP },
-                        label = { Text("СБП (15 дней)") }
-                    )
-                }
+                    textAlign = TextAlign.Center
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -925,7 +919,7 @@ fun ForecastFastFlowDialog(
                                     String.format(Locale.US, "%.2f", day.accrualAmount),
                                     fontSize = tableFontSize,
                                     textAlign = TextAlign.Center,
-                                    color = if (day.actionType == "SUNDAY") Color.Gray else Color(0xFF4CAF50)
+                                    color = if (day.actionType == "SUNDAY") Color(0xFF9C27B0) else Color(0xFF4CAF50)
                                 )
                             }
                         }
@@ -1044,7 +1038,7 @@ fun FastForecastResultsDialog(
                                     String.format(Locale.US, "%.2f", day.accrualAmount),
                                     fontSize = tableFontSize,
                                     textAlign = TextAlign.Center,
-                                    color = if (day.actionType == "SUNDAY") Color.Gray else Color(0xFF4CAF50)
+                                    color = if (day.actionType == "SUNDAY") Color(0xFF9C27B0) else Color(0xFF4CAF50)
                                 )
                             }
                         }

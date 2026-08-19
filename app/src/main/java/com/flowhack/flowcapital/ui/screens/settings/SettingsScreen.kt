@@ -63,6 +63,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -71,6 +72,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -1522,7 +1524,8 @@ private fun CalculateFastFlowDialog(
     val savedBp by settingsManager.bpCoefficientsFlow.collectAsState(initial = emptyMap())
     val savedSbp by settingsManager.sbpCoefficientsFlow.collectAsState(initial = emptyMap())
 
-    var flowType by remember { mutableStateOf(FAST_FLOW_TYPE_BP) }
+    var flowTypeIndex by remember { mutableFloatStateOf(0f) }
+    val flowType = if (flowTypeIndex < 0.5f) FAST_FLOW_TYPE_BP else FAST_FLOW_TYPE_SBP
     var nominalText by remember { mutableStateOf("") }
     var startDateMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var showStartDatePicker by remember { mutableStateOf(false) }
@@ -1555,18 +1558,21 @@ private fun CalculateFastFlowDialog(
                 Text("Введите параметры нового потока для расчёта прогноза:", fontSize = 12.sp, color = Color.Gray)
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = flowType == FAST_FLOW_TYPE_BP,
-                        onClick = { flowType = FAST_FLOW_TYPE_BP },
-                        label = { Text("БП (30 дней)") }
-                    )
-                    FilterChip(
-                        selected = flowType == FAST_FLOW_TYPE_SBP,
-                        onClick = { flowType = FAST_FLOW_TYPE_SBP },
-                        label = { Text("СБП (15 дней)") }
-                    )
-                }
+                Slider(
+                    value = flowTypeIndex,
+                    onValueChange = { flowTypeIndex = it },
+                    valueRange = 0f..1f,
+                    steps = 0,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    text = if (flowType == FAST_FLOW_TYPE_BP) "БП (30 дней)" else "СБП (15 дней)",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = FlowColors.BP_COLOR,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
@@ -1656,7 +1662,8 @@ private fun CalculateExistingFastFlowDialog(
     val savedBp by settingsManager.bpCoefficientsFlow.collectAsState(initial = emptyMap())
     val savedSbp by settingsManager.sbpCoefficientsFlow.collectAsState(initial = emptyMap())
 
-    var flowType by remember { mutableStateOf(FAST_FLOW_TYPE_BP) }
+    var flowTypeIndex by remember { mutableFloatStateOf(0f) }
+    val flowType = if (flowTypeIndex < 0.5f) FAST_FLOW_TYPE_BP else FAST_FLOW_TYPE_SBP
     var nominalText by remember { mutableStateOf("") }
     var currentDayText by remember { mutableStateOf("1") }
     var accrualText by remember { mutableStateOf("") }
@@ -1695,18 +1702,21 @@ private fun CalculateExistingFastFlowDialog(
                 Text("Введите параметры текущего состояния потока:", fontSize = 12.sp, color = Color.Gray)
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = flowType == FAST_FLOW_TYPE_BP,
-                        onClick = { flowType = FAST_FLOW_TYPE_BP },
-                        label = { Text("БП (30 дней)") }
-                    )
-                    FilterChip(
-                        selected = flowType == FAST_FLOW_TYPE_SBP,
-                        onClick = { flowType = FAST_FLOW_TYPE_SBP },
-                        label = { Text("СБП (15 дней)") }
-                    )
-                }
+                Slider(
+                    value = flowTypeIndex,
+                    onValueChange = { flowTypeIndex = it },
+                    valueRange = 0f..1f,
+                    steps = 0,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    text = if (flowType == FAST_FLOW_TYPE_BP) "БП (30 дней)" else "СБП (15 дней)",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = FlowColors.BP_COLOR,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
