@@ -2234,21 +2234,14 @@ fun ProxySettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
         AppLogger.log("ProxySettings", "Proxy list updated: ${savedProxies.size} proxies")
     }
 
-    fun simulateProxyConnection(proxyId: String, onResult: (ProxyConfig) -> Unit) {
+    fun simulateProxyConnection(proxy: ProxyConfig, onResult: (ProxyConfig) -> Unit) {
         scope.launch {
-            kotlinx.coroutines.delay(2000)
-            val proxy = savedProxies.find { it.id == proxyId }
-            if (proxy == null) {
-                onResult(ProxyConfig(
-                    id = proxyId,
-                    status = ProxyStatus.UNAVAILABLE
-                ))
-                return@launch
-            }
-
             try {
                 val startTime = System.currentTimeMillis()
-                val url = URL("https://www.google.com")
+                // Пингуем HTTP-сайт: для HTTP через прокси заголовок Proxy-Authorization
+                // отправляется в обычном запросе. Для HTTPS он должен идти в CONNECT,
+                // что на Android работает ненадёжно (пинг ложно показывал «Недоступно»).
+                val url = URL("http://www.google.com")
                 val connection = url.openConnection(proxy.toProxy()) as HttpURLConnection
                 connection.connectTimeout = 5000
                 connection.readTimeout = 5000
@@ -2271,35 +2264,31 @@ fun ProxySettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
                     val ping = (endTime - startTime).toInt()
 
                     if (connection.responseCode in 200..399) {
-                        val updatedProxy = proxy.copy(
+                        onResult(proxy.copy(
                             status = ProxyStatus.CONNECTED,
                             pingMs = ping
-                        )
-                        onResult(updatedProxy)
+                        ))
                     } else {
-                        val updatedProxy = proxy.copy(
+                        onResult(proxy.copy(
                             status = ProxyStatus.UNAVAILABLE,
                             pingMs = null
-                        )
-                        onResult(updatedProxy)
+                        ))
                     }
                 } catch (e: Exception) {
                     AppLogger.e("ProxySettings", "Ошибка подключения к прокси", e)
-                    val updatedProxy = proxy.copy(
+                    onResult(proxy.copy(
                         status = ProxyStatus.UNAVAILABLE,
                         pingMs = null
-                    )
-                    onResult(updatedProxy)
+                    ))
                 } finally {
                     connection.disconnect()
                 }
             } catch (e: Exception) {
                 AppLogger.e("ProxySettings", "Ошибка создания подключения к прокси", e)
-                val updatedProxy = proxy.copy(
+                onResult(proxy.copy(
                     status = ProxyStatus.UNAVAILABLE,
                     pingMs = null
-                )
-                onResult(updatedProxy)
+                ))
             }
         }
     }
@@ -2339,7 +2328,7 @@ fun ProxySettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
             scope.launch {
                 proxyStorage.addProxy(newProxy)
                 val addedProxy = savedProxies.lastOrNull() ?: newProxy
-                simulateProxyConnection(addedProxy.id) { updatedProxy ->
+                simulateProxyConnection(addedProxy) { updatedProxy ->
                     scope.launch {
                         proxyStorage.updateProxy(updatedProxy)
                     }
@@ -2365,7 +2354,7 @@ fun ProxySettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
             )
             scope.launch {
                 proxyStorage.updateProxy(updatedProxy)
-                simulateProxyConnection(updatedProxy.id) { resultProxy ->
+                simulateProxyConnection(updatedProxy) { resultProxy ->
                     scope.launch {
                         proxyStorage.updateProxy(resultProxy)
                     }
