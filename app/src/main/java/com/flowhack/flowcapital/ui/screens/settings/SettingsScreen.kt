@@ -2246,23 +2246,22 @@ fun ProxySettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
 
             try {
                 val startTime = System.currentTimeMillis()
-                // Для HTTP-прокси с авторизацией задаём глобальный Authenticator.
-                if (proxy.type == ProxyType.HTTP && !proxy.username.isNullOrBlank()) {
-                    java.net.Authenticator.setDefault(object : java.net.Authenticator() {
-                        override fun getPasswordAuthentication(): java.net.PasswordAuthentication {
-                            return java.net.PasswordAuthentication(
-                                proxy.username,
-                                proxy.password?.toCharArray()
-                            )
-                        }
-                    })
-                }
                 val url = URL("https://www.google.com")
                 val connection = url.openConnection(proxy.toProxy()) as HttpURLConnection
                 connection.connectTimeout = 5000
                 connection.readTimeout = 5000
                 connection.requestMethod = "HEAD"
                 connection.instanceFollowRedirects = false
+                // На Android java.net.Authenticator не работает — авторизация прокси
+                // передаётся явным заголовком Proxy-Authorization (Basic).
+                if (!proxy.username.isNullOrBlank()) {
+                    val credentials = "${proxy.username}:${proxy.password ?: ""}"
+                    val encoded = android.util.Base64.encodeToString(
+                        credentials.toByteArray(Charsets.UTF_8),
+                        android.util.Base64.NO_WRAP
+                    )
+                    connection.setRequestProperty("Proxy-Authorization", "Basic $encoded")
+                }
 
                 try {
                     connection.connect()
@@ -3299,7 +3298,8 @@ private suspend fun exportSettingsToJson(context: Context, uri: Uri, settingsMan
             browserFabOffsetY = settingsManager.browserFabOffsetYFlow.first(),
             skipAutoUpdate = settingsManager.skipAutoUpdateFlow.first(),
             skippedVersion = settingsManager.skippedVersionFlow.first(),
-            proxiesJson = ProxyStorage(context).getProxiesJson()
+            proxiesJson = ProxyStorage(context).getProxiesJson(),
+            smartNotifications = settingsManager.smartNotificationsFlow.first()
         )
 
         val json = Json.encodeToString(FullBackupData.serializer(), exportData)
@@ -3358,7 +3358,7 @@ private suspend fun importSettingsFromJson(context: Context, uri: Uri, settingsM
             AppLogger.d("SettingsScreen", "Начата транзакция Room")
 
             database.growingFlowDao().clearAll()
-            importData.growingFlowHistory.forEach { backup ->
+            importData.growingFlowHistory?.forEach { backup ->
                 database.growingFlowDao().insert(
                     GrowingFlowEntity(
                         id = backup.id,
@@ -3373,10 +3373,10 @@ private suspend fun importSettingsFromJson(context: Context, uri: Uri, settingsM
                     )
                 )
             }
-            AppLogger.d("SettingsScreen", "Импортировано РП: ${importData.growingFlowHistory.size} записей")
+            AppLogger.d("SettingsScreen", "Импортировано РП: ${importData.growingFlowHistory?.size ?: 0} записей")
 
             database.noviceFlowDao().clearAll()
-            importData.noviceFlowHistory.forEach { backup ->
+            importData.noviceFlowHistory?.forEach { backup ->
                 database.noviceFlowDao().insert(
                     NoviceFlowEntity(
                         id = backup.id,
@@ -3391,11 +3391,11 @@ private suspend fun importSettingsFromJson(context: Context, uri: Uri, settingsM
                     )
                 )
             }
-            AppLogger.d("SettingsScreen", "Импортировано ПН: ${importData.noviceFlowHistory.size} записей")
+            AppLogger.d("SettingsScreen", "Импортировано ПН: ${importData.noviceFlowHistory?.size ?: 0} записей")
 
             database.premiumStartPeriodDao().clearAll()
             database.premiumStartFlowDao().clearAll()
-            importData.pspFlows.forEach { backup ->
+            importData.pspFlows?.forEach { backup ->
                 database.premiumStartFlowDao().insert(
                     PremiumStartFlowEntity(
                         id = backup.id,
@@ -3407,9 +3407,9 @@ private suspend fun importSettingsFromJson(context: Context, uri: Uri, settingsM
                     )
                 )
             }
-            AppLogger.d("SettingsScreen", "Импортировано ПСП потоков: ${importData.pspFlows.size}")
+            AppLogger.d("SettingsScreen", "Импортировано ПСП потоков: ${importData.pspFlows?.size ?: 0}")
 
-            importData.pspPeriods.forEach { backup ->
+            importData.pspPeriods?.forEach { backup ->
                 database.premiumStartPeriodDao().insert(
                     PremiumStartPeriodEntity(
                         id = backup.id,
@@ -3425,7 +3425,7 @@ private suspend fun importSettingsFromJson(context: Context, uri: Uri, settingsM
                     )
                 )
             }
-            AppLogger.d("SettingsScreen", "Импортировано периодов ПСП: ${importData.pspPeriods.size}")
+            AppLogger.d("SettingsScreen", "Импортировано периодов ПСП: ${importData.pspPeriods?.size ?: 0}")
 
             database.fastFlowDayDao().clearAll()
             database.fastFlowDao().clearAll()
@@ -3470,10 +3470,10 @@ private suspend fun importSettingsFromJson(context: Context, uri: Uri, settingsM
         importData.pnBonusPercent?.let {
             settingsManager.savePnPercentages(it, importData.pnDailyPercent ?: 2.0)
         }
-        importData.eRubCoefficients.let {
+        importData.eRubCoefficients?.let {
             settingsManager.saveERubCoefficients(it)
         }
-        importData.pspCoefficients.let {
+        importData.pspCoefficients?.let {
             settingsManager.savePspCoefficients(it)
         }
         importData.bpCoefficients?.let { settingsManager.saveBpCoefficients(it) }
@@ -3493,6 +3493,7 @@ private suspend fun importSettingsFromJson(context: Context, uri: Uri, settingsM
         importData.skipAutoUpdate?.let { settingsManager.setSkipAutoUpdate(it) }
         importData.skippedVersion?.let { settingsManager.setSkippedVersion(it) }
         importData.proxiesJson?.let { ProxyStorage(context).saveProxiesJson(it) }
+        importData.smartNotifications?.let { settingsManager.setSmartNotifications(it) }
 
         rescheduleSavedReminders(context, settingsManager)
         AppLogger.d("SettingsScreen", "Импорт завершён успешно")
@@ -3582,12 +3583,12 @@ data class FullBackupData(
     val dailyAddition: Double?,
     val pnBonusPercent: Double?,
     val pnDailyPercent: Double?,
-    val eRubCoefficients: Map<Double, Double>,
-    val pspCoefficients: Map<Int, Double>,
-    val growingFlowHistory: List<GrowingFlowEntityBackup>,
-    val noviceFlowHistory: List<NoviceFlowEntityBackup>,
-    val pspFlows: List<PremiumStartFlowBackup>,
-    val pspPeriods: List<PremiumStartPeriodBackup>,
+    val eRubCoefficients: Map<Double, Double>? = null,
+    val pspCoefficients: Map<Int, Double>? = null,
+    val growingFlowHistory: List<GrowingFlowEntityBackup>? = null,
+    val noviceFlowHistory: List<NoviceFlowEntityBackup>? = null,
+    val pspFlows: List<PremiumStartFlowBackup>? = null,
+    val pspPeriods: List<PremiumStartPeriodBackup>? = null,
     val bpCoefficients: Map<Double, Double>? = null,
     val sbpCoefficients: Map<Double, Double>? = null,
     val fastFlows: List<FastFlowBackup>? = null,
@@ -3604,7 +3605,8 @@ data class FullBackupData(
     val browserFabOffsetY: Int? = null,
     val skipAutoUpdate: Boolean? = null,
     val skippedVersion: String? = null,
-    val proxiesJson: String? = null
+    val proxiesJson: String? = null,
+    val smartNotifications: Boolean? = null
 )
 
 /**

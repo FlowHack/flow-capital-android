@@ -99,7 +99,8 @@ fun BrowserScreen(viewModel: BrowserViewModel) {
     val enabledProxies = remember(proxies, siteName) {
         if (siteName == null) emptyList()
         else proxies.filter {
-            it.status == ProxyStatus.CONNECTED && siteName in it.enabledForSites
+            it.status == ProxyStatus.CONNECTED &&
+                (it.enabledForSites.isEmpty() || siteName in it.enabledForSites)
         }.sortedBy { it.pingMs ?: Int.MAX_VALUE }
     }
 
@@ -297,7 +298,6 @@ private fun applyProxyToWebView(proxy: ProxyConfig?) {
                     "http://${proxy.server}:${proxy.port}"
                 }
             }
-            else -> "socks://${proxy.server}:${proxy.port}"
         }
         val proxyConfig = WebKitProxyConfig.Builder()
             .addProxyRule(proxyRule)

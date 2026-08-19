@@ -126,8 +126,7 @@ object ProxyValidator {
             errors = errors
         )
     }
-
-    }
+}
 
 /**
  * Калькулятор бонусов eRub.
