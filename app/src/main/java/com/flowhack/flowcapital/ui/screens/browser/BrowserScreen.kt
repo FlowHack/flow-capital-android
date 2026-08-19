@@ -6,6 +6,7 @@ import android.webkit.CookieManager
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -32,13 +33,13 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -127,18 +128,28 @@ fun BrowserScreen(viewModel: BrowserViewModel) {
 
         if (activeTab != null) {
             Box(modifier = Modifier.fillMaxSize()) {
-                key(activeTab.id) {
-                    AndroidView(
-                        modifier = Modifier.fillMaxSize(),
-                        factory = {
-                            // Отцепляем WebView от прежнего родителя (поворот экрана,
-                            // повторное использование вкладки), чтобы избежать
-                            // исключения "child already has a parent".
-                            (activeTab.webView.parent as? ViewGroup)?.removeView(activeTab.webView)
-                            activeTab.webView
+                AndroidView(
+                    modifier = Modifier.fillMaxSize(),
+                    factory = { FrameLayout(context) },
+                    update = { container ->
+                        // Добавляем активный WebView в контейнер. При переключении
+                        // вкладок контейнер обновляется: старый WebView удаляется,
+                        // новый добавляется. WebView живут в ViewModel, поэтому
+                        // состояние страниц сохраняется.
+                        val webView = activeTab.webView
+                        if (container.getChildAt(0) !== webView) {
+                            container.removeAllViews()
+                            (webView.parent as? ViewGroup)?.removeView(webView)
+                            container.addView(
+                                webView,
+                                FrameLayout.LayoutParams(
+                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                    ViewGroup.LayoutParams.MATCH_PARENT
+                                )
+                            )
                         }
-                    )
-                }
+                    }
+                )
 
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -152,7 +163,14 @@ fun BrowserScreen(viewModel: BrowserViewModel) {
                             }
                     ) {
                         FloatingActionButton(
-                            onClick = { activeTab.webView.reload() },
+                            onClick = {
+                                // Надёжная перезагрузка: даже если страница не
+                                // загрузилась (ошибка сети), loadUrl перезагрузит её.
+                                val webView = activeTab.webView
+                                val currentUrl = webView.url ?: activeTab.url
+                                webView.stopLoading()
+                                webView.loadUrl(currentUrl)
+                            },
                             containerColor = if (isDragging > 0) {
                                 MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
                             } else {
@@ -237,12 +255,22 @@ private fun BrowserEmptyPlaceholder(onOpenSite: (String) -> Unit) {
                         onClick = { onOpenSite(site.url) },
                         modifier = Modifier.size(48.dp)
                     ) {
-                        Icon(
-                            painter = painterResource(id = site.iconRes),
-                            contentDescription = site.name,
-                            tint = Color.Unspecified,
-                            modifier = Modifier.size(40.dp)
-                        )
+                        // Светлая круглая подложка, чтобы тёмные логотипы
+                        // (например, BlackBit) были видны на любом фоне.
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(Color.White),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(id = site.iconRes),
+                                contentDescription = site.name,
+                                tint = Color.Unspecified,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
                     }
                 }
             }

@@ -2,6 +2,8 @@ package com.flowhack.flowcapital.ui.screens.browser
 
 import android.app.Application
 import android.webkit.CookieManager
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -9,6 +11,7 @@ import androidx.lifecycle.AndroidViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import timber.log.Timber
 
 /**
  * ViewModel вкладок браузера.
@@ -80,7 +83,24 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
         }
 
         val webView = WebView(appContext).apply {
-            webViewClient = WebViewClient()
+            webViewClient = object : WebViewClient() {
+                override fun onReceivedError(
+                    view: WebView?,
+                    request: WebResourceRequest?,
+                    error: WebResourceError?
+                ) {
+                    super.onReceivedError(view, request, error)
+                    Timber.tag("BrowserViewModel").e(
+                        "Ошибка загрузки ${view?.url}: код=${error?.errorCode} " +
+                            "описание=${error?.description}"
+                    )
+                }
+
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    Timber.tag("BrowserViewModel").d("Страница загружена: $url")
+                }
+            }
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
