@@ -52,6 +52,7 @@ import androidx.webkit.WebViewFeature
 import com.flowhack.flowcapital.data.proxy.ProxyConfig
 import com.flowhack.flowcapital.data.proxy.ProxyStatus
 import com.flowhack.flowcapital.data.proxy.ProxyStorage
+import com.flowhack.flowcapital.data.proxy.ProxyType
 import com.flowhack.flowcapital.data.settings.SettingsManager
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -287,8 +288,19 @@ private fun applyProxyToWebView(proxy: ProxyConfig?) {
     }
 
     try {
+        val proxyRule = when (proxy.type) {
+            ProxyType.HTTP -> {
+                // HTTP-прокси поддерживает авторизацию через user:pass@ в URL.
+                if (!proxy.username.isNullOrBlank()) {
+                    "http://${proxy.username}:${proxy.password}@${proxy.server}:${proxy.port}"
+                } else {
+                    "http://${proxy.server}:${proxy.port}"
+                }
+            }
+            else -> "socks://${proxy.server}:${proxy.port}"
+        }
         val proxyConfig = WebKitProxyConfig.Builder()
-            .addProxyRule("socks://${proxy.server}:${proxy.port}")
+            .addProxyRule(proxyRule)
             .build()
 
         val executor = Executors.newSingleThreadExecutor()

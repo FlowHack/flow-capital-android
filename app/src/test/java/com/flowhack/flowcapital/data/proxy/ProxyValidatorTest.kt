@@ -46,44 +46,24 @@ class ProxyValidatorTest {
     }
 
     @Test
-    fun validateSocks5Proxy_validConfig_returnsValid() {
-        val result = ProxyValidator.validateSocks5Proxy("192.168.1.1", "1080", "user", "pass")
-
+    fun validateHttpProxy_withValidData_returnsValid() {
+        val result = ProxyValidator.validateHttpProxy("1.2.3.4", "8080", null, null)
         assertTrue(result.isValid)
         assertTrue(result.errors.isEmpty())
     }
 
     @Test
-    fun validateSocks5Proxy_invalidIp_returnsError() {
-        val result = ProxyValidator.validateSocks5Proxy("999.1.1.1", "1080", "user", "pass")
-
+    fun validateHttpProxy_withInvalidIp_returnsError() {
+        val result = ProxyValidator.validateHttpProxy("999.1.1.1", "8080", null, null)
         assertFalse(result.isValid)
         assertTrue(result.errors.any { it.contains("IP") })
     }
 
     @Test
-    fun validateSocks5Proxy_missingCredentials_returnsErrors() {
-        val result = ProxyValidator.validateSocks5Proxy("192.168.1.1", "1080", null, null)
-
+    fun validateHttpProxy_withInvalidPort_returnsError() {
+        val result = ProxyValidator.validateHttpProxy("1.2.3.4", "70000", null, null)
         assertFalse(result.isValid)
-        assertTrue(result.errors.any { it.contains("Логин") })
-        assertTrue(result.errors.any { it.contains("Пароль") })
-    }
-
-    @Test
-    fun validateMtProtoProxy_validConfig_returnsValid() {
-        val result = ProxyValidator.validateMtProtoProxy("192.168.1.1", "443", "secret-key")
-
-        assertTrue(result.isValid)
-        assertTrue(result.errors.isEmpty())
-    }
-
-    @Test
-    fun validateMtProtoProxy_missingSecret_returnsError() {
-        val result = ProxyValidator.validateMtProtoProxy("192.168.1.1", "443", null)
-
-        assertFalse(result.isValid)
-        assertTrue(result.errors.any { it.contains("Ключ") })
+        assertTrue(result.errors.any { it.contains("Порт") })
     }
 }
 

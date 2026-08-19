@@ -6,10 +6,8 @@ import java.net.Proxy
  * Тип прокси-сервера.
  */
 enum class ProxyType {
-    /** SOCKS5 прокси */
-    SOCKS5,
-    /** MTProto прокси */
-    MTPROTO
+    /** HTTP прокси. Поддерживает и HTTPS-сайты через CONNECT. */
+    HTTP
 }
 
 /**
@@ -30,30 +28,28 @@ enum class ProxyStatus {
  * Конфигурация прокси-сервера.
  *
  * @property id Уникальный идентификатор
- * @property type Тип прокси (SOCKS5 или MTPROTO)
+ * @property type Тип прокси (HTTP)
  * @property server Адрес сервера
  * @property port Порт сервера
- * @property username Логин (для SOCKS5)
- * @property password Пароль (для SOCKS5)
- * @property secret Секретный ключ (для MTPROTO)
+ * @property username Логин (опционально)
+ * @property password Пароль (опционально)
  * @property status Статус подключения
  * @property pingMs Время отклика в миллисекундах
  * @property enabledForSites Список сайтов для которых включён прокси
  */
 data class ProxyConfig(
     val id: String = java.util.UUID.randomUUID().toString(),
-    val type: ProxyType = ProxyType.SOCKS5,
+    val type: ProxyType = ProxyType.HTTP,
     val server: String = "",
     val port: Int = 0,
     val username: String? = null,
     val password: String? = null,
-    val secret: String? = null,
     val status: ProxyStatus = ProxyStatus.DISCONNECTED,
     val pingMs: Int? = null,
     val enabledForSites: Set<String> = emptySet()
 ) {
     fun toProxy(): Proxy {
-        return Proxy(Proxy.Type.SOCKS, java.net.InetSocketAddress(server, port))
+        return Proxy(Proxy.Type.HTTP, java.net.InetSocketAddress(server, port))
     }
 }
 
@@ -101,14 +97,15 @@ object ProxyValidator {
     }
 
     /**
-     * Проверить конфигурацию SOCKS5 прокси.
+     * Проверить конфигурацию HTTP прокси.
+     * Логин и пароль опциональны (многие HTTP прокси работают без авторизации).
      * @param server IP-адрес сервера
      * @param port Порт
-     * @param username Логин
-     * @param password Пароль
+     * @param username Логин (опционально)
+     * @param password Пароль (опционально)
      * @return Результат валидации со списком ошибок
      */
-    fun validateSocks5Proxy(
+    fun validateHttpProxy(
         server: String,
         port: String,
         username: String?,
@@ -124,52 +121,13 @@ object ProxyValidator {
             errors.add("Порт должен быть от 1 до 65535")
         }
 
-        if (username.isNullOrBlank()) {
-            errors.add("Логин обязателен")
-        }
-
-        if (password.isNullOrBlank()) {
-            errors.add("Пароль обязателен")
-        }
-
         return ProxyValidationResult(
             isValid = errors.isEmpty(),
             errors = errors
         )
     }
 
-    /**
-     * Проверить конфигурацию MTProto прокси.
-     * @param server IP-адрес сервера
-     * @param port Порт
-     * @param secret Ключ
-     * @return Результат валидации со списком ошибок
-     */
-    fun validateMtProtoProxy(
-        server: String,
-        port: String,
-        secret: String?
-    ): ProxyValidationResult {
-        val errors = mutableListOf<String>()
-
-        if (!validateIpAddress(server)) {
-            errors.add("Неверный формат IP адреса")
-        }
-
-        if (!validatePort(port)) {
-            errors.add("Порт должен быть от 1 до 65535")
-        }
-
-        if (secret.isNullOrBlank()) {
-            errors.add("Ключ обязателен")
-        }
-
-        return ProxyValidationResult(
-            isValid = errors.isEmpty(),
-            errors = errors
-        )
     }
-}
 
 /**
  * Калькулятор бонусов eRub.

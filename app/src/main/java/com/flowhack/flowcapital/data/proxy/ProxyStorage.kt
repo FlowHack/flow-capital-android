@@ -49,12 +49,13 @@ class ProxyStorage(private val context: Context) {
                     val obj = jsonArray.getJSONObject(index)
                     ProxyConfig(
                         id = obj.optString("id", java.util.UUID.randomUUID().toString()),
-                        type = ProxyType.valueOf(obj.optString("type", "SOCKS5")),
+                        type = runCatching {
+                            ProxyType.valueOf(obj.optString("type", "HTTP"))
+                        }.getOrDefault(ProxyType.HTTP),
                         server = obj.optString("server", ""),
                         port = obj.optInt("port", 0),
                         username = obj.optString("username", "").takeIf { it.isNotBlank() && it != "null" },
                         password = obj.optString("password", "").takeIf { it.isNotBlank() && it != "null" },
-                        secret = obj.optString("secret", "").takeIf { it.isNotBlank() && it != "null" },
                         status = ProxyStatus.valueOf(obj.optString("status", "DISCONNECTED")),
                         pingMs = if (obj.has("pingMs") && !obj.isNull("pingMs")) obj.getInt("pingMs") else null,
                         enabledForSites = obj.optJSONArray("enabledForSites")?.let { arr ->
@@ -82,7 +83,6 @@ class ProxyStorage(private val context: Context) {
                 put("port", proxy.port)
                 put("username", proxy.username ?: JSONObject.NULL)
                 put("password", proxy.password ?: JSONObject.NULL)
-                put("secret", proxy.secret ?: JSONObject.NULL)
                 put("status", proxy.status.name)
                 put("pingMs", if (proxy.pingMs != null) proxy.pingMs else JSONObject.NULL)
                 put("enabledForSites", JSONArray(proxy.enabledForSites.toList()))

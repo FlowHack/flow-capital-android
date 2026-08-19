@@ -2219,12 +2219,11 @@ fun ProxySettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
     var showAddDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf<ProxyConfig?>(null) }
     var showDeleteConfirmDialog by remember { mutableStateOf<String?>(null) }
-    var selectedProxyType by remember { mutableStateOf(ProxyType.SOCKS5) }
+    var selectedProxyType by remember { mutableStateOf(ProxyType.HTTP) }
     var server by remember { mutableStateOf("") }
     var port by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var secret by remember { mutableStateOf("") }
     var validationErrors by remember { mutableStateOf<List<String>>(emptyList()) }
 
     val isAddButtonEnabled = savedProxies.size < MAX_PROXIES
@@ -2247,6 +2246,17 @@ fun ProxySettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
 
             try {
                 val startTime = System.currentTimeMillis()
+                // Для HTTP-прокси с авторизацией задаём глобальный Authenticator.
+                if (proxy.type == ProxyType.HTTP && !proxy.username.isNullOrBlank()) {
+                    java.net.Authenticator.setDefault(object : java.net.Authenticator() {
+                        override fun getPasswordAuthentication(): java.net.PasswordAuthentication {
+                            return java.net.PasswordAuthentication(
+                                proxy.username,
+                                proxy.password?.toCharArray()
+                            )
+                        }
+                    })
+                }
                 val url = URL("https://www.google.com")
                 val connection = url.openConnection(proxy.toProxy()) as HttpURLConnection
                 connection.connectTimeout = 5000
@@ -2299,27 +2309,22 @@ fun ProxySettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
         port = proxy.port.toString()
         username = proxy.username ?: ""
         password = proxy.password ?: ""
-        secret = proxy.secret ?: ""
         validationErrors = emptyList()
         showEditDialog = proxy
     }
 
     fun openAddDialog() {
-        selectedProxyType = ProxyType.SOCKS5
+        selectedProxyType = ProxyType.HTTP
         server = ""
         port = ""
         username = ""
         password = ""
-        secret = ""
         validationErrors = emptyList()
         showAddDialog = true
     }
 
     fun connectProxy() {
-        val validationResult = when (selectedProxyType) {
-            ProxyType.SOCKS5 -> ProxyValidator.validateSocks5Proxy(server, port, username, password)
-            ProxyType.MTPROTO -> ProxyValidator.validateMtProtoProxy(server, port, secret)
-        }
+        val validationResult = ProxyValidator.validateHttpProxy(server, port, username, password)
 
         if (validationResult.isValid) {
             val newProxy = ProxyConfig(
@@ -2328,7 +2333,6 @@ fun ProxySettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
                 port = port.toIntOrNull() ?: 0,
                 username = username.takeIf { it.isNotBlank() },
                 password = password.takeIf { it.isNotBlank() },
-                secret = secret.takeIf { it.isNotBlank() },
                 status = ProxyStatus.CONNECTING
             )
             scope.launch {
@@ -2347,10 +2351,7 @@ fun ProxySettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
     }
 
     fun editProxy(existingProxy: ProxyConfig) {
-        val validationResult = when (selectedProxyType) {
-            ProxyType.SOCKS5 -> ProxyValidator.validateSocks5Proxy(server, port, username, password)
-            ProxyType.MTPROTO -> ProxyValidator.validateMtProtoProxy(server, port, secret)
-        }
+        val validationResult = ProxyValidator.validateHttpProxy(server, port, username, password)
 
         if (validationResult.isValid) {
             val updatedProxy = existingProxy.copy(
@@ -2359,7 +2360,6 @@ fun ProxySettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
                 port = port.toIntOrNull() ?: 0,
                 username = username.takeIf { it.isNotBlank() },
                 password = password.takeIf { it.isNotBlank() },
-                secret = secret.takeIf { it.isNotBlank() },
                 status = ProxyStatus.CONNECTING
             )
             scope.launch {
@@ -2486,17 +2486,11 @@ fun ProxySettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
     if (showAddDialog) {
         ProxyAddEditDialog(
             title = "Добавить прокси",
-            proxyType = selectedProxyType,
             server = server,
             port = port,
             username = username,
             password = password,
-            secret = secret,
             validationErrors = validationErrors,
-            onProxyTypeChange = {
-                selectedProxyType = it
-                validationErrors = emptyList()
-            },
             onServerChange = {
                 server = it
                 validationErrors = emptyList()
@@ -2511,10 +2505,6 @@ fun ProxySettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
             },
             onPasswordChange = {
                 password = it
-                validationErrors = emptyList()
-            },
-            onSecretChange = {
-                secret = it
                 validationErrors = emptyList()
             },
             onDismiss = { showAddDialog = false },
@@ -2525,17 +2515,11 @@ fun ProxySettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
     showEditDialog?.let { proxy ->
         ProxyAddEditDialog(
             title = "Редактировать прокси",
-            proxyType = selectedProxyType,
             server = server,
             port = port,
             username = username,
             password = password,
-            secret = secret,
             validationErrors = validationErrors,
-            onProxyTypeChange = {
-                selectedProxyType = it
-                validationErrors = emptyList()
-            },
             onServerChange = {
                 server = it
                 validationErrors = emptyList()
@@ -2550,10 +2534,6 @@ fun ProxySettingsCard(scope: CoroutineScope = rememberCoroutineScope()) {
             },
             onPasswordChange = {
                 password = it
-                validationErrors = emptyList()
-            },
-            onSecretChange = {
-                secret = it
                 validationErrors = emptyList()
             },
             onDismiss = { showEditDialog = null },
@@ -2641,19 +2621,15 @@ private fun ProxyItem(
 @Composable
 private fun ProxyAddEditDialog(
     title: String,
-    proxyType: ProxyType,
     server: String,
     port: String,
     username: String,
     password: String,
-    secret: String,
     validationErrors: List<String>,
-    onProxyTypeChange: (ProxyType) -> Unit,
     onServerChange: (String) -> Unit,
     onPortChange: (String) -> Unit,
     onUsernameChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
-    onSecretChange: (String) -> Unit,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
@@ -2668,27 +2644,11 @@ private fun ProxyAddEditDialog(
         },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(
-                            selected = proxyType == ProxyType.SOCKS5,
-                            onClick = { onProxyTypeChange(ProxyType.SOCKS5) },
-                            colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFE53935))
-                        )
-                        Text("SOCKS5", fontSize = 14.sp)
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(
-                            selected = proxyType == ProxyType.MTPROTO,
-                            onClick = { onProxyTypeChange(ProxyType.MTPROTO) },
-                            colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFE53935))
-                        )
-                        Text("MTProto", fontSize = 14.sp)
-                    }
-                }
+                Text(
+                    text = "HTTP прокси (поддерживает и HTTPS-сайты)",
+                    fontSize = 12.sp,
+                    color = Color.Gray
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -2714,38 +2674,26 @@ private fun ProxyAddEditDialog(
                     isError = validationErrors.any { it.contains("Порт") }
                 )
 
-                if (proxyType == ProxyType.SOCKS5) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = username,
-                        onValueChange = onUsernameChange,
-                        label = { Text("Логин") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        isError = validationErrors.any { it.contains("Логин") }
-                    )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = onUsernameChange,
+                    label = { Text("Логин (необязательно)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    isError = validationErrors.any { it.contains("Логин") }
+                )
 
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = onPasswordChange,
-                        label = { Text("Пароль") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
-                        isError = validationErrors.any { it.contains("Пароль") }
-                    )
-                } else {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = secret,
-                        onValueChange = onSecretChange,
-                        label = { Text("Ключ") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        isError = validationErrors.any { it.contains("Ключ") }
-                    )
-                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = onPasswordChange,
+                    label = { Text("Пароль (необязательно)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    isError = validationErrors.any { it.contains("Пароль") }
+                )
 
                 if (validationErrors.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(8.dp))
